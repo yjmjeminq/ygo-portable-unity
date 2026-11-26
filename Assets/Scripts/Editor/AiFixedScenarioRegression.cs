@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using YGOPortable.AI;
@@ -20,7 +21,7 @@ namespace YGOPortable.Editor
     /// </summary>
     public static class AiFixedScenarioRegression
     {
-        [Serializable] private sealed class FilePin { public string path, sha256; }
+        [Serializable] private sealed class FilePin { public string path, sha256, alternateSha256; }
         [Serializable] private sealed class Manifest
         {
             public int schemaVersion;
@@ -113,8 +114,12 @@ namespace YGOPortable.Editor
                     "Missing or unsupported fixed regression manifest.");
                 foreach (var pin in manifest.files)
                 {
-                    string actual = Hash(Inside(root, pin.path));
-                    Require(string.Equals(actual, pin.sha256, StringComparison.OrdinalIgnoreCase),
+                    string file = Inside(root, pin.path);
+                    bool fixture = pin.path.StartsWith("Tools/AiRegression/", StringComparison.Ordinal) &&
+                        pin.path.EndsWith(".json", StringComparison.Ordinal);
+                    string actual = Hash(file, normalizeFixtureLines: fixture);
+                    Require(string.Equals(actual, pin.sha256, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(actual, pin.alternateSha256, StringComparison.OrdinalIgnoreCase),
                         $"Pinned native/card/fixture data changed: {pin.path}; expected {pin.sha256}, actual {actual}.");
                 }
                 report.fixtureManifestSha256 = Hash(manifestPath);
@@ -633,9 +638,14 @@ namespace YGOPortable.Editor
             foreach (string file in files.OrderBy(value => value, StringComparer.Ordinal))
                 yield return new FilePin { path = file.Substring(root.Length + 1).Replace('\\', '/'), sha256 = Hash(file) };
         }
-        private static string Hash(string path)
+        private static string Hash(string path, bool normalizeFixtureLines = false)
         {
             using var algorithm = SHA256.Create();
+            if (normalizeFixtureLines)
+            {
+                byte[] data = Encoding.UTF8.GetBytes(File.ReadAllText(path, Encoding.UTF8).Replace("\r\n", "\n"));
+                return BitConverter.ToString(algorithm.ComputeHash(data)).Replace("-", "").ToLowerInvariant();
+            }
             using var stream = File.OpenRead(path);
             return BitConverter.ToString(algorithm.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
         }

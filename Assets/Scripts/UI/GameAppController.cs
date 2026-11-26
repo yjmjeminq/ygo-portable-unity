@@ -572,13 +572,15 @@ namespace YGOPortable.UI
             var (deck, level, levelCount) = _storyMode.GetOpponentMatch(episode);
             float deckStrength = levelCount > 1 ? (level - 1f) / (levelCount - 1f) : (episode.chapter - 1f) / 4f;
             bool gxRpg = _storyMode.IsGxRpg;
-            if (gxRpg) deckStrength = (Mathf.Clamp(deck?.difficultyTier ?? 1, 1, 4) - 1f) / 3f;
             bool elite = levelCount > 0 && level >= Math.Min(9, levelCount);
             float planningScale = elite || _storyMode.GetRaid(episode) != null ? ComboSearch.MaxPlanningScale :
-                Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, deckStrength);
+                gxRpg ? GxStoryPlanningScale(deck?.difficultyTier ?? 1) : Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, deckStrength);
             StartDuelMatch(opponent, deck, myDeck, playerGoesFirst, isStoryDuel: true, planningScale: planningScale,
                 opponentDifficulty: gxRpg || elite ? AIDifficulty.Master : AiDifficulty);
         }
+
+        internal static float GxStoryPlanningScale(int difficultyTier) =>
+            Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, (Mathf.Clamp(difficultyTier, 1, 4) - 1f) / 3f);
 
         internal void StartTournamentDuel(DimensionTournament run, UserDeck myDeck)
         {

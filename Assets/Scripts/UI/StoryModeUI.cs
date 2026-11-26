@@ -251,8 +251,11 @@ namespace YGOPortable.UI
             string reward = null;
             bool gx = IsGxRpg;
             bool gxLoss = !won && gx;
+            var resultLines = gx && draw
+                ? new[] { new StoryDialogueLine { text = "듀얼 종료 신호가 울렸다. 이번 승부는 무승부였다." } }
+                : won ? episode.postWinDialogues : episode.postLoseDialogues;
             _finishFieldResult = ReturnToField;
-            PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues,
+            PlayDialogue(episode, resultLines,
                 $"{TitleOf(episode)} · {result}", won ? ReturnToField : FinishDefeat);
             if (gxLoss) FinishDefeat();
 
@@ -295,11 +298,11 @@ namespace YGOPortable.UI
                     _dialogue.ShowChoices(Summary, retry,
                         new("덱 변경 후 재도전", () => PickDeck(Retry), () => episode.forcedPlayerDeckId == 0),
                         new("필드로 복귀", ReturnToField),
-                        new("패배 대화 보기", () =>
+                        new(draw ? "무승부 장면 보기" : "패배 대화 보기", () =>
                         {
                             _finishFieldResult = FinishDefeat;
-                            PlayDialogue(episode, episode.postLoseDialogues, $"{TitleOf(episode)} · {result}", FinishDefeat);
-                        }, () => episode.postLoseDialogues?.Length > 0));
+                            PlayDialogue(episode, resultLines, $"{TitleOf(episode)} · {result}", FinishDefeat);
+                        }, () => resultLines?.Length > 0));
                 }
                 else _dialogue.ShowChoices(Summary, retry,
                     new("대화부터 다시", () => OpenEpisode(index), () => index >= 0),
@@ -400,6 +403,9 @@ namespace YGOPortable.UI
             }
             if (_returnFromTurnOrder != null) CancelTurnOrder();
             else if (_returnFromOpeningPicker != null) CloseOpeningPicker();
+            // Returning to the field during an automatic scene immediately opens that same scene again.
+            else if (IsGxRpg && FromRpgField && _app.RpgField.Root.activeSelf && Script.episodes[_selectedIndex].isCutsceneOnly)
+                _app.ShowScreen(AppScreen.MainMenu);
             else ReturnToEpisodes();
         }
 

@@ -491,6 +491,7 @@ namespace YGOPortable.AI
         {
             var line = new Line();
             int settledMoves = 0;
+            int ritualAceSpend = int.MaxValue;
             int startTurn = trial.TurnNumber;
             uint linkTarget = 0;
             int targetRank = 0;
@@ -509,6 +510,9 @@ namespace YGOPortable.AI
             List<(int Step, ulong State, double Score, Position Before, uint Code, int CopiesOnField)> handSupportSummons = null;
             trial.OnCardMoved += move =>
             {
+                if (line.moves.Count > 0 && move.fromCon == player &&
+                    DuelAiPolicy.SpentOwnRitualAce(move, trial.SelectionChainLink))
+                    ritualAceSpend = Math.Min(ritualAceSpend, line.moves.Count - 1);
                 if (canKeepSetup && !spend.HasValue && move.fromCon == player && move.fromLoc == YgoConstants.LOCATION_MZONE &&
                     (move.fromPos & YgoConstants.POS_FACEUP) != 0 &&
                     (move.toCon != player || move.toLoc != YgoConstants.LOCATION_MZONE))
@@ -748,7 +752,9 @@ namespace YGOPortable.AI
                 if (line.selectedTarget is { } picked && picked.AfterMainActions > safe.step) line.selectedTarget = null;
                 trades.RemoveAll(trade => trade.index >= safe.step);
             }
-            if (trades.Count == 0 || (trial.IsFinished && trial.Winner == player)) return line;
+            if (trial.IsFinished && trial.Winner == player) return line;
+            if (ritualAceSpend < line.moves.Count) line.unpaidLinkTrade = ritualAceSpend;
+            if (trades.Count == 0) return line;
 
             // Leaving more small bodies is insufficient. The projected line must recover the lost Link rating
             // or gain an actionable advantage against the actual board before committing the material.

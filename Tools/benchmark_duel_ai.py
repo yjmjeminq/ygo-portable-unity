@@ -250,6 +250,7 @@ def run_worker(index, arguments, editor, frozen, output):
                YGO_BENCH_FULL_SUITE='1' if arguments.full_suite else '0',
                YGO_BENCH_GX_SUITE='1' if arguments.gx_suite else '0',
                YGO_BENCH_GX_FIELD_AUDIT='1' if arguments.gx_field_audit else '0',
+               YGO_BENCH_GX_SELF_PLAY='1' if arguments.gx_self_play else '0',
                YGO_BENCH_ROSTER_LEVELS='1' if arguments.roster_levels else '0',
                YGO_BENCH_OPENINGS_ONLY='1' if arguments.openings_only else '0',
                YGO_BENCH_REFERENCE_ONLY='1' if arguments.reference_only else '0',
@@ -275,6 +276,10 @@ def run_worker(index, arguments, editor, frozen, output):
 def run_fixed_regressions(arguments, editor, frozen, output):
     worker = worker_path(arguments.workspace, frozen, 0, arguments.candidate_snapshot)
     prepare(worker, frozen, arguments.candidate_policies, arguments.candidate_snapshot)
+    # Keep the recorded decks, but check the engine shipped with the candidate.
+    native = Path('Assets/Plugins/x86_64/ygoengine.dll')
+    candidate = arguments.candidate_snapshot or PROJECT
+    write(worker / native, (candidate / native).read_bytes())
     fixture_dir = PROJECT / 'Tools/AiRegression'
     for fixture in fixture_dir.glob('*.json'):
         write(worker / 'Tools/AiRegression' / fixture.name, fixture.read_bytes())
@@ -433,6 +438,7 @@ def summarize(matches):
                 field_audit[role]['asMaterial'] += sum(trace['method'] != 0 for trace in moves)
                 field_audit[role]['releases'] += sum(bool(trace['reason'] & 0x2) for trace in moves)
                 field_audit[role]['destructions'] += sum(bool(trace['reason'] & 0x1) for trace in moves)
+                field_audit[role]['ritualAceSpends'] += sum(bool(trace.get('ritualAceSpent')) for trace in moves)
                 field_audit[role]['banishments'] += sum(trace['to'] == 0x20 for trace in moves)
                 field_audit[role]['returns'] += sum(trace['to'] in (1, 2, 64) for trace in moves)
     for counts in gx_metrics.values():
@@ -666,6 +672,8 @@ def main():
     suite.add_argument('--full-suite', action='store_true', help='Run all 22 fixed era, summon-method and playstyle matchups.')
     suite.add_argument('--gx-suite', action='store_true', help='Run the ten GX story and competitive theme matchups.')
     suite.add_argument('--gx-field-audit', action='store_true', help='Audit field costs for all 37 GX story decks.')
+    parser.add_argument('--gx-self-play', action='store_true',
+                        help='Use the live GX Master settings and candidate AI for both seats of a GX suite.')
     suite.add_argument('--fixed-regressions', action='store_true', help='Replay every fixed scenario with the current native AI.')
     suite.add_argument('--roster-levels', action='store_true', help='Check every available deck in both seats with the candidate AI through turn two.')
     parser.add_argument('--openings-only', action='store_true', help='Measure the first two duel turns without scoring match winners.')
@@ -721,6 +729,9 @@ def main():
         parser.error('Fixed regressions are a separate native verification mode.')
     if args.roster_levels and (args.fixture or args.replay):
         parser.error('Select a single fixture or use the full roster audit.')
+    if args.gx_self_play and (not (args.gx_suite or args.gx_field_audit) or args.reference_only or args.random_opponent or
+                              args.previous_run or args.paired_previous_revision or args.stage or args.require_gates or args.replay):
+        parser.error('--gx-self-play requires a GX suite and cannot be combined with comparison or replay options.')
     if args.fixture and not args.replay:
         args.jobs = 1
     if args.replay:
@@ -819,7 +830,7 @@ def main():
         raise RuntimeError('Benchmark workers used different candidate policies.')
     summary = summary_identity(summarize(matches), frozen, source_manifests[0],
                                worker_policies[0],
-                               'RandomLegal-v1' if args.random_opponent else None)
+                               'GX Master self-play' if args.gx_self_play else 'RandomLegal-v1' if args.random_opponent else None)
     previous_output = args.previous_run
     if args.previous_snapshot is not None:
         previous_output = output / 'previous'

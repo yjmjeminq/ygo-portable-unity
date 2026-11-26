@@ -45,10 +45,12 @@ namespace YGOPortable.Core
         public const uint POS_DEFENSE = POS_FACEUP_DEFENSE | POS_FACEDOWN_DEFENSE;
 
         public const uint REASON_DESTROY = 0x1;
+        internal const uint REASON_RELEASE = 0x2;
         internal const uint REASON_TEMPORARY = 0x4;
         internal const uint REASON_MATERIAL = 0x8;
         internal const uint REASON_BATTLE = 0x20;
         internal const uint REASON_EFFECT = 0x40;
+        internal const uint REASON_COST = 0x80;
         internal const uint REASON_LOST_TARGET = 0x200;
         internal const uint REASON_RULE = 0x400;
         public const uint REASON_SPSUMMON = 0x800;

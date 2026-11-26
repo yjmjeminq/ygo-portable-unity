@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "builtInFixtures": ["solemn-strike-summon-owner", "predaprimitive-own-fusion"],
-  "note": "Pinned native/card/script bytes and complete fixture files; AI source/policy changes are fingerprinted at runtime rather than pinned. Frozen deck code arrays are checked against the corresponding current preset before replay.",
+  "note": "Pinned reference and shipped native libraries, card/script bytes and complete LF-normalized fixture files; AI source/policy changes are fingerprinted at runtime rather than pinned. Frozen deck code arrays are checked against the corresponding current preset before replay.",
   "fixtures": [
     "sage.json",
     "coyote.json",
@@ -13,7 +13,8 @@
   "files": [
     {
       "path": "Assets/Plugins/x86_64/ygoengine.dll",
-      "sha256": "93936408a0edad5d952045d4f7d1362e5fe7353a1a6c6acf989321f7a1f84dbe"
+      "sha256": "93936408a0edad5d952045d4f7d1362e5fe7353a1a6c6acf989321f7a1f84dbe",
+      "alternateSha256": "0bf991d90c56478a9ffd5bc9063bb64c1142ece23e76704c515cd8b4eb53b8d3"
     },
     {
       "path": "Assets/StreamingAssets/cards_prop.bin",
@@ -25,27 +26,27 @@
     },
     {
       "path": "Tools/AiRegression/sage.json",
-      "sha256": "b000356464c890b2ba084c03b6e1afdd762bc8ed40d83a4412c01e9b97e3d4d9"
+      "sha256": "a0ae82ef50edf48bb544fb04bfad1e7f02c7e62f489957fa1bfdecd1989ac7c7"
     },
     {
       "path": "Tools/AiRegression/coyote.json",
-      "sha256": "536a02290d580254642d84a3cd4b0abe86e2beefda11a0e1fa3319322c6ff8f1"
+      "sha256": "50816f25651c53e5e1e887cf7ad1e2a98735a20d2fee831608d1ad19cb081341"
     },
     {
       "path": "Tools/AiRegression/ddd.json",
-      "sha256": "7696c159ef6361acd6586c6c6936a26cec51e531e13c3017d21631e619ea6831"
+      "sha256": "b8cf17e3fabe2eef4f5c0bfceac116351f33fe342d7e7bd58ca4f71fc067a4b2"
     },
     {
       "path": "Tools/AiRegression/snake.json",
-      "sha256": "bf353ed9237480aec27ecf8b7fa99aab8677115dd95ecd9a279c8bea9f1c12a6"
+      "sha256": "23d5da243750d0c787b2789b9621c299256661ed4b335ee749b5efeddd9b62e3"
     },
     {
       "path": "Tools/AiRegression/monarch.json",
-      "sha256": "364dfa308798b453926d9e85aea15c7d33a927492d48a9f8de524f47df0aae63"
+      "sha256": "ecd4d1c172bf009a1ff4d94e18a1e52ed85bc11b3d43fb39977355e850d304c9"
     },
     {
       "path": "Tools/AiRegression/connector.json",
-      "sha256": "dc63ed2625387807138c04c29084253b3e019914c798859e7329490404ee49e1"
+      "sha256": "f02f97e1be01b3b3fc63225d2b973919ce3412d9815e7f394ef5e8c33a79356a"
     },
     {
       "path": "Assets/StreamingAssets/cards_kr.json",

@@ -357,6 +357,13 @@ namespace YGOPortable.Editor
                             VerifyDialogueStart(episode.preDialogues, episode.id);
                             if (index == 0)
                             {
+                                story.Back();
+                                Require(menu.MenuRoot.activeSelf && !world.Root.activeSelf && !storyRoot.gameObject.activeInHierarchy &&
+                                    world.RpgClears == 0, "Esc restarted or cleared the mandatory GX prologue instead of leaving it.");
+                                gxMenu.onClick.Invoke();
+                                for (int frame = 0; frame < 12 && !storyRoot.gameObject.activeInHierarchy; frame++)
+                                    world.Update(.18f);
+                                VerifyDialogueStart(episode.preDialogues, episode.id);
                                 Require(FieldScene().Find("RpgCompanion") == null, "The GX prologue spawned a partner.");
                                 VerifyGxPrologue(episode);
                                 VerifyGxAutoReadTime(episode);
@@ -484,6 +491,23 @@ namespace YGOPortable.Editor
                         if (episode.id == "gx_ep_02") VerifyGxGuestArt(episode.preDialogues, "준코", 205);
                         VerifyGxDuelDialogueArt(episode);
                         var fieldPosition = (Vector2)typeof(TagForceWorldUI).GetField("_position", flags).GetValue(world);
+                        if (episode.id == "gx_ep_01")
+                        {
+                            story.ShowFieldDuelResult(episode, won: false, draw: true, () => (true, ""), default);
+                            VerifyGxRetryMenu(forcedDeck: false);
+                            var review = storyRoot.Find("Scene/Choices/Choice_3/Button");
+                            Require(review.GetComponentInChildren<Text>().text == "무승부 장면 보기",
+                                "A draw offered the defeat branch.");
+                            Press(storyRoot, "Scene/Choices/Choice_3/Button");
+                            var lines = (StoryDialogueLine[])dialogueType.GetField("_dialogue", flags).GetValue(dialogue);
+                            Require(lines.Length == 1 && lines[0].text.Contains("무승부") && lines[0].speaker == null,
+                                "A character claimed a win in a GX draw.");
+                            Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                            Press(storyRoot, "Scene/Choices/Choice_2/Button");
+                            VerifyGxReturn(fieldPosition, episode.id);
+                            Require(world.RpgClears == index, "A draw cleared the current GX episode.");
+                            app.OpenRpgFieldEpisode(index);
+                        }
                         if (episode.id is "gx_ep_13" or "gx_ep_26") StartGxDuelThroughDialogue(episode, startingDeck);
                         else app.StartStoryDuel(episode, startingDeck, true);
                         VerifyGxSurrender();
@@ -1289,14 +1313,18 @@ namespace YGOPortable.Editor
                     var bind = dialogueType.GetMethod("BindLine", flags);
                     var scenery = FieldScene().Find("Scenery").GetComponent<Image>();
                     var ruins = scenery.sprite;
+                    var viewport = ViewportSize();
                     bind.Invoke(dialogue, new object[] { infirmary, false });
                     var recovery = scenery.sprite;
                     bind.Invoke(dialogue, new object[] { harbor, false });
                     Require(recovery != null && recovery != ruins && scenery.sprite != null &&
                         scenery.sprite != recovery && scenery.sprite != ruins,
                         "The recovery and harbor scenes reused the ruins backdrop.");
+                    Require(ViewportSize() == viewport && !WorldInputRestored(),
+                        "GX follow-up scene resized the field or released movement during dialogue.");
                     bind.Invoke(dialogue, new object[] { 0, false });
-                    Require(scenery.sprite == ruins, "Reading backward from the follow-up did not restore the ruins.");
+                    Require(scenery.sprite == ruins && ViewportSize() == viewport && !WorldInputRestored(),
+                        "Reading backward from the follow-up did not restore the original framing and lock.");
                 }
 
                 void VerifySpeaker(StoryDialogueLine[] lines, string speaker, bool player)

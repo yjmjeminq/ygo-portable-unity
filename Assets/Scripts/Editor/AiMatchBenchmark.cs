@@ -161,12 +161,14 @@ namespace YGOPortable.Editor
             public uint card, source, action, reason, from, to, method;
             public uint[] ownBefore, ownAfter, rivalBefore, rivalAfter;
             public int ownLifeBefore, ownLifeAfter, rivalLifeBefore, rivalLifeAfter;
+            public bool ritualAceSpent;
         }
 
         [Serializable]
         private sealed class DestructionTrace
         {
             public uint effect;
+            public ulong description;
             public int turn, opposingRemovals, draws, lpSwing;
             public bool resolved;
             public List<uint> destroyed = new(), fieldArrivals = new(), handArrivals = new();
@@ -242,6 +244,7 @@ namespace YGOPortable.Editor
                 var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
                 bool gxSuite = Environment.GetEnvironmentVariable("YGO_BENCH_GX_SUITE") == "1";
                 bool gxFieldAudit = Environment.GetEnvironmentVariable("YGO_BENCH_GX_FIELD_AUDIT") == "1";
+                bool gxSelfPlay = Environment.GetEnvironmentVariable("YGO_BENCH_GX_SELF_PLAY") == "1";
                 if (gxSuite || gxFieldAudit)
                 {
                     var gxDecks = StoryModeUI.LoadRpgDecks(streaming, StoryModeUI.GxRpgSeriesId);
@@ -287,17 +290,20 @@ namespace YGOPortable.Editor
                 bool referenceOnly = Environment.GetEnvironmentVariable("YGO_BENCH_REFERENCE_ONLY") == "1";
                 string previousOutput = Environment.GetEnvironmentVariable("YGO_BENCH_PREVIOUS_REPORT");
                 var previous = string.IsNullOrEmpty(previousOutput) ? null : LoadPilotFactory("AiBenchmarkPreviousFactory");
-                Pilot Candidate(int level)
+                Pilot Candidate(int level, int tier = 1)
                 {
                     if (referenceOnly) return baseline(level);
-                    var ai = new TacticalAI(general, links, searchCombos: true);
+                    var ai = gxSelfPlay
+                        ? new TacticalAI(general, links, searchCombos: true, planningScale: GameAppController.GxStoryPlanningScale(tier),
+                            responseLimit: ComboSearch.RpgResponseLimit) { Difficulty = AIDifficulty.Master }
+                        : new TacticalAI(general, links, searchCombos: true);
                     return TimedPilot(ai.ComputeResponse, ai.AdvanceComboPlanning,
                         () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives);
                 }
 
                 if (Environment.GetEnvironmentVariable("YGO_BENCH_ROSTER_LEVELS") == "1")
                 {
-                    AuditRoster(output, start, stride, Candidate, () => nativeErrors, captureReplays);
+                    AuditRoster(output, start, stride, level => Candidate(level), () => nativeErrors, captureReplays);
                     return;
                 }
 
@@ -319,7 +325,8 @@ namespace YGOPortable.Editor
                         {
                             int before = nativeErrors;
                             int rivalLevel = seat == 0 ? secondLevel : firstLevel;
-                            var rival = randomOpponent ? RandomLegalPilot.Create(randomSeed ^ (ulong)(1 - seat)) : baseline(rivalLevel);
+                            var rival = gxSelfPlay ? Candidate(rivalLevel, (seat == 0 ? second : first).difficultyTier) :
+                                randomOpponent ? RandomLegalPilot.Create(randomSeed ^ (ulong)(1 - seat)) : baseline(rivalLevel);
                             var result = Play(index, seed, seat, scenario.Era, scenario.Method, first, second,
                                 seat == 0 ? tested(firstLevel) : rival, seat == 1 ? tested(secondLevel) : rival,
                                 openingOnly, captureReplays);
@@ -332,7 +339,7 @@ namespace YGOPortable.Editor
                         {
                             bool previousFirst = previous != null && ((index + seed + seat) & 1) == 0;
                             var prior = previousFirst ? PlaySeat(previous, seat) : null;
-                            var current = PlaySeat(Candidate, seat);
+                            var current = PlaySeat(level => Candidate(level, (seat == 0 ? first : second).difficultyTier), seat);
                             opening ??= current;
                             VerifyOpeningHands(opening, current);
                             if (previous != null)
@@ -1167,7 +1174,7 @@ namespace YGOPortable.Editor
             var pendingLinkTurns = new int[2];
             var provenMissedBattleTurns = new[] { new HashSet<int>(), new HashSet<int>() };
             bool auditFieldCosts = era.StartsWith("GX/Audit/", StringComparison.Ordinal);
-            bool auditGx = era.StartsWith("GX/", StringComparison.Ordinal) && !auditFieldCosts;
+            bool auditGx = era.StartsWith("GX/", StringComparison.Ordinal);
             var fieldCosts = new[] { new List<FieldCostTrace>(), new List<FieldCostTrace>() };
             var pendingFieldCosts = new List<(byte Owner, FieldCostTrace Trace)>();
             uint[][] fieldBefore = null;
@@ -1580,12 +1587,12 @@ namespace YGOPortable.Editor
 
             void TrackFieldCost(CardMoveEvent move)
             {
-                const uint release = 0x2, cost = 0x80;
                 if (fieldBefore == null || move.fromCon > 1 ||
                     move.fromLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) ||
                     move.toCon == move.fromCon && move.toLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE ||
                     move.TemporarilyBanished || (move.reason & YgoConstants.REASON_BATTLE) != 0 ||
-                    (move.reason & (YgoConstants.REASON_DESTROY | YgoConstants.REASON_MATERIAL | release | cost)) == 0 &&
+                    (move.reason & (YgoConstants.REASON_DESTROY | YgoConstants.REASON_MATERIAL |
+                        YgoConstants.REASON_RELEASE | YgoConstants.REASON_COST)) == 0 &&
                         move.toLoc is not (YgoConstants.LOCATION_REMOVED or YgoConstants.LOCATION_HAND or
                             YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA))
                     return;
@@ -1597,6 +1604,8 @@ namespace YGOPortable.Editor
                     actor = effect?.triggerPlayer ?? lastChoiceOwner, actionOwner = fieldActionOwner,
                     card = move.code, source = effect?.code ?? lastChoiceCode, action = fieldActionCode,
                     reason = move.reason, from = move.fromLoc, to = move.toLoc, method = move.MaterialMethod,
+                    ritualAceSpent = (effect?.triggerPlayer ?? lastChoiceOwner) == owner &&
+                        DuelAiPolicy.SpentOwnRitualAce(move, effect),
                     ownBefore = fieldBefore[owner], rivalBefore = fieldBefore[1 - owner],
                     ownLifeBefore = lifeBefore[owner], rivalLifeBefore = lifeBefore[1 - owner],
                 }));
@@ -1662,7 +1671,8 @@ namespace YGOPortable.Editor
             DestructionTrace Trace(ChainLinkInfo effect)
             {
                 if (!destructionTraces.TryGetValue(effect, out var trace))
-                    destructionTraces.Add(effect, trace = new DestructionTrace { effect = effect.code, turn = duel.TurnNumber });
+                    destructionTraces.Add(effect, trace = new DestructionTrace
+                        { effect = effect.code, description = effect.description, turn = duel.TurnNumber });
                 return trace;
             }
 

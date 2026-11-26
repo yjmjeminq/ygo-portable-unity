@@ -308,6 +308,8 @@ namespace YGOPortable.AI
             bool projected = false) =>
             CanUseIdleAction(session, command, item) &&
             (!UsesTacticalRules || DuelTactics.CanExtend(ExtensionRisk(session, prompt), session.Players[prompt.playerId], command, item)) &&
+            (command is not (0 or 3) || projected || !UsesTacticalRules ||
+                !DuelTactics.NeedsRitualTributeProjection(session.Players[prompt.playerId], item)) &&
             (command != 0 || projected || !UsesTacticalRules || (!ComboSearch.NeedsProvenNormalSummon(item.code) &&
                 (_comboSearch == null || (!DuelTactics.RisksEndPhaseDestruction(session, prompt) &&
                     !DuelTactics.NeedsTributeProjection(session, prompt, item))))) &&
@@ -488,13 +490,25 @@ namespace YGOPortable.AI
         private int? ChoosePriorityMainAction(DuelSession session, DuelPrompt prompt, bool planLinks)
         {
             bool CanUse(int command, SelectableCardItem item) => CanUseMainAction(session, prompt, planLinks, command, item);
-            if (DuelTactics.FindGiftCardWin(session, prompt, CanUse) is int effectWin)
+            int? potentialWin = DuelTactics.FindGiftCardWin(session, prompt, CanUse);
+            bool allowBattle = false;
+            if (potentialWin == null && !_comboProjection && prompt.canBp &&
+                session.Players[1 - prompt.playerId].szone.All(card => card == null))
+            {
+                int bond = prompt.activatable.FindIndex(item => item.code == DuelAiPolicy.PowerBond);
+                if (bond >= 0 && !DuelAiPolicy.CanRiskPowerBond(session, prompt))
+                {
+                    potentialWin = (bond << 16) | 5;
+                    allowBattle = true;
+                }
+            }
+            if (potentialWin is int effectWin)
             {
                 if (_comboProjection) return effectWin;
                 if (!ReferenceEquals(_effectWinPrompt, prompt))
                 {
                     _effectWinPrompt = prompt;
-                    _verifiedEffectWin = DuelCombat.VerifyEffectWin(session, prompt, effectWin, this);
+                    _verifiedEffectWin = DuelCombat.VerifyEffectWin(session, prompt, effectWin, this, allowBattle);
                 }
                 if (_verifiedEffectWin) return effectWin;
             }

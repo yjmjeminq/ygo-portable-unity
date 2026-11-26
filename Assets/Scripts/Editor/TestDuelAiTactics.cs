@@ -61,6 +61,8 @@ namespace YGOPortable.Editor
             VerifyNativeBentenSearch();
             VerifyNativeRitualAcePreservation();
             VerifyNativeRitualWithSpareMaterials();
+            VerifyAdditionalRitualAces();
+            VerifyGxSelfDamageAndDestruction();
             VerifyFieldAceEffects();
             VerifyDrytronAceCosts();
             VerifyAccesscodeCosts();
@@ -279,6 +281,157 @@ namespace YGOPortable.Editor
                     $"The native Ritual {secondSpell} did not summon Idaten while keeping Vishnu. " + string.Join(" | ", duel.Logs.TakeLast(8)));
                 Debug.Log($"[VERIFY GX AI RITUAL] {secondSpell} summoned Idaten with spare materials while Vishnu stayed on the field. Retry=0");
             }
+        }
+
+        private static void VerifyAdditionalRitualAces()
+        {
+            const uint ritual = DuelAiPolicy.MachineAngelRitual, idaten = 3629090, summonedSkull = 70781052;
+            var ritualDeck = new[] { idaten }.Concat(Enumerable.Repeat(ritual, 39)).ToArray();
+            foreach (uint ace in new[] { DuelAiPolicy.HeraldOfUltimateness, DuelAiPolicy.HeraldOfPerfection, DuelAiPolicy.Izana })
+            {
+                using var duel = new DuelSession(recordPlanningReplay: true);
+                OpenGxAiFixture(duel, ritualDeck, Empty, 8000, ace,
+                    own => own.hand.Any(card => card.code == ritual) && own.hand.Any(card => card.code == idaten));
+                var idle = Drive(duel, IsIdle);
+                Require(idle.activatable.Any(card => card.code == ritual), $"The engine did not offer to tribute {ace} for Idaten.");
+                var pilot = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(), searchCombos: true)
+                    { Difficulty = AIDifficulty.Master };
+                int action = Read(pilot.ComputeResponse(duel, idle));
+                Require(action == 7, $"The AI chose {action} instead of preserving ritual ace {ace}.");
+                duel.SubmitResponseInt(action);
+                Drive(duel, IsIdle);
+                Require(duel.Players[0].mzone.Any(card => card?.code == ace) && duel.RetryCount == 0,
+                    $"Ritual ace {ace} did not survive a legal follow-up.");
+
+                using var mock = new DuelSession();
+                mock.Players[0].mzone[0] = FieldMonster(ace);
+                var tribute = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+                tribute.summonable.Add(Effect(summonedSkull, 0, YgoConstants.LOCATION_HAND));
+                Require(Read(Smart().ComputeResponse(mock, tribute)) == 7, $"{ace} was offered for a normal tribute summon.");
+                mock.Players[0].mzone[1] = FieldMonster(GeminiElf, 1);
+                var cost = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_TRIBUTE, min = 1, max = 1 };
+                cost.candidates.Add(new SelectableCardItem { code = ace, location = YgoConstants.LOCATION_MZONE });
+                cost.candidates.Add(new SelectableCardItem { code = GeminiElf, location = YgoConstants.LOCATION_MZONE, sequence = 1 });
+                Require(Smart().ComputeResponse(mock, cost).SequenceEqual(DuelSession.PackCardSelection(1)),
+                    $"Tribute selection spent {ace} instead of the spare monster.");
+                Debug.Log($"[VERIFY GX RITUAL ACE] {ace}: preserved through native ritual and spare-material tribute selection.");
+            }
+            using var merciful = new DuelSession(recordPlanningReplay: true);
+            const uint draw = DuelAiPolicy.MercifulMachineAngel;
+            OpenGxAiFixture(merciful, Deck(draw), Empty, 8000, DuelAiPolicy.Dakini, own => own.hand.Count == 5);
+            var active = Drive(merciful, IsIdle);
+            Require(active.activatable.Any(card => card.code == draw) && Read(Smart().ComputeResponse(merciful, active)) == 7,
+                "Merciful Machine Angel sacrificed the lone Dakini for a draw.");
+            var board = merciful.Players[0];
+            var magnificent = Effect(DuelAiPolicy.MagnificentMachineAngel, 0);
+            Require(!DuelTactics.CanActivate(merciful, active, magnificent), "Magnificent Machine Angel offered the lone Dakini.");
+            board.hand.Add(FieldMonster(DuelAiPolicy.Benten));
+            Require(DuelTactics.CanActivate(merciful, active, magnificent), "Magnificent Machine Angel rejected a spare Benten.");
+            Debug.Log("[VERIFY GX RITUAL ACE] Merciful and Magnificent Machine Angel preserved a lone Dakini.");
+        }
+
+        private static void VerifyGxSelfDamageAndDestruction()
+        {
+            const uint bond = DuelAiPolicy.PowerBond, cyberDragon = 70095154, cyberTwin = 74157028,
+                fortress = 79229522, overdragon = 64599569, squirmer = 24215921, spirit = 90829280, yubel = 78371393;
+            using (var duel = new DuelSession(recordPlanningReplay: true))
+            {
+                OpenGxAiFixture(duel, Deck(bond, cyberDragon, cyberDragon), new[] { cyberTwin, fortress }, 2800, 0,
+                    own => own.hand.Any(card => card.code == bond) && own.hand.Count(card => card.code == cyberDragon) >= 2);
+                var idle = Drive(duel, IsIdle);
+                Require(idle.activatable.Any(card => card.code == bond), "The native Power Bond fixture lacks a legal Fusion.");
+                Require(!DuelTactics.CanActivate(duel, idle, Effect(bond, 0, YgoConstants.LOCATION_HAND)),
+                    "An unavailable Fortress made lethal Power Bond damage appear safe.");
+                int action = Read(Smart().ComputeResponse(duel, idle));
+                Require((action & 0xffff) != 5, "The AI activated lethal Power Bond.");
+            }
+            using (var duel = new DuelSession(recordPlanningReplay: true))
+            {
+                OpenGxAiFixture(duel, Deck(bond, cyberDragon, cyberDragon), new[] { cyberTwin }, 2800, 0,
+                    own => own.hand.Any(card => card.code == bond) && own.hand.Count(card => card.code == cyberDragon) >= 2,
+                    second: true, rivalLife: 4000);
+                Drive(duel, IsIdle);
+                duel.SubmitResponseInt(7);
+                var lethal = Drive(duel, IsIdle);
+                Require(lethal.playerId == 1 && lethal.canBp && (Read(Smart().ComputeResponse(duel, lethal)) & 0xffff) == 5,
+                    "The AI missed a native Power Bond lethal that ends before the burn.");
+            }
+            using (var duel = new DuelSession())
+            {
+                var own = duel.Players[0];
+                own.lp = 2800;
+                own.extra.Add(FieldMonster(overdragon));
+                for (int i = 0; i < 4; i++) own.hand.Add(FieldMonster(cyberDragon));
+                var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD };
+                Require(!DuelAiPolicy.CanRiskPowerBond(duel, idle), "Variable original ATK made Overdragon look free of damage.");
+                own.lp = 3201;
+                Require(DuelAiPolicy.CanRiskPowerBond(duel, idle), "Power Bond rejected a nonlethal damage ceiling.");
+            }
+            foreach (bool replacement in new[] { false, true })
+            {
+                using var duel = new DuelSession();
+                OpenGxAiFixture(duel, replacement ? Deck(squirmer, squirmer, yubel) : Deck(squirmer), Empty, 8000,
+                    spirit, own => own.hand.Any(card => card.code == squirmer));
+                Drive(duel, IsIdle);
+                SubmitIdle(duel, 5, squirmer);
+                var optional = Drive(duel, prompt => prompt.messageType == YgoConstants.MSG_SELECT_YESNO);
+                int choice = Read(Smart().ComputeResponse(duel, optional));
+                Require(choice == (replacement ? 1 : 0), "Squirmer did not distinguish free development from pointless self-destruction.");
+                if (!replacement)
+                {
+                    duel.SubmitResponseInt(choice);
+                    Drive(duel, IsIdle);
+                    Require(duel.Players[0].mzone.Any(card => card?.code == spirit) && duel.RetryCount == 0,
+                        "Squirmer did not preserve Spirit of Yubel without a replacement.");
+                }
+            }
+            using (var duel = new DuelSession())
+            {
+                const uint exodia = 83257450, frame = 64043465, strike = 40605147;
+                var own = duel.Players[0];
+                var rival = duel.Players[1];
+                own.lp = 5000;
+                rival.lp = 6000;
+                own.mzone[0] = FieldMonster(exodia);
+                own.szone[0] = FieldMonster(strike);
+                own.szone[1] = FieldMonster(frame, 1);
+                own.szone[2] = FieldMonster(frame, 2);
+                var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+                var blaze = new SelectableCardItem { code = exodia, location = YgoConstants.LOCATION_MZONE,
+                    description = DuelTactics.ExoddBlazeEquipEffect };
+                Require(!DuelTactics.CanActivate(duel, idle, blaze), "Exodd Blaze halved life and swept only its own back row in Main Phase 2.");
+                idle.canBp = true;
+                Require(DuelTactics.CanActivate(duel, idle, blaze), "Exodd Blaze missed an open lethal attack.");
+                rival.mzone[0] = FieldMonster(yubel);
+                Require(!DuelTactics.CanActivate(duel, idle, blaze), "Exodd Blaze opened an attack into lethal Yubel reflection.");
+            }
+            using (var duel = new DuelSession())
+            {
+                var chain = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+                var guide = FieldMonster(10802915);
+                duel.Players[1].mzone[0] = guide;
+                duel.CurrentChain.Add(new ChainLinkInfo { code = guide.code, triggerPlayer = 1,
+                    triggerLoc = YgoConstants.LOCATION_MZONE });
+                duel.Players[0].szone[0] = FieldMonster(5851097);
+                var droplet = Effect(DuelTactics.ForbiddenDroplet, 0);
+                Require(!DuelTactics.CanActivate(duel, chain, droplet),
+                    "Droplet broke Vanity's Emptiness to negate a summon already forbidden by it.");
+            }
+            Debug.Log("[VERIFY GX SELF DAMAGE] Power Bond, native Squirmer, and Exodd Blaze timing passed.");
+        }
+
+        private static void OpenGxAiFixture(DuelSession duel, uint[] deck, uint[] extra, int life, uint ace,
+            Func<PlayerFieldSnapshot, bool> ready, bool second = false, int rivalLife = 8000)
+        {
+            for (ulong seed = 1; seed <= 32; seed++)
+            {
+                Require(duel.StartNewDuel(Deck(GeminiElf), Empty, deck, extra, p0GoesFirst: second,
+                    seed: new[] { seed, 29UL, 71UL, 97UL }, opponentOpening: new DuelOpening(life, 5, ace),
+                    playerOpening: new DuelOpening(rivalLife, 5, 0)),
+                    "Could not start the GX native fixture.");
+                if (ready(duel.Players[duel.AiPlayerIndex])) return;
+            }
+            throw new InvalidOperationException("Could not draw the GX native fixture opening.");
         }
 
         private static void VerifyFieldAceEffects()

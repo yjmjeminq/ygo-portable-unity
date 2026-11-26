@@ -560,7 +560,7 @@ namespace YGOPortable.UI
                 _speakerUsesPaintedExpression = speaker?.id == 1 || (_rpgAssetFolder == "GX" && speaker?.id is 107 or 119);
                 _opponentReaction.enabled = false;
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
-                if (_rpg && _field == null && _defaultRpgStage != null)
+                if (_rpg && _field == null)
                     SetSprite(_stage, (line.SceneMapPath is string map ? LoadRpgSprite(map) : null) ?? _defaultRpgStage);
                 if (_rpg)
                 {

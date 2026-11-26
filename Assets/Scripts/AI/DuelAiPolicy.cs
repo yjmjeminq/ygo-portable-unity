@@ -19,7 +19,9 @@ namespace YGOPortable.AI
         internal const uint MaskChange = 21143940, DarkLaw = 58481572, PowerBond = 37630732, SuperPoly = 48130397;
         internal const uint MachineAngelRitual = 39996157, MeteonisDrytron = 22398665, Benten = 77235086;
         private const uint MachineAngelAbsoluteRitual = 11398951;
-        internal const uint Dakini = 39618799, Nasateiya = 99427357, Vishnu = 78316184;
+        internal const uint Dakini = 39618799, Nasateiya = 99427357, Vishnu = 78316184, Izana = 91668401;
+        internal const uint HeraldOfUltimateness = 48546368, HeraldOfPerfection = 44665365;
+        internal const uint MercifulMachineAngel = 64442155, MagnificentMachineAngel = 27331568;
         internal const uint MeteoroaDrytron = 24166324;
         private const uint DrytronDad = 56863746, DrytronDra = 69815951, DrytronQua = 95209656, DrytronMuBeta = 1174075;
         private const uint FallenOfAlbaz = 68468459, Granguignol = 24915933, Sanctifire = 38811586;
@@ -27,7 +29,8 @@ namespace YGOPortable.AI
         private const ushort CyberAngelSet = 0x2093;
         private const uint PhantomOfYubel = 80453041;
         private const uint Garura = 11765832, Mudragon = 54757758, StarvingVenom = 41209827, LovingDefender = 47172959;
-        private const uint CyberTwin = 74157028, ChimeratechRampage = 84058253, WakeUpHero = 32828466;
+        private const uint CyberTwin = 74157028, ChimeratechRampage = 84058253, ChimeratechOverdragon = 64599569,
+            WakeUpHero = 32828466;
 
         [Flags]
         internal enum Decisions { MainPhase = 1, Chains = 2, Both = MainPhase | Chains }
@@ -281,9 +284,25 @@ namespace YGOPortable.AI
 
         internal static bool IsMachineAngelRitual(uint code) => code is MachineAngelRitual or MachineAngelAbsoluteRitual;
 
-        internal static bool IsRitualAce(uint code) => code is Vishnu or Dakini or DrytronDad or DrytronDra or DrytronQua;
+        internal static bool IsMachineAngelTribute(uint code) => code is MercifulMachineAngel or MagnificentMachineAngel;
+
+        internal static bool CanSpendForMachineAngel(PlayerFieldSnapshot own) =>
+            !own.mzone.Any(IsEstablishedRitualAce) ||
+            own.hand.Concat(own.mzone.Where(card => card != null && !IsEstablishedRitualAce(card))).Any(card =>
+                CardDatabase.Get(card.code) is { } info && (info.type & YgoConstants.TYPE_RITUAL) != 0 &&
+                CardDatabase.ExtractSetcodes(info.setcode).Contains(CyberAngelSet));
+
+        internal static bool IsRitualAce(uint code) => code is Vishnu or Dakini or Izana or
+            HeraldOfUltimateness or HeraldOfPerfection or DrytronDad or DrytronDra or DrytronQua;
 
         internal static bool IsEstablishedRitualAce(LiveCardState card) => card != null && IsRitualAce(card.code);
+
+        internal static bool SpentOwnRitualAce(CardMoveEvent move, ChainLinkInfo effect) =>
+            move.fromLoc == YgoConstants.LOCATION_MZONE && move.toLoc != YgoConstants.LOCATION_MZONE &&
+            IsRitualAce(move.code) &&
+            (effect == null || effect.triggerPlayer == move.fromCon) &&
+            ((move.reason & (YgoConstants.REASON_RELEASE | YgoConstants.REASON_MATERIAL | YgoConstants.REASON_COST)) != 0 ||
+                effect != null && !effect.negated && (move.reason & YgoConstants.REASON_DESTROY) != 0);
 
         internal static bool IsDrytronReleaseEffect(uint code) => code is 97148796 or 96026108 or 60037599 or 33543890 or 22420202;
 
@@ -351,11 +370,20 @@ namespace YGOPortable.AI
         internal static bool CanRiskPowerBond(DuelSession duel, DuelPrompt prompt)
         {
             var own = duel.Players[prompt.playerId];
-            var targets = own.extra.Select(card => CardDatabase.Get(card.code)).Where(card =>
-                card != null && (card.type & YgoConstants.TYPE_FUSION) != 0 && card.race == YgoConstants.RACE_MACHINE).ToArray();
-            if (targets.Length == 0 || targets.Any(card => card.atk < own.lp)) return true;
-            return prompt.canBp && DuelCombat.VisibleAttackTotal(own) + targets.Max(card => card.atk *
-                (card.code == ChimeratechRampage ? 6 : card.code == CyberTwin ? 4 : 2)) >= duel.Players[1 - prompt.playerId].lp;
+            // The Extra Deck lists owned cards, not the engine's legal Fusion targets.
+            // An unavailable low-ATK card cannot make the activation safe.
+            return own.extra.Select(card => CardDatabase.Get(card.code)).Where(card =>
+                card != null && (card.type & YgoConstants.TYPE_FUSION) != 0 && card.race == YgoConstants.RACE_MACHINE)
+                .All(card => PowerBondBurnCeiling(own, card) < own.lp);
+        }
+
+        private static int PowerBondBurnCeiling(PlayerFieldSnapshot own, CardInfo fusion)
+        {
+            if (fusion.atk >= 0) return fusion.atk;
+            if (fusion.code != ChimeratechOverdragon) return int.MaxValue;
+            // Include the GY in case Cyberdark Chimera has enabled it as Fusion material.
+            return 800 * own.hand.Concat(own.mzone).Concat(own.grave)
+                .Count(card => card?.race == YgoConstants.RACE_MACHINE);
         }
 
         internal static bool HasOpposingFusionMaterial(PlayerFieldSnapshot own, PlayerFieldSnapshot rival)
@@ -456,8 +484,9 @@ namespace YGOPortable.AI
                     DrytronDad => 6,
                     DrytronQua when rival.szone.Count(card => card != null) >= 2 => 5,
                     DrytronDra => 4,
-                    48546368 when own.hand.Any(card => CardDatabase.Get(card.code)?.race == YgoConstants.RACE_FAIRY) => 5,
-                    48546368 => 1,
+                    HeraldOfUltimateness or HeraldOfPerfection when own.hand.Any(card =>
+                        card.code != item.code && CardDatabase.Get(card.code)?.race == YgoConstants.RACE_FAIRY) => 5,
+                    HeraldOfUltimateness or HeraldOfPerfection => 1,
                     Nasateiya when rival.mzone.Any(card => card != null) => 2,
                     Benten => 1,
                     _ => 3,
@@ -469,8 +498,8 @@ namespace YGOPortable.AI
 
             int PowerBondTarget(SelectableCardItem item)
             {
-                int attack = Math.Max(0, CardDatabase.Get(item.code)?.atk ?? 0);
-                if (attack >= own.lp) return 0;
+                var fusion = CardDatabase.Get(item.code);
+                if (fusion == null || PowerBondBurnCeiling(own, fusion) >= own.lp) return 0;
                 return item.code is CyberTwin or ChimeratechRampage ? 6 : 1;
             }
 

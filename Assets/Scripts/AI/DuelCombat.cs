@@ -34,6 +34,19 @@ namespace YGOPortable.AI
             (pain && IsYubel(defender.code) || !defender.effectsDisabled &&
                 (defender.code == LovingDefender || defender.IsAttack && defender.code is 78371393 or 4779091 or 31764700));
 
+        internal static bool CanWinWithExoddBlaze(PlayerFieldSnapshot own, PlayerFieldSnapshot rival, uint sequence)
+        {
+            if (sequence >= own.mzone.Length || own.mzone[sequence] is not { IsFaceUp: true, IsAttack: true } attacker)
+                return false;
+            var blockers = rival.mzone.Where(card => card != null).ToArray();
+            if (blockers.Length > 1) return false;
+            int damage = Math.Max(0, attacker.baseAttack) + 10000;
+            if (blockers.Length == 0) return damage >= rival.lp;
+            var blocker = blockers[0];
+            return blocker.IsFaceUp && !ReflectsAttack(blocker, HasNightmarePain(rival)) &&
+                damage - Math.Max(0, blocker.IsDefense ? blocker.defense : blocker.attack) >= rival.lp;
+        }
+
         internal static int CountFavorableBattles(IEnumerable<int> attacks, IEnumerable<int> defenses)
         {
             var thresholds = defenses.OrderBy(value => value).ToArray();
@@ -84,7 +97,8 @@ namespace YGOPortable.AI
             return FindLethal(rival, attackers).HasValue;
         }
 
-        internal static bool VerifyEffectWin(DuelSession duel, DuelPrompt prompt, int firstAction, TacticalAI advisor)
+        internal static bool VerifyEffectWin(DuelSession duel, DuelPrompt prompt, int firstAction, TacticalAI advisor,
+            bool allowBattle = false)
         {
             var clock = Stopwatch.StartNew();
             bool Expired() => clock.ElapsedMilliseconds >= BattleReplayBudgetMilliseconds;
@@ -96,7 +110,8 @@ namespace YGOPortable.AI
             var pilot = advisor.ForkForComboSearch();
             trial.BeginSpeculation(prompt.playerId, stopAfterTurn: true);
             trial.SubmitResponseInt(firstAction);
-            for (int step = 0; step < 12 && !Expired() && !trial.IsFinished && !trial.SpeculationUncertain &&
+            int maxSteps = allowBattle ? 32 : 12;
+            for (int step = 0; step < maxSteps && !Expired() && !trial.IsFinished && !trial.SpeculationUncertain &&
                 trial.RetryCount == 0 && trial.TurnNumber == duel.TurnNumber; step++)
             {
                 var next = trial.ActivePrompt;
@@ -111,6 +126,12 @@ namespace YGOPortable.AI
                     card.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA))
                     break;
 
+                if (allowBattle && next.messageType == YgoConstants.MSG_SELECT_IDLECMD)
+                {
+                    if (!next.canBp || !CanCloseBattleFromMain(trial, prompt.playerId)) break;
+                    trial.SubmitResponseInt(6);
+                    continue;
+                }
                 var response = pilot.ComputeResponse(trial, next);
                 if (next.messageType == YgoConstants.MSG_SELECT_IDLECMD && (BitConverter.ToInt32(response, 0) & 0xffff) is 6 or 7)
                     break;
