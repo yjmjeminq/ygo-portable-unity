@@ -160,6 +160,7 @@ namespace YGOPortable.Editor
                 var next = scene.Find("DialogueBox/Next/Button").GetComponent<Button>();
                 var playerPortrait = portraits.transform.Find("Protagonist").GetComponent<Image>();
                 var speakerPortrait = portraits.transform.Find("Opponent").GetComponent<Image>();
+                var speakerReaction = speakerPortrait.transform.Find("Reaction/Label").GetComponent<Text>();
                 try
                 {
                     var cgLines = loaded.episodes.SelectMany(episode =>
@@ -177,6 +178,7 @@ namespace YGOPortable.Editor
                                 new StoryDialogueLine { speaker = "카이", text = "그래." },
                                 new StoryDialogueLine { speaker = "설명", text = "바람이 스쳤다." },
                             }, () => { }, rpg: true);
+                        var restingPortrait = speakerPortrait.sprite;
                         Require(!badge.activeSelf && playerPortrait.enabled && speakerPortrait.enabled &&
                             scene.Find("ProtagonistSD") == null && scene.Find("OpponentSD") == null,
                             "Narration lost the two stage portraits or displayed an SD character inside the panel.");
@@ -205,8 +207,8 @@ namespace YGOPortable.Editor
                             playerPortrait.enabled && speakerPortrait.enabled &&
                             caret.enabled && body.text == "<b>고마워.</b>" &&
                             badge.GetComponentInChildren<Text>().color == (Color)new Color32(0xFF, 0x40, 0x81, 255) &&
-                            !portraits.transform.Find("Opponent/Blush").GetComponent<Image>().enabled &&
-                            portraits.transform.Find("Opponent/Heart_0/Label").GetComponent<Text>().enabled,
+                            speakerPortrait.sprite != restingPortrait && !speakerReaction.enabled &&
+                            speakerPortrait.color.g > .98f && speakerPortrait.color.b > .98f,
                             "The authored blush did not return cleanly after fading out the CG.");
                         next.onClick.Invoke();
                         dialogue.Update(.4f);

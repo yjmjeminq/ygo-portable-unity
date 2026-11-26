@@ -38,7 +38,6 @@ namespace YGOPortable.UI
             private static readonly Color OpponentColor = new(1f, .76f, .43f);
             private static readonly Color Listening = new(.48f, .53f, .63f);
             private const float CharactersPerSecond = 34f;
-            private static Sprite _cheekGlow;
 
             private readonly GameObject _root;
             private readonly Image _shade;
@@ -53,8 +52,6 @@ namespace YGOPortable.UI
             private readonly CanvasGroup _cutsceneOverlay;
             private readonly Image _cutsceneImage;
             private readonly AspectRatioFitter _cutsceneAspect;
-            private readonly Image _blush;
-            private readonly Text[] _hearts = new Text[3];
             private readonly StoryDialogueFx _fx;
             private readonly Image _dialoguePanel;
             private readonly Image _speakerPlate;
@@ -103,8 +100,7 @@ namespace YGOPortable.UI
             private bool _rpg;
             private int _rpgEpisode;
             private bool _showCutscene;
-            private bool _akiBlush;
-            private bool _blushOverlay;
+            private bool _akiSpeaking;
             private readonly Image _heroPrevious, _opponentPrevious;
             private readonly Text _heroReaction, _opponentReaction;
             private float _heroFade, _opponentFade, _heroSlide, _opponentSlide;
@@ -164,15 +160,6 @@ namespace YGOPortable.UI
                 _opponentPrevious = PortraitGhost(opponent, "OutgoingOpponent");
                 _heroReaction = Reaction(hero);
                 _opponentReaction = Reaction(opponent);
-                _blush = DuelUiKit.AddImage(Region(opponent, "Blush", .40f, .72f, .60f, .80f).gameObject,
-                    null, new Color(1f, .36f, .60f, .28f), false, false);
-                for (int i = 0; i < _hearts.Length; i++)
-                {
-                    _hearts[i] = AddLabel(opponent, $"Heart_{i}", .59f + i * .063f, .70f, .73f + i * .063f, .83f,
-                        25 - i * 3, color: new Color(1f, .46f, .69f));
-                    _hearts[i].text = "♥";
-                    _hearts[i].raycastTarget = false;
-                }
 
                 var dialogue = DuelUiKit.CreateMenuPanel(content, "DialogueBox",
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
@@ -367,8 +354,8 @@ namespace YGOPortable.UI
                 AnimatePortrait(_hero, _heroPrevious, _heroReaction, _heroSpeaking, delta,
                     _heroSpeaking ? _emotion : null, _poseTime, -1f, ref _heroFade, ref _heroSlide);
                 AnimatePortrait(_opponent, _opponentPrevious, _opponentReaction, _opponentSpeaking, delta,
-                    _opponentSpeaking ? _emotion : null, _poseTime, 1f, ref _opponentFade, ref _opponentSlide);
-                AnimateHearts();
+                    _opponentSpeaking ? _emotion : null, _poseTime, 1f, ref _opponentFade, ref _opponentSlide,
+                    usePaintedExpression: _akiSpeaking);
                 RefreshCaret();
                 if (_stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
                     _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
@@ -476,8 +463,8 @@ namespace YGOPortable.UI
                 _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
-                _akiBlush = _rpg && speaker?.id == 1 && _emotion == "blush";
-                _blushOverlay = false;
+                _akiSpeaking = speaker?.id == 1;
+                _opponentReaction.enabled = false;
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
                 if (_rpg)
                 {
@@ -485,14 +472,12 @@ namespace YGOPortable.UI
                         ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
                     if ((speaker ?? (_opponent.sprite == null ? _sceneOpponent : null)) is { } actor)
                     {
-                        var bust = LoadActorBust(actor.id, speaker != null ? _emotion : null, out bool authoredExpression);
-                        _blushOverlay = _akiBlush && !authoredExpression;
+                        var bust = LoadActorBust(actor.id, speaker != null ? _emotion : null);
                         ShowBust(_opponent, _opponentPrevious, bust ?? DuelProfileArt.Opponent(actor), ref _opponentFade, ref _opponentSlide);
                     }
                     if (_heroSpeaking && !heroPreviouslySpeaking) _heroSlide = Mathf.Max(_heroSlide, .12f);
                     if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
                 }
-                AnimateHearts();
                 BindCutscene(_rpg ? line.cutscene : null);
                 _fx.Play(_rpg ? line.fx : null);
                 _formatting = _rpg ? DialogueTag.Matches(line.text).Cast<Match>().ToArray() : Array.Empty<Match>();
@@ -791,20 +776,18 @@ namespace YGOPortable.UI
             private Sprite LoadHeroBust(string emotion) =>
                 LoadBust("Characters_Standing/full_protagonist", emotion) ?? DuelProfileArt.Player;
 
-            private Sprite LoadActorBust(int id, string emotion, out bool authoredExpression)
+            private Sprite LoadActorBust(int id, string emotion)
             {
                 string outfit = RpgWardrobe.ForStory(id, _rpgEpisode);
                 if (outfit != null)
                 {
-                    var pose = LoadExpression(RpgWardrobe.PortraitStem(id, outfit), emotion);
-                    authoredExpression = pose != null;
-                    var bust = pose ?? LoadRpgSprite(RpgWardrobe.Preview(id, outfit));
+                    var bust = LoadExpression(RpgWardrobe.PortraitStem(id, outfit), emotion) ??
+                        LoadRpgSprite(RpgWardrobe.Preview(id, outfit));
                     if (bust != null) return bust;
                 }
                 string stem = RpgWardrobe.PortraitStem(id, null);
                 // Aki's unsuffixed expression files belong to her everyday clothes.
                 var fallbackPose = id == 1 ? null : LoadExpression(stem, emotion);
-                authoredExpression = fallbackPose != null;
                 return fallbackPose ?? LoadRpgSprite(stem + ".png", waistUp: true);
             }
 
@@ -874,44 +857,16 @@ namespace YGOPortable.UI
                 else UnityEngine.Object.DestroyImmediate(asset);
             }
 
-            private void AnimateHearts()
-            {
-                _blush.enabled = _blushOverlay;
-                if (_blushOverlay && _blush.sprite == null)
-                {
-                    if (_cheekGlow == null)
-                    {
-                        const int size = 32;
-                        var pixels = new Color32[size * size];
-                        for (int y = 0; y < size; y++)
-                        for (int x = 0; x < size; x++)
-                        {
-                            float a = 1f - new Vector2((x + .5f) / size * 2f - 1f, (y + .5f) / size * 2f - 1f).magnitude;
-                            pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Max(0f, a));
-                        }
-                        _cheekGlow = DuelUiChrome.CreateSprite("Story blush", size, size, pixels);
-                    }
-                    _blush.sprite = _cheekGlow;
-                }
-                for (int i = 0; i < _hearts.Length; i++)
-                {
-                    float life = Mathf.Clamp01((_poseTime - i * .13f) / .9f);
-                    var heart = _hearts[i];
-                    heart.enabled = _akiBlush && life is > 0f and < 1f;
-                    heart.rectTransform.anchoredPosition = new Vector2(i * 4f * life, life * 44f);
-                    heart.color = new Color(1f, .46f, .69f, Mathf.Sin(Mathf.PI * life) * .85f);
-                }
-            }
-
             private void AnimatePortrait(Image image, Image ghost, Text reaction, bool speaking, float delta,
-                string emotion, float elapsed, float side, ref float fade, ref float slide)
+                string emotion, float elapsed, float side, ref float fade, ref float slide,
+                bool usePaintedExpression = false)
             {
                 if (!image.enabled) return;
                 float mix = 1f - Mathf.Exp(-delta * 12f);
                 Color mood = emotion switch
                 {
                     "smile" => new Color(1f, .97f, .91f),
-                    "blush" => new Color(1f, .91f, .94f),
+                    "blush" when !usePaintedExpression => new Color(1f, .91f, .94f),
                     "determined" => new Color(1f, .94f, .85f),
                     "sad" => new Color(.76f, .85f, 1f),
                     "hurt" => new Color(.88f, .74f, .77f),
@@ -964,7 +919,7 @@ namespace YGOPortable.UI
                     _ => ("", Color.clear),
                 };
                 float react = Mathf.Clamp01(elapsed / .72f);
-                reaction.enabled = _rpg && glyph.Length != 0 && react < 1f;
+                reaction.enabled = _rpg && !usePaintedExpression && glyph.Length != 0 && react < 1f;
                 if (!reaction.enabled) return;
                 reaction.text = glyph;
                 reaction.rectTransform.anchoredPosition = new Vector2(0f, Mathf.Lerp(-8f, 13f, react));
