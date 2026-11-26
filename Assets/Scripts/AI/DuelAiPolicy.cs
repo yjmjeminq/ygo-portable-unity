@@ -14,6 +14,14 @@ namespace YGOPortable.AI
         private const uint Development = (1u << 4) | (1u << 5) | (1u << 6) | (1u << 14) | (1u << 18);
         private const uint Disruption = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 8) | (1u << 13);
         private const uint Negation = 1u << 8;
+        internal const uint BrandedFusion = 44362883, Albion = 87746184, Lubellion = 70534340, Mirrorjade = 44146295;
+        internal const uint FusionDestiny = 52947044, DestroyerPhoenix = 60461804, MiracleFusion = 45906428;
+        internal const uint MaskChange = 21143940, DarkLaw = 58481572, PowerBond = 37630732, SuperPoly = 48130397;
+        internal const uint MachineAngelRitual = 39996157, MeteonisDrytron = 22398665, Benten = 77235086;
+        internal const uint Dakini = 39618799, Nasateiya = 99427357, Vishnu = 78316184;
+        private const uint PhantomOfYubel = 80453041;
+        private const uint Garura = 11765832, Mudragon = 54757758, StarvingVenom = 41209827, LovingDefender = 47172959;
+        private const uint CyberTwin = 74157028, ChimeratechRampage = 84058253, WakeUpHero = 32828466;
 
         [Flags]
         internal enum Decisions { MainPhase = 1, Chains = 2, Both = MainPhase | Chains }
@@ -191,6 +199,19 @@ namespace YGOPortable.AI
                             score += 1.25f;
                         if (style == DuelDeckStyle.Resource && card?.IsSpell == true && (flags & Development) != 0)
                             score += .8f;
+                        if (item.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE)
+                        {
+                            score += item.code switch
+                            {
+                                BrandedFusion when !own.mzone.Any(monster => monster?.code == Mirrorjade) => 1.1f,
+                                FusionDestiny when !own.mzone.Any(monster => monster?.code == DestroyerPhoenix) &&
+                                    !prompt.spSummonable.Any(option => option.location == YgoConstants.LOCATION_EXTRA &&
+                                        CardDatabase.Get(option.code)?.attr != YgoConstants.ATTRIBUTE_DARK) => .8f,
+                                MachineAngelRitual or MeteonisDrytron when bodies == 0 => .9f,
+                                SuperPoly when HasOpposingFusionMaterial(own, rival) => 2f,
+                                _ => 0f,
+                            };
+                        }
                         if (score <= 0 && prompt.canEp) continue;
                     }
                     else
@@ -202,6 +223,9 @@ namespace YGOPortable.AI
                         if ((flags & Disruption) != 0) score += Weight(Feature.SummonControl);
                         if (extra) score += Weight(Feature.ExtraSummon) +
                             Weight(Feature.ExtraCommitment) * Math.Clamp((ownAttack - attack) / 5000, 0, 1);
+                        if (extra && item.code == PhantomOfYubel && bodies <= 2 &&
+                            !own.mzone.Any(monster => monster?.code == PhantomOfYubel))
+                            score += 1.4f;
                         if (style != DuelDeckStyle.Development && !canBattle && (flags & Disruption) == 0 &&
                             !DuelDeckStrategy.IsKeyPiece(item.code) && attack < strongestRival)
                             score -= .95f;
@@ -237,7 +261,120 @@ namespace YGOPortable.AI
             if (effect.isEventSpecificEffect || (prompt.hintTimingOther & interaction) != 0) score += Weight(Feature.ChainWindow);
             if (session.TurnPlayer != prompt.playerId && (prompt.hintTimingOther & YgoConstants.TIMING_END_PHASE) != 0)
                 score += Weight(Feature.ChainEnd);
+            if (effect.code == DuelTactics.MaxxC && DuelTactics.IsOpponentSummoningEffect(session.CurrentChain.LastOrDefault(), prompt.playerId))
+                score += 1.25f;
+            if (effect.code == DuelTactics.SolemnStrike && session.CurrentChain.Count == 0 &&
+                session.HasPendingSpecialSummon((byte)(1 - prompt.playerId)))
+                score += 4f;
+            if (effect.code == SuperPoly && HasOpposingFusionMaterial(session.Players[prompt.playerId], session.Players[1 - prompt.playerId]))
+                score += 2.5f;
             return score;
+        }
+
+        internal static bool IsRitualSpell(uint code) => code is MachineAngelRitual or MeteonisDrytron;
+
+        internal static bool CanRiskPowerBond(DuelSession duel, DuelPrompt prompt)
+        {
+            var own = duel.Players[prompt.playerId];
+            var targets = own.extra.Select(card => CardDatabase.Get(card.code)).Where(card =>
+                card != null && (card.type & YgoConstants.TYPE_FUSION) != 0 && card.race == YgoConstants.RACE_MACHINE).ToArray();
+            if (targets.Length == 0 || targets.Any(card => card.atk < own.lp)) return true;
+            return prompt.canBp && DuelCombat.VisibleAttackTotal(own) + targets.Max(card => card.atk *
+                (card.code == ChimeratechRampage ? 6 : card.code == CyberTwin ? 4 : 2)) >= duel.Players[1 - prompt.playerId].lp;
+        }
+
+        internal static bool HasOpposingFusionMaterial(PlayerFieldSnapshot own, PlayerFieldSnapshot rival)
+        {
+            var facing = rival.mzone.Where(card => card?.IsFaceUp == true).ToArray();
+            if (facing.Length == 0) return false;
+            var board = own.mzone.Where(card => card != null).Concat(facing).ToArray();
+            return own.extra.Any(card => OpposingMaterialCount(card.code, board, facing) > 0);
+        }
+
+        private static int OpposingMaterialCount(uint target, LiveCardState[] board, LiveCardState[] facing)
+        {
+            bool Match(LiveCardState first, LiveCardState second) => target switch
+            {
+                Garura => first.attribute == second.attribute && first.race == second.race && first.CurrentNameCode != second.CurrentNameCode,
+                Mudragon => first.attribute == second.attribute && first.race != second.race,
+                StarvingVenom => first.attribute == YgoConstants.ATTRIBUTE_DARK && second.attribute == YgoConstants.ATTRIBUTE_DARK &&
+                    ((first.type | second.type) & YgoConstants.TYPE_TOKEN) == 0,
+                LovingDefender => DuelCombat.IsYubel(first.code) && (second.type & YgoConstants.TYPE_EFFECT) != 0 ||
+                    DuelCombat.IsYubel(second.code) && (first.type & YgoConstants.TYPE_EFFECT) != 0,
+                13243124 => first.race == second.race && first.attribute != second.attribute,
+                87758525 => first.IsFaceUp && (second.type & YgoConstants.TYPE_FUSION) != 0 ||
+                    second.IsFaceUp && (first.type & YgoConstants.TYPE_FUSION) != 0,
+                69946549 => (first.type & YgoConstants.TYPE_FUSION) != 0 && second.attribute == YgoConstants.ATTRIBUTE_DARK ||
+                    (second.type & YgoConstants.TYPE_FUSION) != 0 && first.attribute == YgoConstants.ATTRIBUTE_DARK,
+                _ => false,
+            };
+            if (facing.Any(first => facing.Any(second => first != second && Match(first, second)))) return 2;
+            return facing.Any(first => board.Any(second => first != second && Match(first, second))) ? 1 : 0;
+        }
+
+        internal static int? ChooseSummonTarget(DuelSession duel, DuelPrompt prompt, uint source)
+        {
+            if (prompt.min != 1 || prompt.max != 1 || prompt.candidates.Count < 2 ||
+                prompt.candidates.Any(card => card.controller != prompt.playerId)) return null;
+            var own = duel.Players[prompt.playerId];
+            var rival = duel.Players[1 - prompt.playerId];
+            if (prompt.candidates.All(item => item.location == YgoConstants.LOCATION_EXTRA))
+            {
+                if (source == SuperPoly)
+                {
+                    var facing = rival.mzone.Where(card => card?.IsFaceUp == true).ToArray();
+                    var board = own.mzone.Where(card => card != null).Concat(facing).ToArray();
+                    return Best(item => OpposingMaterialCount(item.code, board, facing));
+                }
+                return Best(item => source switch
+                {
+                    BrandedFusion or Lubellion or Albion => item.code switch
+                    {
+                        Mirrorjade => 6,
+                        Lubellion when own.hand.Count > 1 && own.extra.Any(card => card.code == Mirrorjade) => 4,
+                        Albion => 3,
+                        _ => 0,
+                    },
+                    FusionDestiny => item.code == DestroyerPhoenix ? 5 : 0,
+                    MaskChange or 21143941 or 93600443 => item.code == DarkLaw ? 5 : 0,
+                    MiracleFusion => item.code == WakeUpHero ? 4 : item.code == 22908820 ? 3 : 0,
+                    PowerBond => PowerBondTarget(item),
+                    _ => 0,
+                });
+            }
+            if (IsRitualSpell(source) && prompt.SelectionHint == 509 &&
+                prompt.candidates.All(item => (CardDatabase.Get(item.code)?.type & YgoConstants.TYPE_RITUAL) != 0))
+                return Best(item => item.code switch
+                {
+                    Dakini or Vishnu when rival.mzone.Any(card => card != null) => 5,
+                    48546368 when own.hand.Any(card => CardDatabase.Get(card.code)?.race == YgoConstants.RACE_FAIRY) => 5,
+                    48546368 => 1,
+                    Nasateiya when rival.mzone.Any(card => card != null) => 2,
+                    Benten => 1,
+                    _ => 3,
+                });
+            return null;
+
+            int PowerBondTarget(SelectableCardItem item)
+            {
+                int attack = Math.Max(0, CardDatabase.Get(item.code)?.atk ?? 0);
+                if (attack >= own.lp) return 0;
+                return item.code is CyberTwin or ChimeratechRampage ? 6 : 1;
+            }
+
+            int? Best(Func<SelectableCardItem, int> value)
+            {
+                int best = 0;
+                int? choice = null;
+                for (int i = 0; i < prompt.candidates.Count; i++)
+                {
+                    int score = value(prompt.candidates[i]);
+                    if (score <= best) continue;
+                    best = score;
+                    choice = i;
+                }
+                return choice;
+            }
         }
 
         private float Weight(Feature feature) => _weights[(int)feature];

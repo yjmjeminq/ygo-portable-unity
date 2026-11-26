@@ -2527,6 +2527,12 @@ namespace YGOPortable.Core
             return cards.Exists(card => CardDatabase.Get(card.code) is CardInfo info && matches(info));
         }
 
+        internal int CountOwnDeckCopies(byte playerId, uint code) => NativePtr == IntPtr.Zero ? 0 :
+            QueryLocationCards(playerId, YgoConstants.LOCATION_DECK, keepNulls: false, flags: YgoConstants.QUERY_CODE)
+                .Count(card => card.code == code);
+
+        internal bool HasPendingSpecialSummon(byte player) => _pendingSpecialSummons.Any(summon => summon.Item1 == player);
+
         internal void RefreshVisibleEquipTargets(byte playerId)
         {
             if (TracksFieldReadouts || NativePtr == IntPtr.Zero) return;

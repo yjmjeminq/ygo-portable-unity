@@ -21,7 +21,12 @@ namespace YGOPortable.Editor
     public static class AiFixedScenarioRegression
     {
         [Serializable] private sealed class FilePin { public string path, sha256; }
-        [Serializable] private sealed class Manifest { public int schemaVersion; public FilePin[] files; public string[] fixtures; }
+        [Serializable] private sealed class Manifest
+        {
+            public int schemaVersion;
+            public FilePin[] files;
+            public string[] fixtures, builtInFixtures;
+        }
         [Serializable] private sealed class Deck { public int id; public uint[] main, extra; }
         [Serializable] private sealed class Response
         {
@@ -79,6 +84,8 @@ namespace YGOPortable.Editor
 
         private static int _scriptErrors;
         private static StreamWriter _log;
+        private const string SummonNegation = "solemn-strike-summon-owner";
+        private const string KeepOwnFusion = "predaprimitive-own-fusion";
 
         public static void Run()
         {
@@ -101,7 +108,9 @@ namespace YGOPortable.Editor
                 string manifestPath = Path.Combine(fixtureRoot, "manifest.json");
                 var manifest = JsonUtility.FromJson<Manifest>(File.ReadAllText(manifestPath));
                 Require(manifest != null && manifest.schemaVersion == 1 && manifest.files?.Length >= 11 &&
-                    manifest.fixtures?.Length == 6, "Missing or unsupported fixed regression manifest.");
+                    manifest.fixtures?.Length == 6 &&
+                    manifest.builtInFixtures?.SequenceEqual(new[] { SummonNegation, KeepOwnFusion }) == true,
+                    "Missing or unsupported fixed regression manifest.");
                 foreach (var pin in manifest.files)
                 {
                     string actual = Hash(Inside(root, pin.path));
@@ -125,7 +134,8 @@ namespace YGOPortable.Editor
                 var links = LinkComboPolicy.LoadIncluded() ?? throw new InvalidOperationException("Link AI policy is missing.");
                 var filter = (Environment.GetEnvironmentVariable("YGO_AI_REGRESSION_CASES") ?? "")
                     .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(value => value.Trim()).ToArray();
-                var known = new HashSet<string>(manifest.fixtures.Select(path => Path.GetFileNameWithoutExtension(path)));
+                var known = new HashSet<string>(manifest.fixtures.Select(Path.GetFileNameWithoutExtension)
+                    .Concat(manifest.builtInFixtures));
                 Require(filter.All(known.Contains), "Unknown case in YGO_AI_REGRESSION_CASES.");
                 foreach (string relative in manifest.fixtures)
                 {
@@ -136,7 +146,11 @@ namespace YGOPortable.Editor
                     results.Add(Play(fixture, general, links, output));
                     if (_scriptErrors != 0) break;
                 }
-                Require(results.Count == (filter.Length == 0 ? manifest.fixtures.Length : filter.Distinct().Count()),
+                if (_scriptErrors == 0 && (filter.Length == 0 || filter.Contains(SummonNegation)))
+                    results.Add(VerifySummonNegation(general, links));
+                if (_scriptErrors == 0 && (filter.Length == 0 || filter.Contains(KeepOwnFusion)))
+                    results.Add(VerifyOwnFusion(general, links));
+                Require(results.Count == (filter.Length == 0 ? known.Count : filter.Distinct().Count()),
                     "Not every requested regression completed.");
                 Require(_scriptErrors == 0, "Native script errors occurred.");
                 report.complete = true;
@@ -161,6 +175,128 @@ namespace YGOPortable.Editor
                 Debug.Log($"[AI-FIXED-REGRESSION] complete={report.complete} passed={report.passed} failed={report.failed} output={output}");
                 EditorApplication.Exit(exitCode);
             }
+        }
+
+        private static CaseResult VerifySummonNegation(DuelAiPolicy general, LinkComboPolicy links)
+        {
+            const uint strike = 40605147, cyberDragon = 70095154, geminiElf = 69140098;
+            var result = new CaseResult { id = SummonNegation, expectation = "Decline Strike for your Cyber Dragon; negate the opposing summon." };
+            try
+            {
+                foreach (byte trapOwner in new byte[] { 0, 1 })
+                {
+                    uint[] lead = Enumerable.Range(0, 40).Select(i => i % 2 == 0 ? strike : cyberDragon).ToArray();
+                    uint[] follow = Enumerable.Range(0, 40).Select(i => i % 2 == 0 ? strike : geminiElf).ToArray();
+                    using var duel = YgoProjectBuilder.StartSeedMatching(SummonNegation,
+                        lead, Array.Empty<uint>(), follow, Array.Empty<uint>(), true,
+                        current => current.Players[0].hand.Any(card => card.code == strike) &&
+                            current.Players[0].hand.Any(card => card.code == cyberDragon) &&
+                            current.Players[1].hand.Any(card => card.code == strike) &&
+                            current.Players[1].hand.Any(card => card.code == geminiElf));
+                    var ai = new TacticalAI(general, links);
+                    if (trapOwner == 0) SubmitAction(4, strike);
+                    Advance(IsIdle);
+                    duel.SubmitResponseInt(7);
+                    Advance(IsIdle);
+                    if (trapOwner == 1) SubmitAction(4, strike);
+                    Advance(IsIdle);
+                    SubmitAction(0, geminiElf);
+                    Advance(IsIdle);
+                    duel.SubmitResponseInt(7);
+                    Advance(IsIdle);
+                    SubmitAction(1, cyberDragon);
+                    var window = Advance(prompt => prompt.playerId == trapOwner &&
+                        prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.candidates.Any(card => card.code == strike));
+                    int response = BitConverter.ToInt32(ai.ComputeResponse(duel, window), 0);
+                    Write($"STRIKE trapOwner={trapOwner} summonSeat0={duel.HasPendingSpecialSummon(0)} " +
+                        $"chainLinks={duel.CurrentChain.Count} choice={response}");
+                    Require(trapOwner == 0 ? response == -1 : (uint)response < window.candidates.Count &&
+                        window.candidates[response].code == strike, "Solemn Strike chose the wrong summon owner.");
+                    duel.SubmitResponseInt(response);
+                    Advance(IsIdle);
+                    Require(duel.Players[trapOwner].lp == (trapOwner == 0 ? 8000 : 6500) &&
+                        duel.Players[0].mzone.Any(card => card?.code == cyberDragon) == (trapOwner == 0),
+                        "The actual summon or LP outcome diverged from the Strike decision.");
+                    result.retries += duel.RetryCount;
+
+                    static bool IsIdle(DuelPrompt prompt) => prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
+
+                    void SubmitAction(int command, uint code)
+                    {
+                        var prompt = duel.ActivePrompt;
+                        Require(prompt != null && IsIdle(prompt), "Missing native idle prompt.");
+                        var actions = command == 4 ? prompt.sSetable : command == 1 ? prompt.spSummonable : prompt.summonable;
+                        int index = actions.FindIndex(card => card.code == code);
+                        Require(index >= 0, $"Missing native action {command}/{code}.");
+                        duel.SubmitResponseInt((index << 16) | command);
+                    }
+
+                    DuelPrompt Advance(Func<DuelPrompt, bool> stop)
+                    {
+                        for (int step = 0; step < 32 && duel.RetryCount == 0 && !duel.IsFinished; step++)
+                        {
+                            var prompt = duel.ActivePrompt;
+                            if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                            if (stop(prompt)) return prompt;
+                            if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                                duel.SubmitResponseInt(prompt.forced ? 0 : -1);
+                            else if (prompt.messageType is YgoConstants.MSG_SELECT_POSITION or YgoConstants.MSG_SELECT_PLACE)
+                                duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                            else
+                                throw new InvalidOperationException("Unexpected prompt " + prompt.messageType);
+                        }
+                        throw new InvalidOperationException("The native summon-negation prompt did not arrive.");
+                    }
+                }
+                result.passed = true;
+            }
+            catch (Exception error) { result.error = error.ToString(); }
+            result.scriptErrors = _scriptErrors;
+            if (!result.passed) Write($"FAIL {result.id} {result.error}");
+            Write($"END {result.id} passed={result.passed} Retry={result.retries} ScriptErrors={result.scriptErrors}");
+            return result;
+        }
+
+        private static CaseResult VerifyOwnFusion(DuelAiPolicy general, LinkComboPolicy links)
+        {
+            const uint primitive = 89176044, polymerization = 24094653, geminiElf = 69140098,
+                ophrysScorpio = 35272499, firstOfTheDragons = 10817524, cyberDragon = 70095154;
+            var result = new CaseResult { id = KeepOwnFusion, expectation = "Keep the live Fusion when Predaprimitive offers to destroy it." };
+            try
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching(KeepOwnFusion,
+                    TestDuelAiTactics.Deck(primitive, polymerization, ophrysScorpio, geminiElf, geminiElf, geminiElf),
+                    new[] { firstOfTheDragons }, TestDuelAiTactics.Deck(cyberDragon), Array.Empty<uint>(), true,
+                    current => current.Players[0].hand.Any(card => card.code == primitive) &&
+                        current.Players[0].hand.Count(card => card.code == geminiElf) >= 2);
+                TestDuelAiTactics.SubmitIdle(duel, 5, primitive);
+                TestDuelAiTactics.Drive(duel, TestDuelAiTactics.IsIdle);
+                Require(duel.Players[0].grave.Any(card => card.code == primitive) &&
+                    duel.Players[0].hand.Any(card => card.code == polymerization), "Predaprimitive did not resolve its hand search.");
+                TestDuelAiTactics.SubmitIdle(duel, 5, polymerization);
+                TestDuelAiTactics.Drive(duel, TestDuelAiTactics.IsIdle, firstOfTheDragons);
+                Require(duel.Players[0].mzone.Any(card => card?.code == firstOfTheDragons), "The test Fusion did not appear.");
+                duel.SubmitResponseInt(7);
+                TestDuelAiTactics.Drive(duel, TestDuelAiTactics.IsIdle);
+                TestDuelAiTactics.SubmitIdle(duel, 1, cyberDragon);
+                var prompt = TestDuelAiTactics.Drive(duel, current => current.playerId == 0 &&
+                    (current.messageType == YgoConstants.MSG_SELECT_EFFECTYN && current.promptCardCode == primitive ||
+                    current.messageType == YgoConstants.MSG_SELECT_CHAIN && current.candidates.Any(card => card.code == primitive)));
+                var ai = new TacticalAI(general, links);
+                var answer = ai.ComputeResponse(duel, prompt);
+                int pass = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN ? 0 : -1;
+                Require(BitConverter.ToInt32(answer, 0) == pass, "The AI accepted the optional self-destruction trigger.");
+                duel.SubmitResponse(answer);
+                TestDuelAiTactics.Drive(duel, TestDuelAiTactics.IsIdle);
+                Require(duel.Players[0].mzone.Any(card => card?.code == firstOfTheDragons), "The native Fusion did not survive the pass.");
+                result.retries = duel.RetryCount;
+                result.passed = true;
+            }
+            catch (Exception error) { result.error = error.ToString(); }
+            result.scriptErrors = _scriptErrors;
+            if (!result.passed) Write($"FAIL {result.id} {result.error}");
+            Write($"END {result.id} passed={result.passed} Retry={result.retries} ScriptErrors={result.scriptErrors}");
+            return result;
         }
 
         private static CaseResult Play(Fixture fixture, DuelAiPolicy general, LinkComboPolicy links, string output)

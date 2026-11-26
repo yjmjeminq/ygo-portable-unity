@@ -35,6 +35,9 @@ namespace YGOPortable.AI
         private const ulong WingedKuribohInterrupt = ((ulong)WingedKuribohLevel6 << 20) | 1;
         internal const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
         private const uint AshBlossom = 14558127, UpstartGoblin = 70368879, OriginalSinfulSpoils = 89023486;
+        internal const uint MaxxC = 23434538, CalledBy = 24224830, ForbiddenDroplet = 24299458;
+        internal const uint SolemnStrike = 40605147;
+        internal const uint Predaprimitive = 89176044;
         private const uint Nibiru = 27204311, Apollousa = 4280258, Blazar = 21123811,
             Dragoon = 37818794, CyberInfinity = 10443957, Dragonlord = 19652159, Quasar = 35952884,
             ShootingMajestic = 40939228, Savage = 27548199, CrystalWing = 50954680, Rulkallos = 84330567;
@@ -54,7 +57,7 @@ namespace YGOPortable.AI
         private const uint Utopia = 84013237, DoubleOrNothing = 94770493;
         private const uint Stratos = 40044918, RedDragonArchfiend = 70902743, RedZone = 50056656, CrimsonGaia = 98173209;
         private const ulong ApplyContinuousTrapEffect = 94;
-        private const uint ForbiddenDroplet = 24299458, RisingSunUtopia = 76504386;
+        private const uint RisingSunUtopia = 76504386;
         private const uint DdGryphon = 28406301;
         private const uint GalaxyCyclone = 5133471, KaliYuga = 15939229, WhipViper = 79967395;
         private const uint Erebus = 23064604;
@@ -119,6 +122,7 @@ namespace YGOPortable.AI
             89474727, // 진섬광룡 스타더스트 크로니클
             9753964,  // 염마룡 레드 데몬 어비스
             4280258,  // 소명의 신궁-아폴로우사
+            SolemnStrike,
         };
 
         internal static bool IsFieldMonsterSuppression(SelectableCardItem effect) =>
@@ -159,7 +163,19 @@ namespace YGOPortable.AI
             if (last != null && !prompt.IsTriggerChain && !effect.isTriggeredEffect &&
                 ResponseNegates.Contains(effect.code) && (last.negated || last.triggerPlayer == prompt.playerId))
                 return false;
-            if ((effect.code is 23434538 or 42141493 or 84192580 or 87126721) && !effect.isTriggeredEffect &&
+            if (effect.code == SolemnStrike && last == null &&
+                !duel.HasPendingSpecialSummon((byte)(1 - prompt.playerId))) return false;
+            if (effect.code == Predaprimitive && effect.location == YgoConstants.LOCATION_GRAVE)
+                return false; // The optional GY trigger destroys one of our own Fusion monsters.
+            if (effect.code == CalledBy)
+                return OpposingGraveResponse(duel, prompt.playerId, last) != 0;
+            if (effect.code == MaxxC)
+                return duel.Players[prompt.playerId].deckCount > 2 && IsOpponentSummoningEffect(last, prompt.playerId);
+            if (effect.code == DuelAiPolicy.SuperPoly)
+                return DuelAiPolicy.HasOpposingFusionMaterial(duel.Players[prompt.playerId], duel.Players[1 - prompt.playerId]);
+            if (effect.code == DuelAiPolicy.PowerBond && !DuelAiPolicy.CanRiskPowerBond(duel, prompt))
+                return false;
+            if ((effect.code is 42141493 or 84192580 or 87126721) && !effect.isTriggeredEffect &&
                 (duel.TurnPlayer == prompt.playerId || duel.CurrentPhase == YgoConstants.PHASE_END) &&
                 (last == null || last.triggerPlayer == prompt.playerId || last.negated ||
                     ((CardDatabase.Get(last.code)?.DeckEffectCategories ?? 0) & Development) == 0))
@@ -247,6 +263,9 @@ namespace YGOPortable.AI
                 last.description == ((ulong)RisingSunUtopia << 20) && !duel.HasActiveAttack && duel.TurnPlayer == prompt.playerId &&
                 StrongestAttacker(own) < StrongestAttacker(rival) / 2)
                 return false;
+            if (effect.code == ForbiddenDroplet && !rival.mzone.Any(card =>
+                card is { IsFaceUp: true, effectsDisabled: false } && (card.type & YgoConstants.TYPE_EFFECT) != 0))
+                return false;
             if (firstEffect && effect.code == KaliYuga)
             {
                 int enemySpells = rival.szone.Count(card => card != null);
@@ -311,6 +330,27 @@ namespace YGOPortable.AI
                         if (card != null) loss += .85;
                 return loss;
             }
+        }
+
+        internal static bool IsOpponentSummoningEffect(ChainLinkInfo source, byte player) =>
+            source is { negated: false, Resolved: false } && source.triggerPlayer != player &&
+            (source.code is 44362883 or 52947044 or 39996157 or 22398665 or 37630732 or 48130397 ||
+                ((CardDatabase.Get(source.code)?.DeckEffectCategories ?? 0) & SummoningEffects) != 0);
+
+        private static uint OpposingGraveResponse(DuelSession duel, byte player, ChainLinkInfo source) =>
+            source is { negated: false, Resolved: false } && source.triggerPlayer != player &&
+            CardDatabase.Get(source.code)?.IsMonster == true &&
+            duel.Players[1 - player].grave.Any(card => card.code == source.code)
+                ? source.code : 0;
+
+        internal static int ChooseCalledByTarget(DuelSession duel, DuelPrompt prompt)
+        {
+            int count = duel.CurrentChain.Count;
+            if (count < 2 || duel.CurrentChain[count - 1] is not { code: CalledBy } activation ||
+                activation.triggerPlayer != prompt.playerId) return -1;
+            uint target = OpposingGraveResponse(duel, prompt.playerId, duel.CurrentChain[count - 2]);
+            return target == 0 ? -1 : prompt.candidates.FindIndex(card => card.controller == 1 - prompt.playerId &&
+                card.location == YgoConstants.LOCATION_GRAVE && card.code == target);
         }
 
         private static bool CanKeepPhotonHowlingMaterials(DuelSession duel, DuelPrompt prompt,
@@ -1113,6 +1153,32 @@ namespace YGOPortable.AI
             return own ? 10000 + value : -5000 + value;
         }
 
+        internal static int SummonMaterialPriority(DuelSession duel, byte player, SelectableCardItem option,
+            uint source, ulong hint)
+        {
+            if (option.controller != player) return 10000 + SelectionPriority(duel, player, option, Destroy);
+            var info = CardDatabase.Get(option.code);
+            int score = -(Math.Max(0, info?.atk ?? 1000) + Math.Max(0, info?.def ?? 0) / 3);
+            if (option.location == YgoConstants.LOCATION_MZONE)
+                score -= 1000 + (info?.IsExtra == true || (info?.type & YgoConstants.TYPE_RITUAL) != 0 ? 4500 : 0);
+            if (option.location == YgoConstants.LOCATION_DECK) score += 1700;
+            if (option.location == YgoConstants.LOCATION_GRAVE) score += 2200;
+            if (option.location == YgoConstants.LOCATION_HAND && ProtectInHand.Contains(option.code) &&
+                duel.Players[player].hand.Count(card => card.code == option.code) < 2) score -= 3000;
+            if (DuelAiPolicy.IsRitualSpell(source) && hint == Release && option.code == DuelAiPolicy.Benten)
+                score += 4200;
+            if (source == DuelAiPolicy.FusionDestiny && option.code is 9411399 or 16605586)
+                score += 4000;
+            if ((hint is SendToGrave or Discard || hint == 511 && option.location != YgoConstants.LOCATION_GRAVE) &&
+                GraveyardBeneficiaries.Contains(option.code)) score += 2100;
+            if (source == ForbiddenDroplet && option.location == YgoConstants.LOCATION_SZONE &&
+                info is { IsSpell: true } && (info.type & (YgoConstants.TYPE_CONTINUOUS | YgoConstants.TYPE_FIELD | YgoConstants.TYPE_EQUIP)) == 0 &&
+                duel.CurrentChain.Any(link => link.triggerPlayer == player && !link.Resolved && link.code == option.code &&
+                    link.ActivationSource == (player, option.location, option.sequence)))
+                score += 6500;
+            return score;
+        }
+
         internal static int? ChoosePosition(DuelSession duel, DuelPrompt prompt)
         {
             const uint both = YgoConstants.POS_FACEUP_ATTACK | YgoConstants.POS_FACEUP_DEFENSE;
@@ -1124,6 +1190,11 @@ namespace YGOPortable.AI
             int rivalStrongest = StrongestAttacker(rival);
             bool canAttack = duel.TurnNumber > 1 && duel.TurnPlayer == prompt.playerId &&
                 duel.CurrentPhase is YgoConstants.PHASE_MAIN1 or YgoConstants.PHASE_BATTLE;
+
+            if (canAttack && DuelCombat.IsYubel(card.code) && DuelCombat.HasNightmarePain(duel.Players[prompt.playerId]) &&
+                rivalStrongest > 0) return (int)YgoConstants.POS_FACEUP_ATTACK;
+            if (canAttack && DuelCombat.CanTestLethalPosition(duel, prompt.playerId, card.atk))
+                return (int)YgoConstants.POS_FACEUP_ATTACK;
 
             // Never Special Summon in Attack Position when the opponent already controls a stronger attacker!
             if (rivalStrongest > Math.Max(0, card.atk))

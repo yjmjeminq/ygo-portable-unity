@@ -22,6 +22,7 @@ STREAMING = (
     'cards_kr.json', 'cards_prop.bin', 'cardscripts.pack', 'deck_effect_categories.bin',
     'duel_effect_labels_ko.tsv', 'opponents_db.json', 'opponent_deck_levels.json',
 )
+GX_DECK_INPUTS = ('opponents_db.json', 'opponent_deck_levels.json', 'story_gx_rpg_decks.json')
 BLUNDERS = ('exposedAttackers', 'selfDestruction', 'lethalMisses', 'wastedHandtraps', 'retries')
 BLUNDER_RATE_KINDS = ('ownEffectDefeats', 'missedLethal', 'exposureDamageWithoutPayoff',
                       'wastedDisruption', 'resourcesLeftOnDefeat', 'downgradeSummons')
@@ -232,6 +233,9 @@ def worker_path(workspace, frozen, index, candidate_snapshot=None, previous_snap
 def run_worker(index, arguments, editor, frozen, output):
     worker = worker_path(arguments.workspace, frozen, index, arguments.candidate_snapshot, arguments.previous_snapshot)
     prepare(worker, frozen, arguments.candidate_policies, arguments.candidate_snapshot, arguments.previous_snapshot)
+    if arguments.gx_suite:
+        for name, contents in arguments.gx_deck_inputs.items():
+            write(worker / 'Assets/StreamingAssets' / name, contents)
     write(output / f'candidate-source-{index}.json', source_manifest(worker))
     previous_report = None
     if arguments.previous_snapshot is not None:
@@ -244,6 +248,7 @@ def run_worker(index, arguments, editor, frozen, output):
                YGO_BENCH_START=str(index), YGO_BENCH_STRIDE=str(arguments.jobs),
                YGO_BENCH_STYLE_SUITE='1' if arguments.style_suite else '0',
                YGO_BENCH_FULL_SUITE='1' if arguments.full_suite else '0',
+               YGO_BENCH_GX_SUITE='1' if arguments.gx_suite else '0',
                YGO_BENCH_ROSTER_LEVELS='1' if arguments.roster_levels else '0',
                YGO_BENCH_OPENINGS_ONLY='1' if arguments.openings_only else '0',
                YGO_BENCH_REFERENCE_ONLY='1' if arguments.reference_only else '0',
@@ -287,7 +292,8 @@ def run_fixed_regressions(arguments, editor, frozen, output):
 def verify_regression_report(directory, source, policy_hashes):
     report = json.loads((directory / 'summary.json').read_text(encoding='utf-8-sig'))
     fixtures_path = PROJECT / 'Tools/AiRegression/manifest.json'
-    expected = {Path(name).stem for name in json.loads(fixtures_path.read_bytes())['fixtures']}
+    manifest = json.loads(fixtures_path.read_bytes())
+    expected = {Path(name).stem for name in manifest['fixtures']} | set(manifest.get('builtInFixtures', []))
     cases = report.get('cases') or []
     evidence = {item['path']: item['sha256'].lower() for item in report.get('testedFiles') or []}
     required_files = {path: digest for path, digest in source.items() if path.startswith('Assets/Scripts/AI/') or
@@ -406,6 +412,22 @@ def summarize(matches):
             data['winRate'] = data['winPoints'] / data['games'] if data['games'] else None
             data['meanEndBoard'] = data['boardTotal'] / data['endTurns'] if data['endTurns'] else None
         style_report[name][turn_order] = policies
+    gx_fields = ('signatureMonsterReached', 'completedTurns', 'emptyFieldEndTurns', 'emptyMonsterEndTurns',
+                 'battleFinishes', 'provenMissedBattleWins', 'lethalMisses', 'threatsSpent', 'wastedHandtraps',
+                 'trackedResponses', 'selfDestruction', 'decisionMs', 'retries')
+    gx_metrics = {role: Counter() for role in blunders}
+    for match in matches:
+        if not match['era'].startswith('GX/'):
+            continue
+        for seat, side in enumerate(match['sides']):
+            role = 'candidate' if seat == match['candidate'] else 'baseline'
+            gx_metrics[role]['games'] += 1
+            for field in gx_fields:
+                gx_metrics[role][field] += side[field]
+    for counts in gx_metrics.values():
+        if not counts:
+            continue
+        counts['decisionMsPerCompletedTurn'] = counts['decisionMs'] / max(1, counts['completedTurns'])
     return {
         'games': len(matches), 'outcomes': outcomes, 'winRate': wins,
         'gainPercentagePoints': (wins - .5) * 100 if wins is not None else None,
@@ -417,6 +439,7 @@ def summarize(matches):
         'blundersPer100': {role: {name: 100 * value / max(1, len(matches)) for name, value in counts.items()}
                            for role, counts in rate_counts.items()},
         'firstTurnDrawHandtrapActivationsOutsideChain': first_turn_draw_handtraps,
+        **({'gxThemeMetrics': gx_metrics} if gx_metrics['candidate'] else {}),
         'byStyleAndSeat': dict(style_report),
         'topFailures': {role: [dict(kind=kind, count=count, example=examples[role][kind])
                                for kind, count in counts.most_common(5)] for role, counts in problems.items()},
@@ -629,6 +652,7 @@ def main():
     suite = parser.add_mutually_exclusive_group()
     suite.add_argument('--style-suite', action='store_true', help='Run added trap, lock, burn and alternate-win matchups.')
     suite.add_argument('--full-suite', action='store_true', help='Run all 22 fixed era, summon-method and playstyle matchups.')
+    suite.add_argument('--gx-suite', action='store_true', help='Run the ten GX story and competitive theme matchups.')
     suite.add_argument('--fixed-regressions', action='store_true', help='Replay every fixed scenario with the current native AI.')
     suite.add_argument('--roster-levels', action='store_true', help='Check every available deck in both seats with the candidate AI through turn two.')
     parser.add_argument('--openings-only', action='store_true', help='Measure the first two duel turns without scoring match winners.')
@@ -648,7 +672,7 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r'[\w-]+', args.label) or not 1 <= args.jobs <= 4 or args.seeds < 1:
         parser.error('Use a simple run label and positive job/seed counts.')
-    matchups = 22 if args.full_suite else 8 if args.style_suite else 14
+    matchups = 10 if args.gx_suite else 22 if args.full_suite else 8 if args.style_suite else 14
     if args.jobs < 2 and not (args.fixture or args.replay or args.fixed_regressions):
         parser.error('Full benchmarks require two to four workers.')
     if args.fixture:
@@ -739,6 +763,10 @@ def main():
             parser.error('Confirmation requires the same source and policies to pass the random opponent floor.')
     output = args.workspace / args.label
     output.mkdir(parents=True, exist_ok=False)
+    if args.gx_suite:
+        args.gx_deck_inputs = {name: (PROJECT / 'Assets/StreamingAssets' / name).read_bytes() for name in GX_DECK_INPUTS}
+        hashes = {name: hashlib.sha256(contents).hexdigest() for name, contents in args.gx_deck_inputs.items()}
+        write(output / 'gx-decks-sha256.json', json.dumps(hashes, indent=2).encode())
     if args.replay:
         write(output / 'replay-input.jsonl', ''.join(json.dumps(match, ensure_ascii=False) + '\n' for match in selected).encode())
     version = (frozen / 'ProjectSettings/ProjectVersion.txt').read_text().splitlines()[0].split()[-1]

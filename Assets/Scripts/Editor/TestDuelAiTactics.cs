@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using UnityEditor;
 using UnityEngine;
 using YGOPortable.AI;
 using YGOPortable.Core;
@@ -13,7 +14,36 @@ namespace YGOPortable.Editor
         private const uint Nibiru = 27204311, LinkSpider = 98978921, Dandylion = 15341821;
         private const uint Foolish = 81439173, Passcode = 93104632, Imperm = 10045474, GeminiElf = 69140098;
         private const uint Merrli = 74078255, Sulliek = 74920585;
+        private const uint BrandedFusion = 44362883;
         private static readonly uint[] Empty = Array.Empty<uint>();
+
+        public static void RunHeadless()
+        {
+            int exit = 1;
+            int scriptErrors = 0;
+            try
+            {
+                string streaming = Application.streamingAssetsPath;
+                Require(YgoNativeBridge.Initialize(streaming, (kind, message) =>
+                {
+                    if (kind != 0) return;
+                    scriptErrors++;
+                    Debug.LogError(message);
+                }) == 0, "Could not initialize the duel engine.");
+                CardDatabase.Load(streaming);
+                TestChainChooser.Run();
+                Run();
+                AiBattleProbe.VerifyFixtures();
+                Require(scriptErrors == 0, $"Native AI test script errors: {scriptErrors}");
+                exit = 0;
+            }
+            catch (Exception error) { Debug.LogException(error); }
+            finally
+            {
+                YgoNativeBridge.Shutdown();
+                if (Application.isBatchMode) EditorApplication.Exit(exit);
+            }
+        }
 
         internal static void Run()
         {
@@ -26,7 +56,154 @@ namespace YGOPortable.Editor
             VerifyBaitAgainstBaronne();
             VerifySummonBudget();
             VerifyRevealedSweeper();
+            VerifyGxResponses();
+            VerifyGxSummonChoices();
+            VerifyNativeBentenSearch();
+            VerifyGxBattlePriority();
             Debug.Log("[VERIFY AI TACTICS] Ash conservation, Baronne bait, summon budget, revealed sweeper and chain ordering passed. Retry=0");
+        }
+
+        private static void VerifyGxResponses()
+        {
+            const uint maxxC = 23434538, calledBy = 24224830, droplet = 24299458, predaprimitive = 89176044;
+            using var duel = new DuelSession();
+            duel.Players[0].deckCount = 30;
+            var chain = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            var maxx = new SelectableCardItem { code = maxxC, controller = 0, location = YgoConstants.LOCATION_HAND };
+            var called = new SelectableCardItem { code = calledBy, controller = 0, location = YgoConstants.LOCATION_SZONE };
+            var upstart = new ChainLinkInfo { code = Upstart, triggerPlayer = 1 };
+            duel.CurrentChain.Add(upstart);
+            Require(!DuelTactics.CanActivate(duel, chain, maxx), "Maxx C was wasted on a draw effect.");
+            duel.CurrentChain[0] = new ChainLinkInfo { code = BrandedFusion, triggerPlayer = 1 };
+            Require(DuelTactics.CanActivate(duel, chain, maxx), "Maxx C missed an opponent's Branded Fusion.");
+            duel.CurrentChain[0] = new ChainLinkInfo { code = BrandedFusion, triggerPlayer = 0 };
+            Require(!DuelTactics.CanActivate(duel, chain, maxx), "Maxx C was chained to a friendly Branded Fusion.");
+
+            duel.CurrentChain[0] = new ChainLinkInfo { code = Ash, triggerPlayer = 1, triggerLoc = YgoConstants.LOCATION_HAND };
+            duel.Players[1].grave.Add(new LiveCardState { code = Ash });
+            Require(DuelTactics.CanActivate(duel, chain, called), "Called by the Grave missed an opposing Ash in the GY.");
+            duel.CurrentChain[0] = new ChainLinkInfo { code = Ash, triggerPlayer = 0, triggerLoc = YgoConstants.LOCATION_HAND };
+            Require(!DuelTactics.CanActivate(duel, chain, called), "Called by the Grave responded to a friendly effect.");
+            duel.CurrentChain[0] = new ChainLinkInfo { code = Ash, triggerPlayer = 1, triggerLoc = YgoConstants.LOCATION_HAND };
+            duel.CurrentChain.Add(new ChainLinkInfo { code = calledBy, triggerPlayer = 0 });
+            var target = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, playerId = 0,
+                min = 1, max = 1, SelectionHint = DuelTactics.Banish };
+            target.candidates.Add(new SelectableCardItem { code = Baronne, controller = 1, location = YgoConstants.LOCATION_GRAVE });
+            target.candidates.Add(new SelectableCardItem { code = Ash, controller = 1, location = YgoConstants.LOCATION_GRAVE });
+            Require(Smart().ComputeResponse(duel, target).SequenceEqual(DuelSession.PackCardSelection(1)),
+                "Called by the Grave ignored the immediate chain source.");
+
+            var cost = new SelectableCardItem { code = Stratos, controller = 0, location = YgoConstants.LOCATION_HAND };
+            var boss = new SelectableCardItem { code = Baronne, controller = 0, location = YgoConstants.LOCATION_MZONE };
+            target.SelectionHint = DuelTactics.SendToGrave;
+            target.max = 2;
+            target.candidates.Clear();
+            target.candidates.AddRange(new[] { boss, cost });
+            duel.CurrentChain.Clear();
+            duel.CurrentChain.Add(new ChainLinkInfo { code = droplet });
+            Require(Smart().ComputeResponse(duel, target).SequenceEqual(DuelSession.PackCardSelection(1)),
+                "Droplet should send only the cheaper card when one cost suffices.");
+            var primitive = new SelectableCardItem { code = predaprimitive, location = YgoConstants.LOCATION_GRAVE };
+            Require(!DuelTactics.CanActivate(duel, chain, primitive), "Predaprimitive's optional trigger destroyed an own Fusion.");
+            primitive.location = YgoConstants.LOCATION_HAND;
+            Require(DuelTactics.CanActivate(duel, chain, primitive), "Predaprimitive lost its Fusion Spell search from hand.");
+            Debug.Log("[VERIFY GX AI RESPONSE] Maxx C, Called by the Grave, and Droplet cost targeting passed.");
+        }
+
+        private static void VerifyGxSummonChoices()
+        {
+            using var duel = new DuelSession();
+            var summon = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, playerId = 0, min = 1, max = 1 };
+            summon.candidates.Add(new SelectableCardItem { code = 87746184, location = YgoConstants.LOCATION_EXTRA });
+            summon.candidates.Add(new SelectableCardItem { code = 44146295, location = YgoConstants.LOCATION_EXTRA });
+            duel.CurrentChain.Add(new ChainLinkInfo { code = BrandedFusion });
+            Require(ChoosesSecond(), "Branded Fusion failed to choose a legal Mirrorjade.");
+            summon.candidates[1].code = 60461804;
+            duel.CurrentChain[0].code = 52947044;
+            Require(ChoosesSecond(), "Fusion Destiny failed to choose a legal DPE.");
+            summon.candidates[1].code = 58481572;
+            duel.CurrentChain[0].code = 21143940;
+            Require(ChoosesSecond(), "Mask Change failed to choose a legal Dark Law.");
+
+            const uint garura = 11765832;
+            var poly = new SelectableCardItem { code = 48130397 };
+            var darkDragon = new LiveCardState { code = 74677422, position = YgoConstants.POS_FACEUP_ATTACK,
+                attribute = YgoConstants.ATTRIBUTE_DARK, race = YgoConstants.RACE_DRAGON };
+            var darkDragonTwo = new LiveCardState { code = 88264978, position = YgoConstants.POS_FACEUP_ATTACK,
+                attribute = YgoConstants.ATTRIBUTE_DARK, race = YgoConstants.RACE_DRAGON };
+            duel.Players[0].extra.Add(new LiveCardState { code = garura });
+            duel.Players[0].mzone[0] = darkDragon;
+            duel.Players[0].mzone[1] = darkDragonTwo;
+            Require(!DuelTactics.CanActivate(duel, summon, poly), "Super Polymerization spent only friendly material.");
+            duel.Players[0].mzone[1] = null;
+            duel.Players[1].mzone[0] = darkDragonTwo;
+            Require(DuelTactics.CanActivate(duel, summon, poly), "Super Polymerization missed usable opposing material.");
+
+            var benten = new SelectableCardItem { code = 77235086, location = YgoConstants.LOCATION_HAND };
+            var ace = new SelectableCardItem { code = 39618799, location = YgoConstants.LOCATION_MZONE };
+            summon.candidates.Clear();
+            summon.candidates.AddRange(new[] { ace, benten });
+            summon.SelectionHint = DuelTactics.Release;
+            duel.CurrentChain[0].code = 39996157;
+            Require(ChoosesSecond(), "The Ritual tribute should use Benten's search before spending the established ace.");
+            var powerBond = new SelectableCardItem { code = 37630732 };
+            duel.Players[0].lp = 1000;
+            duel.Players[0].extra.Clear();
+            duel.Players[0].extra.Add(new LiveCardState { code = 74157028 });
+            Require(!DuelTactics.CanActivate(duel, summon, powerBond), "Power Bond paid lethal burn when Battle Phase was unavailable.");
+            Debug.Log("[VERIFY GX AI SUMMON] Branded, HERO, Super Polymerization and Benten choices passed.");
+
+            bool ChoosesSecond() => Smart().ComputeResponse(duel, summon).SequenceEqual(DuelSession.PackCardSelection(1));
+        }
+
+        private static void VerifyGxBattlePriority()
+        {
+            using var duel = new DuelSession();
+            var attacker = new LiveCardState { code = 89631139, position = YgoConstants.POS_FACEUP_ATTACK, attack = 3000 };
+            var yubel = new LiveCardState { code = 78371393, position = YgoConstants.POS_FACEUP_ATTACK };
+            var pain = new LiveCardState { code = 65261141, position = YgoConstants.POS_FACEUP_ATTACK };
+            var own = duel.Players[0];
+            var rival = duel.Players[1];
+            own.mzone[0] = attacker;
+            rival.lp = 2000;
+            var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, playerId = 0, canBp = true, canEp = true };
+            idle.repositionable.Add(new SelectableCardItem { code = attacker.code, location = YgoConstants.LOCATION_MZONE });
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 6, "A visible direct lethal should enter Battle Phase immediately.");
+            rival.mzone[0] = yubel;
+            var battle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_BATTLECMD, playerId = 0, canM2 = true };
+            var attack = new SelectableCardItem { code = attacker.code, location = YgoConstants.LOCATION_MZONE };
+            battle.attackable.Add(attack);
+            Require(Read(Smart().ComputeResponse(duel, battle)) == 2, "The AI attacked into Yubel's lethal reflection.");
+            own.mzone[0] = yubel;
+            own.szone[0] = pain;
+            rival.mzone[0] = attacker;
+            attack.code = yubel.code;
+            Require(Read(Smart().ComputeResponse(duel, battle)) == 1, "Yubel did not exploit Nightmare Pain's reflection.");
+            Debug.Log("[VERIFY GX AI BATTLE] Open lethal, Yubel defense and Nightmare Pain retaliation passed.");
+        }
+
+        private static void VerifyNativeBentenSearch()
+        {
+            const uint ritual = 39996157, dakini = 39618799, benten = 77235086, petitAngel = 76103404;
+            uint[] required = { ritual, dakini, benten, petitAngel };
+            using var duel = YgoProjectBuilder.StartSeedMatching("Dakini and Benten", Deck(required), Empty, Deck(GeminiElf), Empty, true,
+                current => required.All(code => current.Players[0].hand.Any(card => card.code == code)));
+            bool searched = false;
+            duel.OnCardMoved += move => searched |= move.fromLoc == YgoConstants.LOCATION_DECK &&
+                move.toCon == 0 && move.toLoc == YgoConstants.LOCATION_HAND && duel.ResolvingChainLink?.code == benten;
+            SubmitIdle(duel, 5, ritual);
+            var ai = Smart();
+            for (int step = 0; step < 25 && !duel.IsFinished && duel.RetryCount == 0; step++)
+            {
+                var prompt = duel.ActivePrompt;
+                if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                if (IsIdle(prompt)) break;
+                duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+            }
+            Require(duel.Players[0].mzone.Any(card => card?.code == dakini) &&
+                duel.Players[0].grave.Any(card => card.code == benten) && searched &&
+                duel.RetryCount == 0, "Native Dakini must use Benten and resolve the resulting LIGHT Fairy search.");
+            Debug.Log("[VERIFY GX AI RITUAL] Native Dakini summoned and Benten's search resolved. Retry=0");
         }
 
         private static void VerifyNegationTargets()
@@ -274,16 +451,16 @@ namespace YGOPortable.Editor
 
         private static TacticalAI Smart() => new(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded());
 
-        private static uint[] Deck(params uint[] cycle) => Enumerable.Range(0, 40).Select(i => cycle[i % cycle.Length]).ToArray();
+        internal static uint[] Deck(params uint[] cycle) => Enumerable.Range(0, 40).Select(i => cycle[i % cycle.Length]).ToArray();
 
-        private static bool IsIdle(DuelPrompt prompt) => prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
+        internal static bool IsIdle(DuelPrompt prompt) => prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
 
         private static bool IncludesChainEffect(DuelPrompt prompt, uint code) =>
             prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.candidates.Any(card => card.code == code);
 
         private static int Read(byte[] response) => BitConverter.ToInt32(response, 0);
 
-        private static void SubmitIdle(DuelSession duel, int command, uint code)
+        internal static void SubmitIdle(DuelSession duel, int command, uint code)
         {
             var prompt = duel.ActivePrompt;
             Require(prompt != null && IsIdle(prompt), "Expected an idle command prompt.");
@@ -300,7 +477,7 @@ namespace YGOPortable.Editor
             duel.SubmitResponseInt((index << 16) | command);
         }
 
-        private static DuelPrompt Drive(DuelSession duel, Func<DuelPrompt, bool> stop, uint selected = 0)
+        internal static DuelPrompt Drive(DuelSession duel, Func<DuelPrompt, bool> stop, uint selected = 0)
         {
             var basic = new TacticalAI();
             for (int step = 0; step < 28 && !duel.IsFinished && duel.RetryCount == 0; step++)

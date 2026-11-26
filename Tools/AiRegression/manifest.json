@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "builtInFixtures": ["solemn-strike-summon-owner", "predaprimitive-own-fusion"],
   "note": "Pinned native/card/script bytes and complete fixture files; AI source/policy changes are fingerprinted at runtime rather than pinned. Frozen deck code arrays are checked against the corresponding current preset before replay.",
   "fixtures": [
     "sage.json",

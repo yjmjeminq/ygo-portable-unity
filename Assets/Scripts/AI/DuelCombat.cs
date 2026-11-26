@@ -11,6 +11,8 @@ namespace YGOPortable.AI
         private const int Lethal = 100000;
         private const int BattleReplayBudgetMilliseconds = 80;
         private const uint UtopiaDragonar = 95134948;
+        private const uint NightmarePain = 65261141;
+        private const uint LovingDefender = 47172959;
         private const ulong ReduceAttackerToZero = ((ulong)UtopiaDragonar << 20) | 1;
 
         internal static bool OpenLethal(DuelSession duel, byte player)
@@ -22,6 +24,15 @@ namespace YGOPortable.AI
 
         internal static int VisibleAttackTotal(PlayerFieldSnapshot field) => field.mzone
             .Where(card => card?.IsFaceUp == true && card.IsAttack).Sum(card => Math.Max(0, card.attack));
+
+        internal static bool IsYubel(uint code) => code is 78371393 or 4779091 or 31764700 or 90829280 or 80453041 or 47172959;
+
+        internal static bool HasNightmarePain(PlayerFieldSnapshot side) =>
+            side.szone.Any(card => card is { code: NightmarePain, IsFaceUp: true, effectsDisabled: false });
+
+        private static bool ReflectsAttack(LiveCardState defender, bool pain) => defender.IsFaceUp &&
+            (pain && IsYubel(defender.code) || !defender.effectsDisabled &&
+                (defender.code == LovingDefender || defender.IsAttack && defender.code is 78371393 or 4779091 or 31764700));
 
         internal static int CountFavorableBattles(IEnumerable<int> attacks, IEnumerable<int> defenses)
         {
@@ -116,6 +127,7 @@ namespace YGOPortable.AI
             if (attackers.Sum(entry => entry.live.attack) < rival.lp) return null;
             var defenders = rival.mzone.Where(card => card != null).ToArray();
             if (attackers.Length == 0 || defenders.Any(card => !card.IsFaceUp)) return null;
+            bool pain = HasNightmarePain(rival);
             // An engine-offered consecutive attack can expire once a different monster attacks.
             int repeat = previousAttacker == uint.MaxValue ? -1 :
                 Array.FindIndex(attackers, entry => entry.live.sequence == previousAttacker);
@@ -155,6 +167,7 @@ namespace YGOPortable.AI
             int? Damage(int i, int j)
             {
                 var defender = defenders[j];
+                if (ReflectsAttack(defender, pain)) return null;
                 int difference = attackers[i].live.attack - (defender.IsDefense ? defender.defense : defender.attack);
                 return difference > 0 || difference == 0 && !defender.IsDefense && breakable[j]
                     ? (defender.IsDefense ? 0 : difference) : null;
@@ -241,6 +254,7 @@ namespace YGOPortable.AI
         internal static bool HasWorthwhileDirectAttack(LiveCardState attacker)
         {
             if (attacker.attack > 0) return true;
+            if (IsYubel(attacker.code)) return false;
             if (attacker.effectsDisabled || (attacker.type & YgoConstants.TYPE_EFFECT) == 0) return false;
             if (CardDatabase.Get(attacker.code)?.desc is not { Length: > 0 } text) return true;
             return text.Contains("공격 선언") || text.Contains("직접 공격") || text.Contains("데미지 스텝") ||
@@ -278,7 +292,7 @@ namespace YGOPortable.AI
                 else
                 {
                     foreach (var defender in rival.mzone)
-                        if (defender != null) value = Math.Max(value, AttackValue(attacker, defender, rival.lp));
+                        if (defender != null) value = Math.Max(value, AttackValue(attacker, defender, own, rival));
                 }
                 if (value <= best) continue;
                 best = value;
@@ -297,12 +311,13 @@ namespace YGOPortable.AI
             var rival = duel.Players[1 - prompt.playerId];
             var defenders = rival.mzone.Where(card => card != null).ToArray();
             if (defenders.Length < 2 || defenders.Any(card => !card.IsFaceUp)) return null;
-            var destroyable = defenders.Where(CanDestroyByBattle).ToArray();
+            bool pain = HasNightmarePain(rival);
+            var destroyable = defenders.Where(card => CanDestroyByBattle(card) && !ReflectsAttack(card, pain)).ToArray();
             if (destroyable.Length < 2) return null;
             var attackers = prompt.attackable.Select(action => GetMonster(own, action.sequence)).ToArray();
             var greedy = attackers[greedyIndex];
             if (greedy == null) return null;
-            var firstTarget = defenders.OrderByDescending(defender => AttackValue(greedy, defender, rival.lp)).First();
+            var firstTarget = defenders.OrderByDescending(defender => AttackValue(greedy, defender, own, rival)).First();
 
             int RemovalsAfter(int attackIndex, LiveCardState defeated) => 1 +
                 CountFavorableBattles(attackers.Where((card, index) => card != null && index != attackIndex).Select(card => card.attack),
@@ -323,7 +338,7 @@ namespace YGOPortable.AI
                 foreach (var defender in destroyable)
                 {
                     if (attacker.attack <= BattleDefense(defender) || RemovalsAfter(i, defender) != possible) continue;
-                    int value = AttackValue(attacker, defender, rival.lp);
+                    int value = AttackValue(attacker, defender, own, rival);
                     if (value <= bestValue) continue;
                     bestValue = value;
                     best = (i, defender.sequence);
@@ -371,7 +386,7 @@ namespace YGOPortable.AI
                 var side = duel.Players[action.controller];
                 var defender = GetMonster(side, action.sequence);
                 if (defender == null) continue;
-                int value = AttackValue(attacker, defender, side.lp);
+                int value = AttackValue(attacker, defender, duel.Players[prompt.playerId], side);
                 if (value <= best) continue;
                 best = value;
                 choice = i;
@@ -379,10 +394,25 @@ namespace YGOPortable.AI
             return choice;
         }
 
-        private static int AttackValue(LiveCardState attacker, LiveCardState defender, int rivalLp)
+        internal static bool HasFavorableBattle(LiveCardState attacker, LiveCardState defender,
+            PlayerFieldSnapshot own, PlayerFieldSnapshot rival) => defender.IsFaceUp
+                ? AttackValue(attacker, defender, own, rival) > 0 : attacker.attack >= 1400;
+
+        private static int AttackValue(LiveCardState attacker, LiveCardState defender,
+            PlayerFieldSnapshot own, PlayerFieldSnapshot rival)
         {
             // A set monster's printed stats and effects are hidden.
             if (!defender.IsFaceUp) return attacker.attack - 1550;
+            if (ReflectsAttack(defender, HasNightmarePain(rival))) return -100000 - Math.Max(0, attacker.attack);
+            int rivalLp = rival.lp;
+            if (attacker.code is LovingDefender or 31764700 && !attacker.effectsDisabled && defender.attack > 0)
+                return defender.attack >= rivalLp ? Lethal + defender.attack : 1500 + defender.attack;
+            if (defender.IsAttack && IsYubel(attacker.code) && HasNightmarePain(own) && defender.attack > attacker.attack &&
+                !attacker.effectsDisabled)
+            {
+                int reflected = defender.attack - attacker.attack;
+                return reflected >= rivalLp ? Lethal + reflected : 900 + reflected;
+            }
 
             int defense = BattleDefense(defender);
             int difference = attacker.attack - defense;
@@ -390,6 +420,7 @@ namespace YGOPortable.AI
             if (damage > 0 && damage >= rivalLp) return Lethal + damage;
             if (difference > 0)
             {
+                if (!CanDestroyByBattle(defender) && damage == 0) return -1;
                 const uint UnstoppableExodia = 83257450;
                 int value = 900 + Threat(defender) + damage;
                 // Exodia's visible zero DEF is a chance to remove its LP-based attack and
@@ -413,6 +444,7 @@ namespace YGOPortable.AI
             var text = CardDatabase.Get(card.code)?.desc;
             return card.effectsDisabled || text == null ||
                 (!text.Contains("전투로는 파괴되지", StringComparison.Ordinal) &&
+                 !text.Contains("전투 / 효과로는 파괴되지", StringComparison.Ordinal) &&
                  !text.Contains("이 카드는 전투에 의해서는 파괴되지", StringComparison.Ordinal));
         }
 

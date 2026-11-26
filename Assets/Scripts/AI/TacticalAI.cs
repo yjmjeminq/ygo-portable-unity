@@ -35,6 +35,7 @@ namespace YGOPortable.AI
         private const uint PotOfGreed = 55144522;
         private const uint GracefulCharity = 79571449, AHeroLives = 8949584, Tuning = 96363153;
         private const uint Faris = 18094166, ShadowMist = 50720316, Malicious = 9411399, Scheiren = 572850;
+        private const uint NeosConnector = 85840608, Kaibaman = 67768675, BlueEyes = 89631139;
         private const uint VisasStarfrost = 56099748;
         private const uint MelffyFootsteps = 25687946;
         private const uint Terraforming = 73628505, MaleficWorld = 27564031, MaleficTerritory = 75223115;
@@ -52,6 +53,7 @@ namespace YGOPortable.AI
         private uint _plannedAttackTargetSequence = uint.MaxValue;
         private uint _linkSummon;
         private uint? _crossoutDeclaration;
+        private uint _lastAnnouncedEffect, _calledByTarget;
         private bool? _linkDeck;
         private readonly Dictionary<string, int> _effectCounts = new Dictionary<string, int>();
         private readonly HashSet<uint> _repositionedSeqs = new HashSet<uint>();
@@ -99,6 +101,7 @@ namespace YGOPortable.AI
                 _attackerSequence = uint.MaxValue;
                 _plannedAttackTargetSequence = uint.MaxValue;
                 _linkSummon = 0;
+                _lastAnnouncedEffect = _calledByTarget = 0;
                 _effectCounts.Clear();
                 _repositionedSeqs.Clear();
             }
@@ -134,13 +137,21 @@ namespace YGOPortable.AI
                 case YgoConstants.MSG_SELECT_CHAIN:
                 {
                     int choice = PickChain(session, prompt, emergencyFallback);
-                    if (UsesTacticalRules && choice >= 0 && prompt.candidates[choice].code == DuelTactics.CrossoutDesignator)
-                        _crossoutDeclaration = DuelTactics.FindCrossoutTarget(session, prompt.playerId);
+                    if (UsesTacticalRules && choice >= 0)
+                    {
+                        _lastAnnouncedEffect = prompt.candidates[choice].code;
+                        if (_lastAnnouncedEffect == DuelTactics.CrossoutDesignator)
+                            _crossoutDeclaration = DuelTactics.FindCrossoutTarget(session, prompt.playerId);
+                        if (_lastAnnouncedEffect == DuelTactics.CalledBy)
+                            _calledByTarget = session.CurrentChain.LastOrDefault()?.code ?? 0;
+                    }
                     return BitConverter.GetBytes(choice);
                 }
 
                 case YgoConstants.MSG_SELECT_EFFECTYN:
-                    return BitConverter.GetBytes(DecideEffectYesNo(session, prompt));
+                    int accept = DecideEffectYesNo(session, prompt);
+                    if (accept == 1 && UsesTacticalRules) _lastAnnouncedEffect = prompt.promptCardCode;
+                    return BitConverter.GetBytes(accept);
 
                 case YgoConstants.MSG_SELECT_YESNO:
                     if (UsesTacticalRules && session.SelectionChainLink is { } source && source.triggerPlayer == prompt.playerId &&
@@ -177,7 +188,7 @@ namespace YGOPortable.AI
                     return BitConverter.GetBytes((UsesTacticalRules ? DuelTactics.ChoosePosition(session, prompt) : null) ?? PickPosition(session, prompt));
 
                 case YgoConstants.MSG_SELECT_SUM:
-                    return BuildSelectSum(prompt);
+                    return BuildSelectSum(session, prompt);
 
                 case YgoConstants.MSG_SELECT_COUNTER:
                     return BuildSelectCounter(prompt);
@@ -297,6 +308,7 @@ namespace YGOPortable.AI
             (command != 0 || projected || !UsesTacticalRules || (!ComboSearch.NeedsProvenNormalSummon(item.code) &&
                 (_comboSearch == null || (!DuelTactics.RisksEndPhaseDestruction(session, prompt) &&
                     !DuelTactics.NeedsTributeProjection(session, prompt, item))))) &&
+            (command != 0 || !UsesTacticalRules || item.code != Kaibaman || CanRevealThreeBlueEyes(session, prompt.playerId)) &&
             (command is not (0 or 3) || !UsesTacticalRules || !DuelDeckStrategy.IsExodiaPiece(item.code) ||
                 DuelDeckStrategy.For(session, prompt.playerId) != DuelDeckStyle.Lock) &&
             (command is not (0 or 3) || !UsesTacticalRules ||
@@ -309,6 +321,14 @@ namespace YGOPortable.AI
             (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item) &&
                 CanEndMainPhaseWithEffect(session, prompt, item) &&
                 (!UsesTacticalRules || !DddTurnPlan.ReserveScalesForGilgamesh(session, prompt, item))));
+
+        private static bool CanRevealThreeBlueEyes(DuelSession duel, byte player)
+        {
+            var own = duel.Players[player];
+            int visible = own.hand.Count(card => card.code == BlueEyes) + own.grave.Count(card => card.code == BlueEyes) +
+                own.mzone.Count(card => card is { IsFaceUp: true, code: BlueEyes });
+            return visible >= 3 || visible + duel.CountOwnDeckCopies(player, BlueEyes) >= 3;
+        }
 
         private DuelTactics.ExtensionRisk ExtensionRisk(DuelSession session, DuelPrompt prompt)
         {
@@ -369,7 +389,7 @@ namespace YGOPortable.AI
 
         private bool CanSearchCombo(DuelSession session, DuelPrompt prompt, bool planLinks) =>
             _comboSearch != null && UsesAdvancedDifficulty && session.RetryCount == 0 && _actionsThisTurn < 48 &&
-            !(prompt.canBp && DuelCombat.OpenLethal(session, prompt.playerId)) &&
+            !HasVisibleBattleWin(session, prompt) &&
             ChoosePriorityMainAction(session, prompt, planLinks) == null &&
             ReferenceEquals(session.ActivePrompt, prompt) && (IsRecovering(session, prompt) || planLinks ||
                 DddTurnPlan.IsDddDeck(session.Players[prompt.playerId]) ||
@@ -379,8 +399,14 @@ namespace YGOPortable.AI
         private bool IsRecovering(DuelSession session, DuelPrompt prompt) =>
             _comboSearch != null && UsesTacticalRules && session.TurnPlayer == prompt.playerId && session.TurnInterruptions > 0;
 
+        private static bool HasVisibleBattleWin(DuelSession session, DuelPrompt prompt) =>
+            prompt.canBp && session.Players[1 - prompt.playerId].szone.All(card => card == null) &&
+            DuelCombat.CanCloseBattleFromMain(session, prompt.playerId);
+
         private byte[] BuildIdleCmd(DuelSession s, DuelPrompt p, bool fallback, int? plannedMainAction)
         {
+            _lastAnnouncedEffect = _calledByTarget = 0;
+            if (UsesTacticalRules && !fallback && HasVisibleBattleWin(s, p)) return BitConverter.GetBytes(6);
             bool planLinks = PlanLinks(s, p);
             int? preparation = plannedMainAction == null && UsesTacticalRules && !fallback && _actionsThisTurn < 48
                 ? ChoosePriorityMainAction(s, p, planLinks) : null;
@@ -392,8 +418,6 @@ namespace YGOPortable.AI
             _linkSummon = 0;
             bool CanUse(int command, SelectableCardItem item) => CanUseMainAction(s, p, planLinks, command, item);
 
-            if (plannedMainAction == null && UsesTacticalRules && p.canBp && DuelCombat.OpenLethal(s, p.playerId))
-                return BitConverter.GetBytes(6);
             if (preparation is int ready)
             {
                 if (ReferenceEquals(_baitPrompt, p) && _baitAction == ready) _usedBait = true;
@@ -474,6 +498,21 @@ namespace YGOPortable.AI
             if (DddTurnPlan.ChooseUpkeepRescue(session, prompt,
                 CanUse) is int rescue)
                 return rescue;
+
+            if (session.CurrentPhase == YgoConstants.PHASE_MAIN1 && session.TurnPlayer == prompt.playerId)
+            {
+                var ownField = session.Players[prompt.playerId].mzone;
+                var rivalField = session.Players[1 - prompt.playerId].mzone;
+                if (ownField.Count(card => card != null) == 1 &&
+                    ownField.First(card => card != null) is { code: NeosConnector, IsFaceUp: true, IsAttack: true } exposed &&
+                    rivalField.Any(card => card is { IsFaceUp: true, IsAttack: true } && card.attack > exposed.attack))
+                {
+                    // Connector's field ignition can replace an exposed attacker with a defender.
+                    int revival = prompt.activatable.FindIndex(item => item.code == NeosConnector &&
+                        item.controller == prompt.playerId && item.location == YgoConstants.LOCATION_MZONE && CanUse(5, item));
+                    if (revival >= 0) return (revival << 16) | 5;
+                }
+            }
 
             if (!_comboProjection && !_usedBait && session.TurnNumber == 2)
             {
@@ -805,6 +844,7 @@ namespace YGOPortable.AI
             if (command == 1 || command == 5)
             {
                 var item = command == 1 ? prompt.spSummonable[index] : prompt.activatable[index];
+                if (command == 5 && UsesTacticalRules) _lastAnnouncedEffect = item.code;
                 if (UsesTacticalRules && (_linkDeck == true || UsesComboPlanning) && command == 1 &&
                     item.location == YgoConstants.LOCATION_EXTRA && LinkComboPolicy.Rank(item.code) > 0)
                     _linkSummon = item.code;
@@ -1078,6 +1118,31 @@ namespace YGOPortable.AI
             }
 
             ulong hint = UsesTacticalRules ? p.SelectionHint : s.LastHintMsg;
+            uint effect = SelectionEffect(s, p);
+            if (UsesTacticalRules && hint == DuelTactics.Banish && p.min == 1 && p.max == 1)
+            {
+                int graveTarget = DuelTactics.ChooseCalledByTarget(s, p);
+                if (graveTarget < 0 && _lastAnnouncedEffect == DuelTactics.CalledBy && _calledByTarget != 0)
+                    graveTarget = p.candidates.FindIndex(card => card.controller != p.playerId &&
+                        card.location == YgoConstants.LOCATION_GRAVE && card.code == _calledByTarget);
+                if (graveTarget >= 0) return PackIndexList(new[] { graveTarget });
+            }
+            if (UsesTacticalRules && DuelAiPolicy.ChooseSummonTarget(s, p, effect) is int ace)
+                return PackIndexList(new[] { ace });
+            if (UsesTacticalRules && effect == DuelAiPolicy.Nasateiya && p.min == 1 && p.max == 1 &&
+                p.candidates.Count > 1 && p.candidates.All(card => card.controller != p.playerId && card.location == YgoConstants.LOCATION_MZONE))
+                return PackIndexList(new[] { Enumerable.Range(0, p.candidates.Count).OrderByDescending(index =>
+                    DuelTactics.SelectionPriority(s, p.playerId, p.candidates[index], DuelTactics.Destroy)).First() });
+            bool material = IsThemedMaterialSelection(effect, hint);
+            bool dropletCost = effect == DuelTactics.ForbiddenDroplet && hint == DuelTactics.SendToGrave &&
+                p.candidates.All(card => card.controller == p.playerId);
+            if (UsesTacticalRules && (material || dropletCost))
+            {
+                if (p.min == 0 && p.cancelable) return BitConverter.GetBytes(-1);
+                return PackIndexList(Enumerable.Range(0, p.candidates.Count).OrderByDescending(index =>
+                    DuelTactics.SummonMaterialPriority(s, p.playerId, p.candidates[index], effect, hint))
+                    .Take(Math.Max(1, (int)p.min)));
+            }
             if (UsesTacticalRules && hint == DuelTactics.AddToHand)
             {
                 int winged = DuelTactics.FindWingedKuribohSearch(s, p);
@@ -1227,6 +1292,14 @@ namespace YGOPortable.AI
             }
             if (p.candidates.Count > 0)
             {
+                uint effect = SelectionEffect(s, p);
+                if (UsesTacticalRules && (IsThemedMaterialSelection(effect, p.SelectionHint) ||
+                    p.SelectionHint == DuelTactics.SendToGrave && effect == DuelTactics.ForbiddenDroplet))
+                {
+                    int index = Enumerable.Range(0, p.candidates.Count).OrderByDescending(i =>
+                        DuelTactics.SummonMaterialPriority(s, p.playerId, p.candidates[i], effect, p.SelectionHint)).First();
+                    return PackTwoInts(1, index);
+                }
                 if ((LinkComboPolicy.ChooseMaterial(s, p, _linkSummon, _linkDeck == true) ??
                     DddTurnPlan.ChooseScale(s, p) ?? LinkTurnPlan.ChooseLinkMaterial(s, p) ??
                     FusionXyzTurnPlan.ChooseLinkMaterial(s, p)) is int material)
@@ -1266,7 +1339,15 @@ namespace YGOPortable.AI
             return PackIndexList(chosen);
         }
 
-        private byte[] BuildSelectSum(DuelPrompt p)
+        private uint SelectionEffect(DuelSession duel, DuelPrompt prompt) =>
+            duel.SelectionChainLink is { } link && link.triggerPlayer == prompt.playerId ? link.code : _lastAnnouncedEffect;
+
+        private static bool IsThemedMaterialSelection(uint effect, ulong hint) =>
+            hint == DuelTactics.Release && DuelAiPolicy.IsRitualSpell(effect) || hint == 511 && effect is
+                DuelAiPolicy.BrandedFusion or DuelAiPolicy.Lubellion or DuelAiPolicy.Albion or DuelAiPolicy.FusionDestiny or
+                DuelAiPolicy.MiracleFusion or DuelAiPolicy.SuperPoly or DuelAiPolicy.PowerBond;
+
+        private byte[] BuildSelectSum(DuelSession s, DuelPrompt p)
         {
             int n = p.candidates.Count;
             int minCnt = (int)p.min;
@@ -1274,18 +1355,25 @@ namespace YGOPortable.AI
             int target = (int)(p.acc & 0xFFFF);
 
             var mustParams = p.mustSelect.Select(m => ((int)(m.sumParam & 0xFFFF), (int)((m.sumParam >> 16) & 0xFFFF))).ToList();
-            var candParams = p.candidates.Select(c => ((int)(c.sumParam & 0xFFFF), (int)((c.sumParam >> 16) & 0xFFFF))).ToList();
+            uint effect = SelectionEffect(s, p);
+            var order = Enumerable.Range(0, n);
+            if (UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect))
+                order = order.OrderByDescending(i => DuelTactics.SummonMaterialPriority(
+                    s, p.playerId, p.candidates[i], effect, DuelTactics.Release));
+            int[] indices = order.ToArray();
+            var candParams = indices.Select(i => p.candidates[i]).Select(c =>
+                ((int)(c.sumParam & 0xFFFF), (int)((c.sumParam >> 16) & 0xFFFF))).ToList();
             var picked = new List<int>();
 
             if (!p.sumExactCountZeroAny && p.max > 0)
             {
                 if (SolveExactSum(mustParams, candParams, target, minCnt, maxCnt, picked))
-                    return PackIndexList(picked);
+                    return PackIndexList(picked.Select(i => indices[i]));
             }
             else
             {
                 if (SolveOverflowSum(mustParams, candParams, target, picked))
-                    return PackIndexList(picked);
+                    return PackIndexList(picked.Select(i => indices[i]));
             }
 
             // Fallback subset
@@ -1459,17 +1547,14 @@ namespace YGOPortable.AI
         {
             if (s.TurnNumber <= 1) return false;
             int opp = 1 - playerId;
-            var oppMons = s.Players[opp].mzone.Where(m => m != null).ToList();
-            foreach (var m in s.Players[playerId].mzone)
+            var own = s.Players[playerId];
+            var rival = s.Players[opp];
+            var oppMons = rival.mzone.Where(m => m != null).ToList();
+            foreach (var m in own.mzone)
             {
                 if (m?.IsFaceUp != true || !m.IsAttack) continue;
                 if (oppMons.Count == 0 && DuelCombat.HasWorthwhileDirectAttack(m)) return true;
-                foreach (var om in oppMons)
-                {
-                    if (!om.IsFaceUp && m.attack >= 1400) return true;
-                    if (om.IsDefense && m.attack > om.defense) return true;
-                    if (!om.IsDefense && m.attack > om.attack) return true;
-                }
+                if (oppMons.Any(om => DuelCombat.HasFavorableBattle(m, om, own, rival))) return true;
             }
             return false;
         }

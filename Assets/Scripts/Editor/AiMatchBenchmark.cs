@@ -8,6 +8,7 @@ using UnityEditor;
 using UnityEngine;
 using YGOPortable.AI;
 using YGOPortable.Core;
+using YGOPortable.UI;
 using Debug = UnityEngine.Debug;
 
 namespace YGOPortable.Editor
@@ -44,6 +45,19 @@ namespace YGOPortable.Editor
             ("Sky Striker/Development", 20687, 20686, YgoConstants.SUMMON_TYPE_LINK),
             ("Sky Striker/Control", 20687, 20682, YgoConstants.SUMMON_TYPE_LINK),
             ("DM/Ritual", 51049, 51954, YgoConstants.SUMMON_TYPE_RITUAL),
+        };
+        private static readonly (string Era, int FirstDeck, int SecondDeck, uint Method)[] GxMatchups =
+        {
+            ("GX/Cyber Angel–Destiny HERO", 69101, 69011, YgoConstants.SUMMON_TYPE_RITUAL),
+            ("GX/Drytron–Branded", 51991, 69033, YgoConstants.SUMMON_TYPE_RITUAL),
+            ("GX/Yubel–HERO", 69027, 20689, YgoConstants.SUMMON_TYPE_FUSION),
+            ("GX/Modern Yubel–Masked HERO", 20680, 69029, YgoConstants.SUMMON_TYPE_LINK),
+            ("GX/Cyberdark–Ancient Gear", 69016, 69028, YgoConstants.SUMMON_TYPE_FUSION),
+            ("GX/Cyber Dragon–Sacred Beasts", 69001, 69009, YgoConstants.SUMMON_TYPE_FUSION),
+            ("GX/Dark Magician–Despia", 69034, 50698, YgoConstants.SUMMON_TYPE_FUSION),
+            ("GX/Exodia–Evil HERO", 69023, 69025, YgoConstants.SUMMON_TYPE_FUSION),
+            ("GX/Nasateiya–Branded", 69102, 69033, YgoConstants.SUMMON_TYPE_RITUAL),
+            ("GX/Cyber Angel–Fiendsmith", 69103, 20685, YgoConstants.SUMMON_TYPE_RITUAL),
         };
 
         internal readonly struct Pilot
@@ -113,6 +127,8 @@ namespace YGOPortable.Editor
         {
             public int deck, level, decisions, branches, chosenAlternatives, retries, endTurns, openings, threatsSpent, lethalMisses;
             public int exposedAttackers, selfDestruction, wastedHandtraps;
+            public int completedTurns, emptyFieldEndTurns, emptyMonsterEndTurns, trackedResponses;
+            public int provenMissedBattleWins, battleFinishes;
             public int equipRuleLosses, selfDestructionWithoutEquipRuleLoss;
             public int selfDefeatTurn, selfDefeatDamage;
             public uint selfDefeatEffect;
@@ -122,6 +138,7 @@ namespace YGOPortable.Editor
             public int slowestTurn, slowestMessage, slowestPhase, slowestStep;
             public int slowestOrdinaryTurn, slowestOrdinaryMessage, slowestOrdinaryPhase, slowestOrdinaryStep;
             public bool reachedMain, methodAvailable, methodReached, aceReached;
+            public bool signatureMonsterReached;
             public bool planTimingAvailable;
             public bool ordinaryTimingSeparated;
             public uint method;
@@ -187,6 +204,7 @@ namespace YGOPortable.Editor
             42141493, 59438930, 38814750, 10443957, 52038441,
         };
         private static readonly HashSet<uint> ReactiveHandtraps = new() { 14558127, 97268402, 10045474 };
+        private static readonly HashSet<uint> GxTrackedResponses = new() { 14558127, 23434538, 10045474, 24224830, 24299458, 48130397 };
         private const uint Negation = 1u << 8;
 
         public static void Run()
@@ -212,6 +230,15 @@ namespace YGOPortable.Editor
                 CardDatabase.Load(streaming);
                 DeckRepository.Load(streaming, Path.Combine(Path.GetDirectoryName(output), "benchmark-save"), false);
                 var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
+                bool gxSuite = Environment.GetEnvironmentVariable("YGO_BENCH_GX_SUITE") == "1";
+                if (gxSuite)
+                {
+                    var gxDecks = StoryModeUI.LoadRpgDecks(streaming, StoryModeUI.GxRpgSeriesId);
+                    if (gxDecks.Count != 37) throw new InvalidOperationException("The GX benchmark requires all 37 story decks.");
+                    foreach (var deck in gxDecks) decks.Add(deck.Key, deck.Value);
+                    if (!decks[51991].main.Contains(22398665u) || !decks[69033].main.Contains(44362883u))
+                        throw new InvalidOperationException("The GX deck inputs lack the expected Drytron and Branded Ritual/Fusion engines.");
+                }
                 if (Environment.GetEnvironmentVariable("YGO_BENCH_REPLAY") is { Length: > 0 } replayPath)
                 {
                     int inspect = int.TryParse(Environment.GetEnvironmentVariable("YGO_BENCH_INSPECT"), out int index) ? index : -1;
@@ -238,7 +265,7 @@ namespace YGOPortable.Editor
                 bool captureReplays = Environment.GetEnvironmentVariable("YGO_BENCH_CAPTURE_REPLAYS") == "1";
                 bool randomOpponent = Environment.GetEnvironmentVariable("YGO_BENCH_RANDOM_OPPONENT") == "1";
                 string fixture = Environment.GetEnvironmentVariable("YGO_BENCH_FIXTURE");
-                var matchups = fullSuite ? Matchups.Concat(StyleMatchups).ToArray() : styleSuite ? StyleMatchups : Matchups;
+                var matchups = gxSuite ? GxMatchups : fullSuite ? Matchups.Concat(StyleMatchups).ToArray() : styleSuite ? StyleMatchups : Matchups;
                 if (randomOpponent) Debug.Log($"[AI BENCH] Facing {RandomLegalPilot.Version} with independent fixed seeds.");
                 if (fullSuite || styleSuite)
                 {
@@ -1118,6 +1145,8 @@ namespace YGOPortable.Editor
             var linkDowngrades = new[] { new List<LinkMaterialDowngradeTrace>(), new List<LinkMaterialDowngradeTrace>() };
             var pendingLinkMaterials = new[] { new List<(uint Card, int Rank)>(), new List<(uint Card, int Rank)>() };
             var pendingLinkTurns = new int[2];
+            var provenMissedBattleTurns = new[] { new HashSet<int>(), new HashSet<int>() };
+            bool auditGx = era.StartsWith("GX/", StringComparison.Ordinal);
             int responseIndex = 0, activeResponseStep = -1;
             using var duel = new DuelSession(recordPlanningReplay: true);
             StartFixture(duel, matchup, seed, first, second);
@@ -1131,6 +1160,10 @@ namespace YGOPortable.Editor
             {
                 TrackDestruction(duel.ResolvingChainLink, move);
                 TrackLinkMaterialDowngrade(move);
+                if (move.toCon < 2 && move.toLoc == YgoConstants.LOCATION_MZONE &&
+                    move.fromLoc != YgoConstants.LOCATION_MZONE && (move.toPos & YgoConstants.POS_FACEUP) != 0 &&
+                    move.code == presets[move.toCon].sigCard)
+                    result.sides[move.toCon].signatureMonsterReached = true;
                 if (lastAttack is { } attack && move.fromCon != attack.Player && move.fromLoc == YgoConstants.LOCATION_MZONE &&
                     move.toLoc != YgoConstants.LOCATION_MZONE && (move.reason & YgoConstants.REASON_BATTLE) != 0)
                     combatPayoffs[attack.Player].Add((attack.Slot, attack.Code));
@@ -1226,6 +1259,12 @@ namespace YGOPortable.Editor
             };
             duel.OnLifePointChange += (player, delta, life, kind) =>
             {
+                if (kind == LifePointChangeKind.BattleDamage && delta < 0 && life <= 0 &&
+                    lastAttack is { } strike && player != strike.Player)
+                {
+                    result.sides[strike.Player].battleFinishes++;
+                    provenMissedBattleTurns[strike.Player].Remove(duel.TurnNumber);
+                }
                 if (kind is LifePointChangeKind.EffectDamage or LifePointChangeKind.Damage && delta < 0 && life <= 0 &&
                     duel.ResolvingChainLink is { negated: false } source && source.triggerPlayer == player)
                 {
@@ -1335,6 +1374,14 @@ namespace YGOPortable.Editor
                     selectedDefense[player].Add((prompt.promptCardCode, "summon_in_defense"));
                 bool skippedBattle = prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canBp && command == 7;
                 bool leftBattle = prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && (command & 0xffff) is 2 or 3;
+                if (auditGx && player == candidate && !provenMissedBattleTurns[player].Contains(turn) &&
+                    (skippedBattle || leftBattle || prompt.IsAttackTargetSelection ||
+                        prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && prompt.attackable.Count > 1) &&
+                    AiBattleProbe.TryProveMissedLethal(duel, prompt, response, out string proof))
+                {
+                    provenMissedBattleTurns[player].Add(turn);
+                    Failure(player, "native_battle_win_missed", $"step={replayStep}, response={BitConverter.ToString(response)}, winning line={proof}");
+                }
                 if ((skippedBattle || leftBattle) && CanReplayLethal(duel, prompt, skippedBattle))
                 {
                     side.lethalMisses++;
@@ -1351,6 +1398,10 @@ namespace YGOPortable.Editor
                         Failure(player, "wasted_handtrap", $"{card.code} chained to {last.code}, negated={last.negated}, sameSeat={last.triggerPlayer == player}");
                     }
                 }
+                if (card != null && GxTrackedResponses.Contains(card.code) &&
+                    (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
+                        prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && (command & 0xffff) == 5))
+                    side.trackedResponses++;
 
                 double beforeBoard = Board(own);
                 Array.Clear(destroyed, 0, destroyed.Length);
@@ -1377,6 +1428,15 @@ namespace YGOPortable.Editor
                     double board = Board(field);
                     ending.boardTotal += board;
                     ending.endTurns++;
+                    if (duel.TurnNumber != turn)
+                    {
+                        ending.completedTurns++;
+                        if (!field.mzone.Any(monster => monster != null))
+                        {
+                            ending.emptyMonsterEndTurns++;
+                            if (!field.szone.Any(spell => spell != null)) ending.emptyFieldEndTurns++;
+                        }
+                    }
                     if (turn <= 2)
                     {
                         ending.earlyBoard = board;
@@ -1432,6 +1492,7 @@ namespace YGOPortable.Editor
             for (int player = 0; player < 2; player++)
             {
                 var side = result.sides[player];
+                side.provenMissedBattleWins = provenMissedBattleTurns[player].Count;
                 side.branches = pilots[player].Branches();
                 side.chosenAlternatives = pilots[player].ChosenAlternatives?.Invoke() ?? 0;
                 side.planTimingAvailable = pilots[player].MaxPlanMilliseconds != null;
