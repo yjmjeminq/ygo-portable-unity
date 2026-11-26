@@ -245,12 +245,12 @@ namespace YGOPortable.UI
             Tint(Area(mission, "Divider", .056f, .602f, .946f, .609f), new Color(.46f, .63f, .80f, .32f));
             bool travel = episode != null && targetRegion != _rpgLocation;
             string objective = episode == null ? episodes.Length > 0 ? "자유 탐험" : "이야기를 불러오지 못했습니다" :
-                travel ? $"{CampaignRegions[targetRegion].Name} · 이동" : episode.isCutsceneOnly ? episode.title :
-                $"{episode.opponentName}에게 말 걸기";
+                string.IsNullOrWhiteSpace(episode.fieldObjective) ? episode.title : episode.fieldObjective;
+            if (travel) objective = $"{CampaignRegions[targetRegion].Name}\n{objective}";
             HudLabel(Area(mission, "Chapter", .056f, .338f, .69f, .594f),
-                episode == null ? "현재 진행" : $"!  다음 목표 · {episode.chapter}기", 17, RpgUiStyle.Gold, heading: true);
+                episode == null ? "현재 진행" : "!  다음 목표", 17, RpgUiStyle.Gold, heading: true);
             var approach = _rpgInteractions.Find(candidate => candidate.Priority == RpgActionPriority.Story).Select;
-            var objectiveLabel = HudLabel(Area(mission, "Objective", .056f, .069f, approach != null || travel ? .705f : .947f, .315f),
+            var objectiveLabel = HudLabel(Area(mission, "Objective", .056f, .025f, approach != null || travel ? .705f : .947f, .332f),
                 objective, 21, Color.white, heading: true);
             objectiveLabel.resizeTextMinSize = 15;
             objectiveLabel.resizeTextMaxSize = 21;

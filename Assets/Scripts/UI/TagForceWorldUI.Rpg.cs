@@ -422,7 +422,7 @@ namespace YGOPortable.UI
                 MoveTo(point, interact, actor);
             }
             BindPortrait(art, Approach);
-            BuildRpgResidentMotion(actor, profile, spot, role, patrol, name);
+            BuildRpgResidentMotion(actor, profile, spot, role, patrol, name, Approach);
             string verb = role switch
             {
                 RpgResidentRole.Story => "이야기 진행",

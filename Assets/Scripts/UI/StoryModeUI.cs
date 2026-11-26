@@ -47,6 +47,7 @@ namespace YGOPortable.UI
         public string opponentName;
         public int deckId;
         public string regionId;
+        public string fieldObjective;
         public bool isCutsceneOnly;
         public int playAsCharacterId;
         public int forcedPlayerDeckId;
@@ -753,12 +754,15 @@ namespace YGOPortable.UI
                 deck?.sigCard is > 0 ? CardDatabase.GetName(deck.sigCard) : "");
             bool pickedInitialDeck = false;
             PlayDialogue(episode, episode.preDialogues, TitleOf(episode), ShowPreparation);
-            _dialogue.SetBranch(StoryDialogueBranch.AfterLine(episode), () =>
+            int choiceLine = StoryDialogueBranch.AfterLine(episode);
+            string replyingSpeaker = IsGxRpg && !string.IsNullOrWhiteSpace(episode.preDialogues[choiceLine].speaker)
+                ? episode.preDialogues[choiceLine].speaker : episode.opponentName;
+            _dialogue.SetBranch(choiceLine, () =>
                 _dialogue.ShowChoices(() => "어떻게 답할까?", choices.Select(choice => new StoryChoice(
                     $"{choice.Reply}\n{StoryDialogueBranch.Effect(choice.Stance)}", () =>
                     {
                         _stance = choice.Stance;
-                        _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
+                        _dialogue.AnswerBranch(choice.Reply, replyingSpeaker, choice.Response);
                     })).ToArray()));
 
             void CompleteScene()

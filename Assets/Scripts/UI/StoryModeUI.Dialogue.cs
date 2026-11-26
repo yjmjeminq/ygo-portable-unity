@@ -424,7 +424,9 @@ namespace YGOPortable.UI
                 else if (_autoSpeed > 0)
                 {
                     _readTime += delta * _autoSpeed;
-                    if (_readTime >= Mathf.Max(1.05f, _characters.Length * .037f)) Advance();
+                    float readDuration = IsGxDialogue ? Mathf.Max(1.65f, _characters.Length * .055f) :
+                        Mathf.Max(1.05f, _characters.Length * .037f);
+                    if (_readTime >= readDuration) Advance();
                 }
             }
 

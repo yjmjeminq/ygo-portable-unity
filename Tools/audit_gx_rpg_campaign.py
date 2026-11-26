@@ -142,10 +142,19 @@ def main():
         require(region and region["unlockAfter"] <= index, f"{chapter}: invalid or locked destination.")
         used_actors.add(character)
         cutscene = bool(episode.get("isCutsceneOnly"))
+        objective = episode.get("fieldObjective", "")
+        require(isinstance(objective, str) and 0 < len(objective.strip()) <= 24 and "\n" not in objective,
+                f"{chapter}: missing or oversized field objective.")
         if not cutscene:
             deck_id = episode.get("deckId")
             require(deck_id in decks and decks[deck_id]["episodeId"] == chapter and decks[deck_id]["charId"] == character,
                     f"{chapter}: deck does not match its episode and actor.")
+            pre = episode["preDialogues"]
+            choice = episode.get("choiceAfterLine", 0)
+            position_valid = type(choice) is int and 1 <= choice < len(pre)
+            require(position_valid and pre[choice - 1].get("speaker") and
+                    not any(re.search(r"듀얼[!！.]", line["text"]) for line in pre[:choice]),
+                    f"{chapter}: dialogue choice must come before the duel call.")
         portrait = episode.get("playAsCharacterId", 0)
         require(portrait == 0 or (portrait == 107 and episode.get("forcedPlayerDeckId") == pov.get(chapter)),
                 f"{chapter}: invalid forced player portrait/deck.")

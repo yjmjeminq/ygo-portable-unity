@@ -359,6 +359,7 @@ namespace YGOPortable.Editor
                             {
                                 Require(FieldScene().Find("RpgCompanion") == null, "The GX prologue spawned a partner.");
                                 VerifyGxPrologue(episode);
+                                VerifyGxAutoReadTime(episode);
                                 story.Update(.75f);
                                 CaptureGx("01-opening");
                                 Press(storyRoot, "Scene/DialogueTools/Auto/Button");
@@ -389,6 +390,9 @@ namespace YGOPortable.Editor
                         if (episode.id == "gx_ep_01")
                         {
                             VerifyGxHarborWalk();
+                            var travelObjective = panel.Find("FieldHud/QuestTrack/Objective/Label").GetComponent<Text>();
+                            Require(travelObjective.text.Contains(world.CampaignRegion(location).Name) &&
+                                travelObjective.text.Contains(episode.fieldObjective), "GX travel hid the current objective.");
                             world.Update(.5f);
                             CaptureGx("02-harbor");
                             VerifyGxAspectLayouts(everyMap: false);
@@ -413,6 +417,8 @@ namespace YGOPortable.Editor
                             FieldScene().Find("Scenery").GetComponent<Image>().sprite != null &&
                             panel.Find("FieldHud/FieldDetails/GxOpponentTier/Value/Label") != null,
                             $"GX duel HUD or field was missing for {episode.id}.");
+                        Require(panel.Find("FieldHud/QuestTrack/Objective/Label").GetComponent<Text>().text == episode.fieldObjective,
+                            $"GX field did not explain the objective at {episode.id}.");
                         VerifyGxResidentTimeline(episode, location);
                         bool isPov = episode.playAsCharacterId > 0;
                         string identity = FieldScene().Find("Player/GxIdentity/Label").GetComponent<Text>().text;
@@ -442,6 +448,15 @@ namespace YGOPortable.Editor
                             for (int tick = 0; tick < 40 && !storyRoot.gameObject.activeInHierarchy; tick++) world.Update(.15f);
                             Require(storyRoot.gameObject.activeInHierarchy, "The GX field guide did not reach the active NPC.");
                         }
+                        else if (episode.id == "gx_ep_13")
+                        {
+                            var marker = FieldScene().Find("MainQuestNpc/MainQuestMarker");
+                            Require(marker.GetComponent<Button>().IsInteractable() &&
+                                marker.GetComponent<Image>().raycastTarget && marker.GetComponent<CanvasGroup>().blocksRaycasts,
+                                "The GX quest marker was not clickable.");
+                            Press(FieldScene(), "MainQuestNpc/MainQuestMarker");
+                            for (int tick = 0; tick < 40 && !storyRoot.gameObject.activeInHierarchy; tick++) world.Update(.15f);
+                        }
                         else app.OpenRpgFieldEpisode(index);
                         Require(story.IsGxRpg && story.GetOpponentMatch(episode).Deck?.id == episode.deckId &&
                             FieldScene().Find("DialogueCast") != null, $"GX episode used the wrong deck or stage at {episode.id}.");
@@ -469,7 +484,8 @@ namespace YGOPortable.Editor
                         if (episode.id == "gx_ep_02") VerifyGxGuestArt(episode.preDialogues, "준코", 205);
                         VerifyGxDuelDialogueArt(episode);
                         var fieldPosition = (Vector2)typeof(TagForceWorldUI).GetField("_position", flags).GetValue(world);
-                        app.StartStoryDuel(episode, startingDeck, true);
+                        if (episode.id is "gx_ep_13" or "gx_ep_26") StartGxDuelThroughDialogue(episode, startingDeck);
+                        else app.StartStoryDuel(episode, startingDeck, true);
                         VerifyGxSurrender();
                         defeats++;
                         VerifyGxRetryMenu(isPov);
@@ -612,6 +628,7 @@ namespace YGOPortable.Editor
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
                     Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master wins, 34 surrender/retry routes, 19 lockouts, 12 grounded fields and three POV decks passed.");
                     Debug.Log("[VERIFY GX RESIDENTS] Rescue, recovery, changed forms, missing characters and story-only patrol restrictions passed.");
+                    Debug.Log("[VERIFY GX OBJECTIVES] Field guidance, marker approach, pre-duel choices and automatic reading time passed.");
                     Debug.Log("[VERIFY GX QOL] One-click travel, NPC prompts, running, deck swaps and editor return, save recovery and three aspect ratios passed.");
                 }
                 finally
@@ -623,6 +640,72 @@ namespace YGOPortable.Editor
                     if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
                     else PlayerPrefs.DeleteKey(gxPreference);
                     PlayerPrefs.Save();
+                }
+
+                void VerifyGxAutoReadTime(StoryEpisodeData episode)
+                {
+                    const int shortLine = 2;
+                    var bind = dialogueType.GetMethod("BindLine", flags);
+                    bind.Invoke(dialogue, new object[] { shortLine, false });
+                    VerifyDisplayedText(episode.preDialogues[shortLine]);
+                    story.Update(1.1f);
+                    Require(CurrentLine() == shortLine, "GX autoplay advanced before the short line could be read.");
+                    story.Update(1.5f);
+                    Require(CurrentLine() == shortLine + 1, "GX autoplay stopped advancing after the reading pause.");
+                    bind.Invoke(dialogue, new object[] { 0, false });
+                }
+
+                void StartGxDuelThroughDialogue(StoryEpisodeData episode, UserDeck deck)
+                {
+                    int choiceLine = episode.choiceAfterLine - 1;
+                    var next = (Button)dialogueType.GetField("_next", flags).GetValue(dialogue);
+                    var choices = storyRoot.Find("Scene/Choices");
+                    for (int line = 0; line <= choiceLine; line++)
+                        AdvanceLine(episode.preDialogues[line], line);
+
+                    Require(choices.gameObject.activeInHierarchy && Get("_session") == null && CurrentLine() == choiceLine,
+                        $"The dialogue skipped its pre-duel choice at {episode.id}.");
+                    Press(choices, "Choice_1/Button");
+                    var spoken = (StoryDialogueLine[])dialogueType.GetField("_dialogue", flags).GetValue(dialogue);
+                    Require(spoken.Length == episode.preDialogues.Length + 2 &&
+                        spoken[choiceLine + 1].text == episode.choices[1].text &&
+                        spoken[choiceLine + 2].text == episode.choices[1].response &&
+                        spoken[choiceLine + 2].speaker == episode.preDialogues[choiceLine].speaker &&
+                        ReferenceEquals(spoken[choiceLine + 3], episode.preDialogues[choiceLine + 1]),
+                        $"The choice did not return to the right speaker and scripted line at {episode.id}.");
+                    for (int line = choiceLine + 1; line < spoken.Length; line++) AdvanceLine(spoken[line], line);
+
+                    Require(storyRoot.Find("DeckSelection").gameObject.activeInHierarchy && Get("_session") == null,
+                        $"The dialogue did not reach deck preparation at {episode.id}.");
+                    var picker = (Dropdown)dialogueType.GetField("_picker", flags).GetValue(dialogue);
+                    int deckIndex = picker.options.FindIndex(option => option.text == deck.name);
+                    Require(deckIndex >= 0, $"The selected deck was unavailable at {episode.id}.");
+                    picker.SetValueWithoutNotify(deckIndex);
+                    Press(storyRoot, "DeckSelection/Window/Apply/Button");
+                    var firstChoice = choices.Find("Choice_0/Button");
+                    Require(firstChoice.GetComponentInChildren<Text>().text == "듀얼 개시!", $"No way to start {episode.id}.");
+                    Press(choices, "Choice_0/Button");
+                    for (int attempt = 0; attempt < 15; attempt++)
+                    {
+                        string label = firstChoice.GetComponentInChildren<Text>().text;
+                        if (label is "선공" or "듀얼 시작")
+                        {
+                            Press(choices, "Choice_0/Button");
+                            break;
+                        }
+                        Press(choices, $"Choice_{attempt % 3}/Button");
+                    }
+                    story.Update(4f);
+                    Require(Get("_session") is DuelSession { NativePtr: var handle } && handle != IntPtr.Zero,
+                        $"The quest dialogue could not reach a duel at {episode.id}.");
+
+                    void AdvanceLine(StoryDialogueLine entry, int expectedIndex)
+                    {
+                        Require(CurrentLine() == expectedIndex, $"Unexpected GX dialogue order at {episode.id}.");
+                        story.Update(2f);
+                        VerifyDisplayedText(entry);
+                        next.onClick.Invoke();
+                    }
                 }
 
                 void VerifyGxResidentTimeline(StoryEpisodeData episode, int location)

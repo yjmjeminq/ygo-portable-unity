@@ -179,7 +179,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "아카데미아 도착"
     },
     {
       "id": "gx_ep_01",
@@ -442,6 +443,25 @@
           "speaker": "",
           "text": "나는 씁쓸하게 입맛을 다시며 덱을 정리했다. 이 정도로 무너질 순 없다."
         }
+      ],
+      "fieldObjective": "카이저와 시범전 치르기",
+      "choiceAfterLine": 21,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "오늘은 내가 먼저 압박하겠다.",
+          "response": "좋다. 시범전이라도 첫 수부터 받아내지."
+        },
+        {
+          "stance": "Calm",
+          "text": "첫 패부터 차분히 볼게.",
+          "response": "그럼 첫 수의 의미까지 보게 되겠군."
+        },
+        {
+          "stance": "Bond",
+          "text": "리스펙트 듀얼이 어떤 건지 직접 보고 싶군.",
+          "response": "내 방식은 말보다 필드 위에서 보여주지."
+        }
       ]
     },
     {
@@ -637,7 +657,9 @@
           "text": "언제든 환영이야. 다음에도 지지 않아!",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "아스카의 도전 받기",
+      "choiceAfterLine": 13
     },
     {
       "id": "gx_ep_03",
@@ -869,7 +891,9 @@
           "text": "……말도 안 되는 드로우 운이군. 하지만 확실히, 지루하진 않았어.",
           "emotion": "smile"
         }
-      ]
+      ],
+      "fieldObjective": "쥬다이의 도전 받기",
+      "choiceAfterLine": 23
     },
     {
       "id": "gx_cutscene_01_forest_hideout",
@@ -896,6 +920,10 @@
           "speaker": "윤",
           "text": "후우… 여기가 제일 조용하군. 어디, 오늘 쥬다이 녀석이 썼던 변칙 융합 루트를 복기해 볼까.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "돌바닥 위에 옛 필드 선이 남아 있었다. 본관 경기장과 달리 누가 이기고 지는지 보러 오는 사람은 없었다."
         },
         {
           "speaker": "",
@@ -972,7 +1000,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "숲속 빈 듀얼장 둘러보기"
     },
     {
       "id": "gx_ep_04",
@@ -1148,7 +1177,9 @@
           "text": "……만죠메한테 페이스를 빼앗기다니. 꼴사납군.",
           "emotion": "sad"
         }
-      ]
+      ],
+      "fieldObjective": "숲속의 만죠메 만나기",
+      "choiceAfterLine": 14
     },
     {
       "id": "gx_ep_05",
@@ -1411,7 +1442,9 @@
           "text": "꽤 매서운 한 방이었어. 하지만 실전은 지금부터다.",
           "emotion": "smile"
         }
-      ]
+      ],
+      "fieldObjective": "아스카의 새 덱과 겨루기",
+      "choiceAfterLine": 12
     },
     {
       "id": "gx_cutscene_01b_library_night",
@@ -1429,6 +1462,10 @@
         {
           "speaker": "",
           "text": "중간고사를 앞둔 늦은 밤. 기숙사 복도 불빛이 대부분 꺼진 시각, 자판기 앞에는 뜻밖에도 사오토메 레이와 유우키 쥬다이가 컵라면을 들고 웅성거리고 있었다."
+        },
+        {
+          "speaker": "",
+          "text": "시험이 코앞이라 오늘은 숲에서 덱을 펴지 않기로 했다. 대신 잠깐 바람을 쐬러 기숙사 뒤로 나왔다."
         },
         {
           "speaker": "유우키 쥬다이",
@@ -1575,7 +1612,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "자판기 앞에서 잠시 쉬기"
     },
     {
       "id": "gx_ep_06",
@@ -1754,7 +1792,9 @@
           "text": "치밀한 계산이었어. 다시 한 번 겨뤄보고 싶군.",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "미사와의 검증 듀얼 돕기",
+      "choiceAfterLine": 10
     },
     {
       "id": "gx_ep_07",
@@ -2004,6 +2044,25 @@
           "text": "……어둠의 장치에 시야가 흐려졌나. 아스카를 두고 물러설 순 없어. 다시 간다!",
           "emotion": "determined"
         }
+      ],
+      "fieldObjective": "폐기숙사에서 아스카 찾기",
+      "choiceAfterLine": 16,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "그 장치까지 네 필드째 꺾어 주지.",
+          "response": "체험도 못 해 본 어둠을 함부로 얕보는군!"
+        },
+        {
+          "stance": "Calm",
+          "text": "불빛이 꺼질 때의 움직임부터 보겠다.",
+          "response": "어느 쪽이 먼저 눈을 감을지 두고 보자고."
+        },
+        {
+          "stance": "Bond",
+          "text": "아스카가 묻던 일부터 대답해.",
+          "response": "궁금하면 먼저 살아남아 봐라, 애송이."
+        }
       ]
     },
     {
@@ -2107,7 +2166,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "소나기 피할 곳 찾기"
     },
     {
       "id": "gx_ep_08",
@@ -2402,6 +2462,25 @@
           "text": "아스카 앞에서 질 순 없어. 저 가면은 반드시 내가 부순다!",
           "emotion": "determined"
         }
+      ],
+      "fieldObjective": "후부키의 흔적 따라가기",
+      "choiceAfterLine": 15,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "가면을 벗겨서 그 말부터 거두게 하지.",
+          "response": "그럴 수 있다면 해 봐라."
+        },
+        {
+          "stance": "Calm",
+          "text": "가면 아래 네 움직임을 보고 판단하겠다.",
+          "response": "네가 내 눈을 똑바로 볼 수나 있겠느냐?"
+        },
+        {
+          "stance": "Bond",
+          "text": "아스카가 부른 이름, 방금 들었잖아.",
+          "response": "그 이름은 이곳에 올 때 버렸다."
+        }
       ]
     },
     {
@@ -2607,7 +2686,9 @@
           "text": "압도적인 파워군… 하지만 패턴은 완전히 읽었다. 다시 붙는다!",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "지하 유적의 진동 조사",
+      "choiceAfterLine": 14
     },
     {
       "id": "gx_ep_10",
@@ -2758,7 +2839,9 @@
           "text": "대단한 성장이군. 이제 나도 방심할 수 없겠어.",
           "emotion": "smile"
         }
-      ]
+      ],
+      "fieldObjective": "아스카와 겨울 스파링",
+      "choiceAfterLine": 9
     },
     {
       "id": "gx_cutscene_01d_winter_break_eve",
@@ -2825,7 +2908,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "종업식 뒤 부두 약속"
     },
     {
       "id": "gx_cutscene_02_season2_arrival",
@@ -2971,7 +3055,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "새 학기 입항객 맞이"
     },
     {
       "id": "gx_ep_11",
@@ -3133,7 +3218,9 @@
           "text": "……운명 따위에 질 순 없지. 다시 한 판 붙자, 에드.",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "에드와 시범전 치르기",
+      "choiceAfterLine": 11
     },
     {
       "id": "gx_cutscene_02b_cafeteria_lunch",
@@ -3292,7 +3379,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "본관에서 점심 챙기기"
     },
     {
       "id": "gx_ep_12",
@@ -3486,6 +3574,25 @@
           "text": "질투의 힘이라는 건 무섭군. 다음엔 진심으로 상대해 주지.",
           "emotion": "smile"
         }
+      ],
+      "fieldObjective": "아스카와 밤의 약속 지키기",
+      "choiceAfterLine": 10,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "내가 지금 어떤 상대인지 직접 확인해 봐.",
+          "response": "그래. 당신이 또 피하려 들면 절대 안 넘어가."
+        },
+        {
+          "stance": "Calm",
+          "text": "디스크부터 내려. 손이 떨리고 있어.",
+          "response": "지금은 내려놓으면 다시 들기 더 어려울 것 같아."
+        },
+        {
+          "stance": "Bond",
+          "text": "세레나 얘기보다 오늘 네가 꺼내고 싶은 수를 보여 줘.",
+          "response": "그걸 말하려고 왔는데, 얼굴 보니까 자꾸 다른 말부터 나와."
+        }
       ]
     },
     {
@@ -3558,6 +3665,10 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "아스카가 위층 통로로 몸을 돌렸다. 소매 끝에서 늘 달고 다니던 기숙사 배지가 반쯤 가려져 있었다."
+        },
+        {
           "speaker": "유우키 쥬다이",
           "text": "형! 소문 듣고 바로 왔는데, 둘 다 말이 안 통해. 만죠메는 내 얼굴을 보고도 모르는 사람처럼 굴었어!",
           "emotion": "shock",
@@ -3582,10 +3693,16 @@
         {
           "speaker": "",
           "text": "차가운 눈동자로 나를 외면하는 아스카의 모습에, 내 안에서 오랫동안 식어 있던 분노가 거세게 타올랐다."
+        },
+        {
+          "speaker": "윤",
+          "text": "쥬다이, 광장에 남은 학생들을 봐 줘. 난 만죠메를 지나 아스카한테 갈게.",
+          "emotion": "determined"
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "하얀 제복의 소문 확인"
     },
     {
       "id": "gx_ep_13",
@@ -3618,6 +3735,15 @@
           ]
         },
         {
+          "speaker": "",
+          "text": "만죠메 너머로 아스카가 계단을 오르는 게 보였다. 뒤쫓으려 하자 만죠메가 복도의 문을 닫고 디스크를 펼쳤다."
+        },
+        {
+          "speaker": "만죠메 쥰 (빛의 결사)",
+          "text": "여왕님께 가고 싶으면 여기서 날 꺾어. 한 발짝이라도 더 가는 건 내가 허락하지 않는다.",
+          "emotion": "determined"
+        },
+        {
           "speaker": "만죠메 쥰 (빛의 결사)",
           "text": "오시리스 레드의 오물과 어울리던 과거는 버렸다. 하얀 빛만이 유일한 진리다!",
           "emotion": "determined"
@@ -3626,6 +3752,10 @@
           "speaker": "윤",
           "text": "네 형들한테도 안 굽히던 자존심을 고작 점술가 따위한테 팔아넘기다니. 내가 정신 차리게 해주지.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "그는 잠깐 입술을 깨물었다. 하지만 하얀 디스크에 불이 켜지자 다시 눈빛이 굳었다."
         },
         {
           "speaker": "만죠메 쥰 (빛의 결사)",
@@ -3659,6 +3789,10 @@
           "speaker": "만죠메 쥰",
           "text": "으윽…… 내가 대체 무슨 헛소리를…… 아, 아스카가 사이오한테 당했어! 빨리 막아야 해!",
           "emotion": "shock"
+        },
+        {
+          "speaker": "",
+          "text": "만죠메는 소매를 내려다봤다. 하얀 디스크에 불이 꺼지고 나서야 내 얼굴을 똑바로 바라봤다."
         },
         {
           "speaker": "윤",
@@ -3696,6 +3830,25 @@
           "text": "아스카를 구하기 전에 여기서 멈출 순 없어. 다시 간다!",
           "emotion": "determined"
         }
+      ],
+      "fieldObjective": "만죠메가 막은 통로 열기",
+      "choiceAfterLine": 8,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "복도 문을 열게 만들겠어.",
+          "response": "내 공격을 받고도 그대로 서 있으면 해 보든가."
+        },
+        {
+          "stance": "Calm",
+          "text": "네가 첫 수를 두는 걸 먼저 보겠다.",
+          "response": "한 수라도 양보할 거라고 생각하지 마라."
+        },
+        {
+          "stance": "Bond",
+          "text": "만죠메, 내가 부른 이름을 들어 봐.",
+          "response": "그 이름을 마음대로 부를 수 있는 것도 여기까지다."
+        }
       ]
     },
     {
@@ -3727,6 +3880,10 @@
               "action": "focus"
             }
           ]
+        },
+        {
+          "speaker": "",
+          "text": "만죠메가 일러 준 대로, 코트 옆 화면에는 내 리그 경기 영상이 멈춰 있었다. 화면 속 내 손이 첫 카드에 닿기 직전이었다."
         },
         {
           "speaker": "텐죠인 아스카 (빛의 결사)",
@@ -3854,6 +4011,25 @@
           "text": "……안전하게만 싸워선 저 벽을 못 깨. 모든 걸 걸고 다시 간다!",
           "emotion": "determined"
         }
+      ],
+      "fieldObjective": "위층 코트에서 아스카 찾기",
+      "choiceAfterLine": 10,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "그 메모로 내 수를 넘을 수 있을지 보자.",
+          "response": "좋아. 단 한 번도 예상 못 한 수로 꺾어줄게."
+        },
+        {
+          "stance": "Calm",
+          "text": "네가 익힌 수를 하나씩 보겠다.",
+          "response": "끝까지 보겠다면 눈 돌리지 마."
+        },
+        {
+          "stance": "Bond",
+          "text": "기억하고 있었군. 그 수를 끝까지 보여 줘.",
+          "response": "……보여 달라고 했지. 이번엔 눈앞에서 똑똑히 봐."
+        }
       ]
     },
     {
@@ -3939,6 +4115,10 @@
         },
         {
           "speaker": "",
+          "text": "아스카는 이불 위에 덱을 올려놓았다. 지금 당장 뛰쳐나가는 대신, 먼저 기억에 남은 수를 한 장씩 맞춰 보기로 했다."
+        },
+        {
+          "speaker": "",
           "text": "그때, 의무실 문이 벌컥 열리며 후부키가 환한 미소로 걸어 들어왔다.",
           "stage": [
             {
@@ -4020,7 +4200,9 @@
           "text": "붉은 눈의 폭발력이 만만치 않군요. 다시 상대하겠습니다.",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "의무실에서 아스카 살피기",
+      "choiceAfterLine": 15
     },
     {
       "id": "gx_cutscene_02d_sunset_walk",
@@ -4095,10 +4277,15 @@
           "speaker": "",
           "text": "노을빛에 물든 그녀의 눈동자는 그 어떤 빛의 결사의 환상보다도 맑고 단단하게 빛나고 있었다.",
           "cutscene": "cg_gx_sunset_boardwalk"
+        },
+        {
+          "speaker": "",
+          "text": "아스카와 갈라진 뒤 디스크에 메시지 하나가 도착했다. 발신인은 료. 화산 결투장에 있으니 오늘 밤 옛 승부의 답을 보여 주겠다는 내용이었다."
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "아스카와 결승 준비 이야기"
     },
     {
       "id": "gx_ep_16",
@@ -4131,6 +4318,11 @@
           ]
         },
         {
+          "speaker": "윤",
+          "text": "메시지에 옛 승부의 답이라고 썼더군. 왜 하필 이런 장소에서 보자는 거지?",
+          "emotion": "determined"
+        },
+        {
           "speaker": "헬 카이저 료",
           "text": "왔군, 무패의 프로. 예전의 무른 리스펙트는 버렸다. 오직 승리만을 갈망하는 진짜 어둠의 사이버류를 맛보여 주지.",
           "emotion": "determined"
@@ -4152,6 +4344,10 @@
         {
           "speaker": "",
           "text": "화산 지하 듀얼장의 붉은 열기 속에서 헬 카이저의 전류 목걸이가 지직거리며 불꽃을 튀겼다."
+        },
+        {
+          "speaker": "",
+          "text": "나는 디스크를 켜기 전, 철망 바깥의 전원 스위치부터 확인했다. 료의 디스크와 목걸이가 같은 장치에 연결돼 있었다."
         },
         {
           "speaker": "헬 카이저 료",
@@ -4197,6 +4393,10 @@
         },
         {
           "speaker": "",
+          "text": "료가 고개를 돌려 목걸이의 잠금쇠를 풀었다. 바닥에 내려놓은 장치에서 이번에는 아무 소리도 나지 않았다."
+        },
+        {
+          "speaker": "",
           "text": "어두운 지하 듀얼장을 빠져나오며 나는 잠깐 뒤를 돌아보았다. 료의 눈동자에서 광기가 조금이나마 가라앉은 듯했다."
         }
       ],
@@ -4211,7 +4411,9 @@
           "text": "전류의 고통 따위에 흔들릴 순 없어. 다시 간다!",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "료가 보낸 도전 확인",
+      "choiceAfterLine": 10
     },
     {
       "id": "gx_ep_17",
@@ -4415,6 +4617,25 @@
           "text": "아직 안 끝났어! 그 사람이 지켜보고 있어, 반드시 이겨서 증명할 거야!",
           "emotion": "determined"
         }
+      ],
+      "fieldObjective": "아스카로 제넥스 결승 출전",
+      "choiceAfterLine": 12,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "이번에는 마지막 수까지 제가 밀고 갈 거예요.",
+          "response": "좋아. 지난번처럼 첫 방어에서 무너지지 마."
+        },
+        {
+          "stance": "Calm",
+          "text": "첫 패가 달라도 제 전개는 흔들리지 않아요.",
+          "response": "그 자신감이 승부 끝에도 남아 있으면 좋겠네."
+        },
+        {
+          "stance": "Bond",
+          "text": "지난번에 막힌 수를 여기서 다시 써 보겠어요.",
+          "response": "그래. 그 뒤에 뭘 준비했는지 나도 궁금해."
+        }
       ]
     },
     {
@@ -4531,7 +4752,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "우승 뒤 부두에서 만나기"
     },
     {
       "id": "gx_ep_18",
@@ -4567,6 +4789,16 @@
           "speaker": "유우키 쥬다이",
           "text": "형! 사이오랑 붙기 전에 나랑도 몸풀기 한 판 하자! 어제 결승 보고 나니까 가만히 못 있겠어.",
           "emotion": "smile"
+        },
+        {
+          "speaker": "유우키 쥬다이",
+          "text": "아스카가 위층 출입구를 확인 중이래. 연락 오면 바로 갈 수 있게 여기서 기다리래.",
+          "emotion": "determined"
+        },
+        {
+          "speaker": "윤",
+          "text": "좋아. 그때까지만 한 판이다. 제어실에 들어가면 무슨 덱이 나올지 아직 모르니까.",
+          "emotion": "determined"
         },
         {
           "speaker": "",
@@ -4614,6 +4846,10 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "그때 아스카에게서 메시지가 왔다. 아레나 뒤편 계단을 찾았고, 입구에서 나를 기다리겠다고 했다."
+        },
+        {
           "speaker": "윤",
           "text": "나도 즐거웠어, 쥬다이. 자, 이제 사이오의 파멸의 빛을 끝내러 가지.",
           "emotion": "determined"
@@ -4630,7 +4866,9 @@
           "text": "방심했군. 하지만 기분 나쁘지 않아. 다시 한 판 하자!",
           "emotion": "smile"
         }
-      ]
+      ],
+      "fieldObjective": "쥬다이와 몸풀기 한 판",
+      "choiceAfterLine": 9
     },
     {
       "id": "gx_ep_19",
@@ -4675,6 +4913,15 @@
         {
           "speaker": "",
           "text": "유리창 옆 제어 모니터에 위성 레이저의 발사까지 남은 시간이 붉게 점멸하고 있었다."
+        },
+        {
+          "speaker": "",
+          "text": "화면에 찍힌 조준점이 조금씩 본관 쪽으로 옮겨 가고 있었다. 취소 버튼을 눌러도 같은 승인 표시만 떴다."
+        },
+        {
+          "speaker": "윤",
+          "text": "취소 명령이 잠겨 있어. 저 디스크가 제어 장치에 연결돼 있다면, 듀얼로 끊을 수 있겠군.",
+          "emotion": "determined"
         },
         {
           "speaker": "사이오 타쿠마",
@@ -4735,6 +4982,10 @@
           ]
         },
         {
+          "speaker": "",
+          "text": "아스카가 제어 화면을 다시 확인했다. 조준점과 타이머가 모두 사라진 것을 보고 나서야 우리는 문에서 물러섰다."
+        },
+        {
           "speaker": "에드 피닉스",
           "text": "……고맙다. 사이오를 구해줘서. 넌 정말이지 대단한 녀석이야.",
           "emotion": "smile"
@@ -4778,6 +5029,25 @@
           "speaker": "윤",
           "text": "정위치만 뜨는 억지 운명이라도 계산으로 깰 수 있어. 다시 간다!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "사이오의 제어실로 가기",
+      "choiceAfterLine": 8,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "타이머보다 먼저 네 디스크를 멈춰 주지.",
+          "response": "기껏해야 몇 분이다. 해 볼 테면 해 보게."
+        },
+        {
+          "stance": "Calm",
+          "text": "카운트에 맞춰 움직이진 않겠다. 내 순서대로 가겠어.",
+          "response": "숫자를 안 본다 한들 발사는 예정대로 진행된다."
+        },
+        {
+          "stance": "Bond",
+          "text": "아스카, 화면을 봐 줘. 사이오의 마지막 수까지 보겠다.",
+          "response": "둘이서 바라봐도 정해진 결과는 바뀌지 않아."
         }
       ]
     },
@@ -4940,7 +5210,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "교환학생을 항구에서 맞이"
     },
     {
       "id": "gx_ep_20",
@@ -4992,6 +5263,10 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "요한은 루비가 앉은 쪽을 보며 덱 케이스를 열었다. 한 장을 뽑아 보여 주기 전, 내 쪽의 빈 모래밭까지 손으로 가리켰다."
+        },
+        {
           "speaker": "윤",
           "text": "가족이라. 쥬다이랑 통하는 데가 있겠군.",
           "emotion": "smile"
@@ -5018,6 +5293,10 @@
           "speaker": "윤",
           "text": "보옥수의 연계가 꽤 까다롭더군. 훌륭한 덱이다, 요한.",
           "emotion": "smile"
+        },
+        {
+          "speaker": "",
+          "text": "요한이 웃으며 디스크를 끄려던 때였다. 루비가 어깨를 박차고 허공을 향해 울부짖었다."
         },
         {
           "speaker": "",
@@ -5061,7 +5340,9 @@
           "text": "보옥수의 폭발력을 얕봤군. 다시 간다!",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "해변에서 요한 만나기",
+      "choiceAfterLine": 9
     },
     {
       "id": "gx_cutscene_05_dimension_shift",
@@ -5145,6 +5426,10 @@
         },
         {
           "speaker": "",
+          "text": "만죠메는 더 따지려다 본관 쪽으로 달려가는 학생들을 보고 몸을 돌렸다. 나는 쓰러진 안내판을 세워 본관 쪽을 가리키게 했다."
+        },
+        {
+          "speaker": "",
           "text": "나는 주변을 훑었다. 바위산 뒤로 뭐가 있는지, 물과 식량은 얼마나 버틸지, 아는 게 하나도 없었다."
         },
         {
@@ -5165,10 +5450,15 @@
           "speaker": "윤",
           "text": "그래. 다친 사람은 본관으로 옮겨. 아무도 혼자 움직이지 마.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "우리는 본관에 물을 모으고, 해가 뜨면 황야 가장자리부터 살피기로 했다. 모두를 데리고 나갈 길을 찾는 게 먼저였다."
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "섬을 삼킨 균열 확인"
     },
     {
       "id": "gx_ep_21",
@@ -5210,6 +5500,11 @@
         },
         {
           "speaker": "오스틴 오브라이언",
+          "text": "바위턱을 지나면 본관에서 우릴 볼 수 없다. 이쪽 망을 맡은 학생이 신호를 못 보면 둘 다 돌아오는 거다.",
+          "emotion": "determined"
+        },
+        {
+          "speaker": "오스틴 오브라이언",
           "text": "저 학생들까지 데리고 나갈 거라면 먼저 네 실력을 확인해야겠다. 돌아올 수 있는 곳에서 시험하지.",
           "emotion": "determined"
         },
@@ -5217,6 +5512,10 @@
           "speaker": "윤",
           "text": "좋다. 여기서 스파링만 한다. 디스크가 저들처럼 반응하면 즉시 둘 다 꺼.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "오브라이언이 고개를 끄덕이고 거리를 벌렸다. 바위턱을 넘지 않는 것과 귀환 신호를 잊지 않는 것, 둘 다 맞추고 나서야 디스크를 켰다."
         },
         {
           "speaker": "오스틴 오브라이언",
@@ -5313,7 +5612,9 @@
           "text": "여기서 무너질 순 없어. 다시 간다!",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "오브라이언과 정찰 준비",
+      "choiceAfterLine": 9
     },
     {
       "id": "gx_ep_22",
@@ -5360,6 +5661,15 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "짐은 모래에 협곡을 그리고 두 갈래 길 중 하나에 돌을 놓았다. 요한이 마지막으로 신호를 보낸 자리였다."
+        },
+        {
+          "speaker": "짐 크로커다일 쿡",
+          "text": "밤엔 어느 길도 비슷해 보였어. 비탈에서 들리는 소리만 따라갔다간 돌아 나오기도 힘들어.",
+          "emotion": "sad"
+        },
+        {
           "speaker": "짐 크로커다일 쿡",
           "text": "저 협곡 끝이야. 들어가면 묘지까지 노리는 놈들이 있어. 내 화석 융합으로 대응할 수 있는지 먼저 맞춰 보자, 친구.",
           "emotion": "determined"
@@ -5392,6 +5702,11 @@
           "emotion": "determined"
         },
         {
+          "speaker": "짐 크로커다일 쿡",
+          "text": "길이 갈라지는 곳마다 등불을 두 번 깜빡일게. 내가 앞에서 보이면 그때 따라와.",
+          "emotion": "determined"
+        },
+        {
           "speaker": "텐죠인 아스카",
           "text": "등불은 내가 챙겨 왔어. 협곡에 들어가기 전에 잠깐이라도 쉬자.",
           "emotion": "smile",
@@ -5413,6 +5728,25 @@
           "speaker": "윤",
           "text": "묘지 자원 관리가 핵심이군. 다시 상대하지!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "짐에게 요한의 행방 묻기",
+      "choiceAfterLine": 8,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "묘지를 건드리는 순간까지 직접 보여 줘.",
+          "response": "크하하, 좋아. 깜빡하면 네 카드부터 가져갈 거야."
+        },
+        {
+          "stance": "Calm",
+          "text": "되돌릴 수 있는 카드부터 남겨 두고 간다.",
+          "response": "그게 필요해. 저 안에선 한 장이 아까울 거야."
+        },
+        {
+          "stance": "Bond",
+          "text": "네가 회수하는 수까지 눈에 익히고 가겠다.",
+          "response": "같이 들어갈 때 꽤 편하겠네, 친구. 잘 봐."
         }
       ]
     },
@@ -5492,7 +5826,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "모닥불에서 출발 준비"
     },
     {
       "id": "gx_ep_23",
@@ -5525,6 +5860,10 @@
           ]
         },
         {
+          "speaker": "",
+          "text": "회랑에 들어서자 짐의 등불이 뒤로 멀어졌다. 아몬 뒤쪽의 석문 너머로는 아래층에서 울리는 진동이 전해졌다."
+        },
+        {
           "speaker": "아몬 가람",
           "text": "당신도 정점에 서려고 모든 걸 걸었던 프로 아닌가? 왜 여기까지 남을 구하러 왔지?",
           "emotion": "determined"
@@ -5546,6 +5885,11 @@
         },
         {
           "speaker": "아몬 가람",
+          "text": "그럼 저 문이 열리는 데 뭘 치러야 하는지 보고도 같은 말을 할 수 있나?",
+          "emotion": "determined"
+        },
+        {
+          "speaker": "아몬 가람",
           "text": "엑조디아의 힘을 얻으려면 희생이 필요했어. 당신이 그 앞을 막는다면 그 힘으로 치우겠어.",
           "emotion": "determined"
         },
@@ -5561,6 +5905,10 @@
           "speaker": "아몬 가람",
           "text": "큭… 감정을 품고서도 이 정도의 냉철함을 유지하다니……",
           "emotion": "shock"
+        },
+        {
+          "speaker": "",
+          "text": "아몬 뒤로 비치던 금빛이 꺼졌다. 돌문 틈이 벌어지며 아래층으로 이어지는 계단이 드러났다."
         },
         {
           "speaker": "",
@@ -5587,7 +5935,9 @@
           "text": "엑조디오스가 완성되기 전에 끝낸다. 다시 간다!",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "성채 안에서 두 사람 찾기",
+      "choiceAfterLine": 9
     },
     {
       "id": "gx_ep_24",
@@ -5629,6 +5979,15 @@
           "speaker": "윤",
           "text": "네가 거기서 다칠까 봐 그래. 아까도 회랑을 지나는 동안 그 생각뿐이었어.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "아스카의 손이 디스크 위에서 잠시 멈췄다. 그녀는 내가 다음 말을 할 때까지 기다렸다."
+        },
+        {
+          "speaker": "윤",
+          "text": "모닥불 곁에서는 네가 내 옆에 있어 다행이라고 했지. 막상 들어갈 때가 되니까 그 말대로 행동하기가 어렵군.",
+          "emotion": "sad"
         },
         {
           "speaker": "텐죠인 아스카",
@@ -5694,6 +6053,12 @@
           "cutscene": "cg_gx_first_kiss"
         },
         {
+          "speaker": "텐죠인 아스카",
+          "text": "그럼 약속 하나 더. 새벽에 내가 먼저 눈을 뜨면, 당신이 올 때까지 여기서 기다릴게.",
+          "cutscene": "cg_gx_first_kiss",
+          "emotion": "blush"
+        },
+        {
           "speaker": "",
           "text": "말을 마치고도 서로의 이마를 댄 채 한참을 서 있었다.",
           "cutscene": "cg_gx_first_kiss",
@@ -5710,6 +6075,25 @@
           "speaker": "윤",
           "text": "그래. 네 말이 맞았다. 나도 내일은 네 뒤를 맡지.",
           "emotion": "smile"
+        }
+      ],
+      "fieldObjective": "아스카와 최심부 진입 준비",
+      "choiceAfterLine": 7,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "내 전력을 받아낼 때까지 밀고 들어와.",
+          "response": "좋아. 받아내기만 하고 끝낼 생각은 없어."
+        },
+        {
+          "stance": "Calm",
+          "text": "내가 어디서 남은 패를 쓰는지 봐.",
+          "response": "그동안 몇 번을 봐 왔는데. 이번에는 내가 먼저 읽을게."
+        },
+        {
+          "stance": "Bond",
+          "text": "내일 내 뒤를 부탁해도 되는지, 네 수를 보고 답할게.",
+          "response": "그래. 그 답이 나올 때까지 물러서지 않을게."
         }
       ]
     },
@@ -5745,6 +6129,10 @@
           ]
         },
         {
+          "speaker": "",
+          "text": "쥬다이 뒤로 성문에 새겨진 문양이 맥박처럼 깜빡였다. 그가 한 걸음 움직일 때마다 검은 빛이 디스크 쪽으로 모였다."
+        },
+        {
           "speaker": "텐죠인 아스카",
           "text": "쥬다이, 짐한테 다 들었어. 요한이 살아 있다면 저 문 너머야. 같이 가자.",
           "emotion": "sad",
@@ -5769,6 +6157,10 @@
           "speaker": "윤",
           "text": "그 카드에 힘을 더 주면 요한을 찾을 거라 믿는 거냐? 네가 여기서 동료하고 싸우는 걸 보면 요한이 뭐라고 할까?",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "쥬다이가 잠깐 눈을 감았다. 요한의 이름이 나올 때마다 문 쪽을 보는 버릇만은 아직 그대로였다."
         },
         {
           "speaker": "패왕 쥬다이",
@@ -5813,6 +6205,10 @@
           "emotion": "sad"
         },
         {
+          "speaker": "",
+          "text": "쥬다이는 제일 먼저 성문 손잡이를 잡았다. 전처럼 뛰어 들어가는 대신 우리 둘의 발소리가 닿을 때까지 기다렸다."
+        },
+        {
           "speaker": "윤",
           "text": "그래, 같이 가자. 아스카, 우리 뒤를 부탁해.",
           "emotion": "smile"
@@ -5828,6 +6224,25 @@
           "speaker": "윤",
           "text": "쥬다이를 이대로 둘 순 없어. 다시 간다!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "성문 앞에서 쥬다이 만나기",
+      "choiceAfterLine": 9,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "초융합을 쓸 틈부터 없애주지.",
+          "response": "멈출 수 있다고 믿는다면 앞으로 나와라."
+        },
+        {
+          "stance": "Calm",
+          "text": "요한 쪽으로 갈 길은 그대로 둘 거야. 네 수부터 보지.",
+          "response": "내가 열어야 할 길을 네가 정하지 마라."
+        },
+        {
+          "stance": "Bond",
+          "text": "네가 돌아오면 요한한테 같이 갈 거야.",
+          "response": "그 이름을 방패로 쓰지 마라."
         }
       ]
     },
@@ -5873,6 +6288,11 @@
           "emotion": "determined"
         },
         {
+          "speaker": "유벨",
+          "text": "이 아이의 덱으로 문을 열었어. 문을 닫을 생각이라면 먼저 그 덱부터 이겨야 할 거야.",
+          "emotion": "smile"
+        },
+        {
           "speaker": "",
           "text": "제단에서 번지기 시작한 문양이 쥬다이와 아스카가 선 곳 바로 앞까지 닿았다."
         },
@@ -5880,6 +6300,10 @@
           "speaker": "유벨",
           "text": "초융합에 마지막 한 사람만 더 있으면 돼. 내가 직접 고를까?",
           "emotion": "smile"
+        },
+        {
+          "speaker": "",
+          "text": "나는 돌아갈 계단과 요한 사이의 거리를 쟀다. 승부를 끝내는 순간에는 쥬다이가 요한을 바로 잡을 수 있어야 했다."
         },
         {
           "speaker": "윤",
@@ -5919,6 +6343,10 @@
           "text": "윤! 손 내밀어! 우리 같이 돌아가기로 했잖아!",
           "emotion": "hurt",
           "fx": "shake"
+        },
+        {
+          "speaker": "",
+          "text": "내 발밑의 돌조각마저 검은 틈 아래로 사라졌다. 딛고 다시 올라설 곳이 없었다."
         },
         {
           "speaker": "",
@@ -5977,6 +6405,25 @@
           "text": "아스카와 동료들을 위해서라도 여기서 질 순 없어!",
           "emotion": "determined"
         }
+      ],
+      "fieldObjective": "제단에서 요한 구하기",
+      "choiceAfterLine": 7,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "네가 요한에게 씌운 것부터 끊겠어.",
+          "response": "좋아. 이 아이의 덱을 어디까지 막나 볼게."
+        },
+        {
+          "stance": "Calm",
+          "text": "계단에는 손대지 마. 나한테 먼저 카드를 써.",
+          "response": "후후. 네가 문양 바깥에서 끝까지 버틸 수 있다면 말이지."
+        },
+        {
+          "stance": "Bond",
+          "text": "요한, 들리면 버텨. 쥬다이가 바로 옆에 있어.",
+          "response": "이 아이 이름을 불러도 지금 대답하는 건 나야."
+        }
       ]
     },
     {
@@ -6028,6 +6475,11 @@
           "emotion": "determined"
         },
         {
+          "speaker": "텐죠인 아스카",
+          "text": "안에서는 덱을 알아보는 것만으로 부족할 거야. 유벨이 어떤 수를 놓치는지 끝까지 볼게.",
+          "emotion": "determined"
+        },
+        {
           "speaker": "",
           "text": "아스카가 재킷을 어깨에 걸치고 덱을 꺼냈다. 떨리던 손이 익숙한 카드 모서리를 쥐자 조금씩 가라앉았다.",
           "fx": "heartbeat"
@@ -6048,7 +6500,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "윤을 되찾을 준비"
     },
     {
       "id": "gx_ep_27",
@@ -6101,6 +6554,10 @@
           "text": "유벨이 내 앞에서 윤의 덱을 펼쳤다. 나는 덱 케이스에서 사이버 엔젤을 꺼냈다."
         },
         {
+          "speaker": "",
+          "text": "손을 떨지 않으려고 꽉 쥐는 대신 카드를 한 장 고쳐 잡았다. 저쪽의 덱보다 그걸 다루는 손을 봐야 했다."
+        },
+        {
           "speaker": "텐죠인 아스카",
           "text": "(이제 네가 한 수를 둘 차례야. 기다리겠다고 했지. 들었어, 윤.)",
           "emotion": "determined"
@@ -6115,6 +6572,10 @@
           "text": "그 카드를 아껴 두는 이유부터 달라. 난 수없이 그 맞은편에 있었어. 네가 놓친 수가 뭔지도 알아.",
           "emotion": "determined",
           "fx": "flash"
+        },
+        {
+          "speaker": "",
+          "text": "유벨은 대답보다 먼저 에이스가 든 쪽으로 손을 옮겼다. 그 사람이라면 내가 뭘 내는지 한 번 더 기다렸을 거야."
         },
         {
           "speaker": "유벨 (윤에게 빙의)",
@@ -6218,6 +6679,25 @@
           "speaker": "텐죠인 아스카",
           "text": "절대 포기 안 해! 그 사람을 되찾을 때까지 몇 번이고 일어설 거야!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "아스카로 윤을 구하기",
+      "choiceAfterLine": 11,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "당신이 쥔 에이스부터 넘어 보이겠어.",
+          "response": "그 앞에서 네가 기다릴 차례까지 남아 있을까?"
+        },
+        {
+          "stance": "Calm",
+          "text": "겉으로 보이는 카드 한 장에 속지 않겠어.",
+          "response": "좋아. 어디까지 내 손을 읽을 수 있나 보지."
+        },
+        {
+          "stance": "Bond",
+          "text": "윤이 어떤 수를 남겨 두는지, 그 맞은편에서 배웠어.",
+          "response": "그렇다면 그 사람 손으로 직접 시험해 주지."
         }
       ]
     },
@@ -6367,7 +6847,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "돌아온 본관에서 합류"
     },
     {
       "id": "gx_ep_28",
@@ -6406,6 +6887,11 @@
         },
         {
           "speaker": "크로노스 데 메디치",
+          "text": "성적표에 승패를 적는 건 오늘로 마지막이오. 나는 윤 군이 이 학교에서 어떤 듀얼을 배웠는지 내 눈으로 보고 싶노라네.",
+          "emotion": "smile"
+        },
+        {
+          "speaker": "크로노스 데 메디치",
           "text": "윤 군, 그날 잠깐 쉬러 오셨다고 했지요. 이렇게 오래 머물게 된 이유를 이제 물어도 되겠소이까?",
           "emotion": "smile"
         },
@@ -6421,7 +6907,12 @@
         },
         {
           "speaker": "크로노스 데 메디치",
-          "text": "좋소이다! 교사의 자존심을 걸고 혼신의 일격을 날려주겠노라네! 듀얼!",
+          "text": "좋소이다. 준비가 됐다면 마지막 평가에 임할 각오를 들려주시게나.",
+          "emotion": "determined"
+        },
+        {
+          "speaker": "크로노스 데 메디치",
+          "text": "그 마음을 앤틱 기어 앞에서도 보여주시게. 이제 마지막 수업을 시작하겠노라네! 듀얼!",
           "emotion": "determined",
           "fx": "flash"
         }
@@ -6461,6 +6952,25 @@
           "speaker": "윤",
           "text": "교수님의 진심은 대단하군요. 다시 도전하겠습니다!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "크로노스의 졸업 평가",
+      "choiceAfterLine": 8,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "마지막이니 교수님의 전력도 보여 주십시오.",
+          "response": "물론이오. 마지막까지 바라는 대로 상대해 드리리다."
+        },
+        {
+          "stance": "Calm",
+          "text": "성적표에 적힐 점수보다 마지막 한 수가 궁금합니다.",
+          "response": "그 한 수를 기대하고 있겠소이다."
+        },
+        {
+          "stance": "Bond",
+          "text": "마지막 수업에서 배울 게 아직 남았습니다.",
+          "response": "마지막까지 배울 마음이 있다니 기쁘구려."
         }
       ]
     },
@@ -6503,6 +7013,10 @@
           "speaker": "유우키 쥬다이",
           "text": "어제 레이하고 연습했거든! 형, 아스카, 우리 차례까지 방심하면 안 돼!",
           "emotion": "smile"
+        },
+        {
+          "speaker": "",
+          "text": "레이가 쥬다이의 덱 쪽을 흘끗 보고 한 걸음 물러섰다. 미리 합을 맞춘 팀이라는 게 그 짧은 동작만으로도 보였다."
         },
         {
           "speaker": "",
@@ -6606,7 +7120,9 @@
           "text": "방심했네! 다시 호흡 맞춰서 꼭 이기자!",
           "emotion": "determined"
         }
-      ]
+      ],
+      "fieldObjective": "아스카와 태그 결승 출전",
+      "choiceAfterLine": 3
     },
     {
       "id": "gx_cutscene_06c_autumn_bench",
@@ -6672,7 +7188,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "자판기 벤치에서 우승 축하"
     },
     {
       "id": "gx_ep_30",
@@ -6693,6 +7210,10 @@
         {
           "speaker": "",
           "text": "프로 구단 스카우터들이 기록지를 들고 앞줄에 섰다. 그걸 확인한 만죠메가 디스크를 켰다."
+        },
+        {
+          "speaker": "",
+          "text": "만죠메가 스카우터들 앞에 자기 덱을 먼저 올려놓았다. 평소처럼 가문 이름을 앞세우지 않고, 기록지에 본인 이름만 크게 적었다."
         },
         {
           "speaker": "만죠메 쥰",
@@ -6726,6 +7247,10 @@
           "speaker": "만죠메 쥰",
           "text": "역시 만만한 벽은 아니군. 다음에는 여기 말고 리그에서 만나자고, 윤!",
           "emotion": "smile"
+        },
+        {
+          "speaker": "",
+          "text": "만죠메는 결과표를 건네받고도 바로 떠나지 않았다. 자신이 놓친 수를 물어보고 답을 들은 뒤에야 만족한 듯 고개를 끄덕였다."
         },
         {
           "speaker": "",
@@ -6828,7 +7353,9 @@
           "text": "정말 강해졌군, 만죠메. 한 판 더 붙자!",
           "emotion": "smile"
         }
-      ]
+      ],
+      "fieldObjective": "만죠메의 공개 경기 치르기",
+      "choiceAfterLine": 6
     },
     {
       "id": "gx_cutscene_07_darkness_invasion",
@@ -6910,6 +7437,11 @@
           "text": "안개 안쪽에서 폐기숙사 벽이 일그러졌다. 한 발만 더 들어가면 뒤에 선 사람도 보이지 않을 만큼 짙었다."
         },
         {
+          "speaker": "텐죠인 후부키",
+          "text": "유스케가 사라진 날에도 이 근처에서 길이 끊겼어. 안으로 들어가면 내 목소리가 닿는 데서 멈춰, 윤.",
+          "emotion": "determined"
+        },
+        {
           "speaker": "윤",
           "text": "아스카, 뒤쪽 길을 봐 줘. 후부키, 우리 둘이서 네 친구에게 다가가자.",
           "emotion": "determined"
@@ -6932,7 +7464,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "검은 안개가 번진 곳 조사"
     },
     {
       "id": "gx_ep_31",
@@ -6963,6 +7496,10 @@
           "speaker": "윤",
           "text": "알아. 그래서 돌아가는 길에 내 이름을 부르는 사람이 생겼을 때 한 번 더 돌아봤지.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "유리처럼 보이는 막에 손을 대자, 방금 들은 후부키의 목소리가 한 박자 늦게 울렸다. 완전히 끊긴 건 아니었다."
         },
         {
           "speaker": "",
@@ -7022,6 +7559,11 @@
           "emotion": "sad"
         },
         {
+          "speaker": "후지와라 유스케",
+          "text": "내가 붙들고 있던 막은 끝났어. 그런데…… 저 안개는 아직 내 말을 듣지 않아.",
+          "emotion": "shock"
+        },
+        {
           "speaker": "",
           "text": "후부키가 친구의 이름을 다시 불렀다. 그 목소리 위로, 꺼질 줄 알았던 안개가 하늘 한가운데 모여들기 시작했다.",
           "fx": "shake"
@@ -7042,6 +7584,25 @@
           "speaker": "윤",
           "text": "클리어 월드의 파훼법은 이미 계산했다. 다시 간다!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "후지와라 너머의 막 열기",
+      "choiceAfterLine": 9,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "말로 못 열겠다면 이 막부터 깨겠어.",
+          "response": "안쪽으로 들어오면 네 이름부터 잊게 될 거야."
+        },
+        {
+          "stance": "Calm",
+          "text": "밖의 소리가 남아 있는 동안 그 방향을 놓치지 않겠다.",
+          "response": "얼마나 남아 있는지 직접 확인해 봐."
+        },
+        {
+          "stance": "Bond",
+          "text": "후부키의 목소리까지 막을 수는 없을 거야.",
+          "response": "……그 소리까지 언제나 남을 거라고 믿나?"
         }
       ]
     },
@@ -7112,6 +7673,10 @@
           ]
         },
         {
+          "speaker": "",
+          "text": "안개가 짙어질 때마다 서로의 윤곽이 흐려졌다. 그래도 한 사람이 이름을 부르면 그쪽으로 다시 돌아볼 수 있었다."
+        },
+        {
           "speaker": "텐죠인 후부키",
           "text": "학교 애들 이름, 잊힐 때마다 하나씩 불러 보자. 난 유스케부터 부를게.",
           "emotion": "determined"
@@ -7120,6 +7685,11 @@
           "speaker": "유우키 쥬다이",
           "text": "난 레이부터! 형은 듀얼에 집중해. 우리가 계속 부르고 있을게.",
           "emotion": "smile"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "여기서 계속 부를게. 뒤를 돌아봐야 할 때는 내 목소리부터 찾아.",
+          "emotion": "determined"
         },
         {
           "speaker": "윤",
@@ -7142,6 +7712,10 @@
         {
           "speaker": "",
           "text": "다크니스가 걷히고 나서야 익숙한 목소리들이 돌아왔다. 폐기숙사 계단 아래에서 준코가 모모에를 부르고 있었다."
+        },
+        {
+          "speaker": "",
+          "text": "아스카는 한동안 대답하지 못했다. 준코가 모모에의 손을 잡는 걸 확인하고 나서야 들고 있던 디스크를 내렸다."
         },
         {
           "speaker": "텐죠인 아스카",
@@ -7169,6 +7743,25 @@
           "speaker": "윤",
           "text": "우리가 지켜낸 3년을 어둠에 넘길 순 없어! 다시 간다!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "안개 속 학생들 되찾기",
+      "choiceAfterLine": 3,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "네가 그 목소리를 지우기 전에 끝내지.",
+          "response": "그 결의까지 잊고 나면 무엇을 할 수 있지?"
+        },
+        {
+          "stance": "Calm",
+          "text": "눈앞이 흐려져도 동료들의 방향은 기억한다.",
+          "response": "발밑만 남으면 그 방향도 헷갈릴 것이다."
+        },
+        {
+          "stance": "Bond",
+          "text": "내 이름을 처음 불러 준 사람들부터 다시 찾아올 거야.",
+          "response": "그 사람들이 널 기억할 수 있을까?"
         }
       ]
     },
@@ -7271,7 +7864,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "숙소에서 졸업 준비"
     },
     {
       "id": "gx_ep_33",
@@ -7332,6 +7926,10 @@
         {
           "speaker": "",
           "text": "윤이 덱을 꽂을 때까지 가만히 서 있었다. 그 사람하고 마주 보고 있으니 정작 셔플하는 내 손은 떨리지 않았다."
+        },
+        {
+          "speaker": "",
+          "text": "덱 케이스 안에는 노트에서 빼낸 종이 한 장이 들어 있었다. 빈 칸에 적을 날짜는 아직 쓰지 않았다."
         },
         {
           "speaker": "텐죠인 아스카",
@@ -7439,6 +8037,25 @@
           "text": "응. 같은 수에 두 번은 안 당해. 다시 한 판!",
           "emotion": "determined"
         }
+      ],
+      "fieldObjective": "아스카로 숲속의 약속 지키기",
+      "choiceAfterLine": 7,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "그 에이스를 오늘은 내가 넘어볼게.",
+          "response": "그래. 네가 넘어오면 나도 그 뒤의 수를 쓰지."
+        },
+        {
+          "stance": "Calm",
+          "text": "준비한 수가 막혀도 끝까지 내 방식으로 갈게.",
+          "response": "네가 그 다음에 뭘 고를지 나도 궁금하군."
+        },
+        {
+          "stance": "Bond",
+          "text": "당신과 오래 겨루고 싶어서 여기까지 왔어.",
+          "response": "알아. 오늘도 마지막 수까지 잘 부탁해."
+        }
       ]
     },
     {
@@ -7490,6 +8107,11 @@
         {
           "speaker": "어둠의 유우기",
           "text": "아까 보니 덱을 섞는 얼굴부터 즐거워 보이더군. 자네가 지금 하는 듀얼을 나도 만나 보고 싶네.",
+          "emotion": "smile"
+        },
+        {
+          "speaker": "윤",
+          "text": "이곳에서 듀얼을 하는 건 오랜만인데, 지켜보는 사람이 있을 줄은 몰랐습니다.",
           "emotion": "smile"
         },
         {
@@ -7564,6 +8186,25 @@
           "speaker": "윤",
           "text": "역시 전설은 다르군… 하지만 다음엔 반드시 이겨 보이겠다!",
           "emotion": "determined"
+        }
+      ],
+      "fieldObjective": "숲속에서 아스카와 만나기",
+      "choiceAfterLine": 8,
+      "choices": [
+        {
+          "stance": "Challenge",
+          "text": "처음부터 전력을 다해도 되겠습니까?",
+          "response": "그 말을 기다렸네. 첫 카드부터 기꺼이 받아 주지."
+        },
+        {
+          "stance": "Calm",
+          "text": "한 수씩 신중히 보겠습니다.",
+          "response": "시간은 충분하네. 즐기며 두게."
+        },
+        {
+          "stance": "Bond",
+          "text": "오래 기억할 만한 듀얼이 되었으면 합니다.",
+          "response": "그대와 직접 겨뤄 보면 나도 한동안 기억할 것 같군."
         }
       ]
     },
@@ -7648,7 +8289,8 @@
         }
       ],
       "postWinDialogues": [],
-      "postLoseDialogues": []
+      "postLoseDialogues": [],
+      "fieldObjective": "약속한 듀얼 이어가기"
     }
   ]
 }
