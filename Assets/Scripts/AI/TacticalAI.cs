@@ -74,11 +74,12 @@ namespace YGOPortable.AI
 
         public TacticalAI() { }
 
-        internal TacticalAI(DuelAiPolicy policy, LinkComboPolicy linkPolicy = null, bool searchCombos = false, float planningScale = 1f)
+        internal TacticalAI(DuelAiPolicy policy, LinkComboPolicy linkPolicy = null, bool searchCombos = false,
+            float planningScale = 1f, int responseLimit = ComboSearch.DefaultResponseLimit)
         {
             _policy = policy;
             _linkPolicy = linkPolicy;
-            if (searchCombos) _comboSearch = new ComboSearch(planningScale);
+            if (searchCombos) _comboSearch = new ComboSearch(planningScale, responseLimit);
             _tacticalRules = true;
         }
 

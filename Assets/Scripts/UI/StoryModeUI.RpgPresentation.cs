@@ -10,8 +10,11 @@ namespace YGOPortable.UI
     {
         private RectTransform _rpgFaceoff;
         private CanvasGroup _rpgFaceoffGroup;
+        private RectTransform _rpgChallengerBanner, _rpgBossBanner;
+        private Image _rpgFaceoffFlash;
         private Action _rpgFaceoffFinish;
         private float _rpgFaceoffTime;
+        internal const float RpgFaceoffDuration = 1.12f;
 
         internal void OpenFieldRecap(int index)
         {
@@ -32,38 +35,47 @@ namespace YGOPortable.UI
                 preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1), rpgEpisode: index + 1);
         }
 
-        private void PlayRpgFaceoff(StoryEpisodeData episode, Action finish)
+        private void PlayRpgFaceoff(StoryEpisodeData episode, string deckTitle, Action finish)
         {
             CancelRpgFaceoff();
             _rpgFaceoffFinish = finish;
             _rpgFaceoffTime = 0f;
             _rpgFaceoff = DuelUiKit.FillRect("RpgBossFaceoff", Root.transform);
             _rpgFaceoffGroup = _rpgFaceoff.gameObject.AddComponent<CanvasGroup>();
-            _rpgFaceoffGroup.alpha = 0f;
             DuelUiKit.AddImage(_rpgFaceoff.gameObject, DuelUiKit.WhiteSprite, new Color(.009f, .019f, .037f, .98f));
-            var hero = DuelUiKit.CreateMenuPanel(_rpgFaceoff, "Kai", new Vector2(.12f, .28f), new Vector2(.40f, .76f));
-            var boss = DuelUiKit.CreateMenuPanel(_rpgFaceoff, "Boss", new Vector2(.60f, .28f), new Vector2(.88f, .76f));
-            RpgUiStyle.Panel(hero);
-            RpgUiStyle.Panel(boss, accent: true);
-            Portrait(hero, _app.RpgField?.RpgStandingPortrait(0) ?? DuelProfileArt.Player, "카이");
-            Portrait(boss, _app.RpgField?.RpgStandingPortrait(episode.charId, RpgWardrobe.EpisodeNumber(episode)) ??
+            var backdrop = DuelUiKit.FillRect("Split", _rpgFaceoff).gameObject.AddComponent<RpgFaceoffSplit>();
+            backdrop.raycastTarget = false;
+            var content = Application.isMobilePlatform ? MobileSafeArea.Create(_rpgFaceoff) : _rpgFaceoff;
+            _rpgChallengerBanner = Region(content, "Kai", .042f, .21f, .494f, .92f);
+            _rpgBossBanner = Region(content, "Boss", .506f, .21f, .958f, .92f);
+            Portrait(_rpgChallengerBanner, _app.RpgField?.RpgStandingPortrait(0) ?? DuelProfileArt.Player, "카이");
+            Portrait(_rpgBossBanner, _app.RpgField?.RpgStandingPortrait(episode.charId, RpgWardrobe.EpisodeNumber(episode)) ??
                 DuelProfileArt.Opponent(DeckRepository.GetCharacter(episode.charId)), episode.opponentName);
-            AddLabel(_rpgFaceoff, "Versus", .42f, .41f, .58f, .64f, 46, color: DuelUiKit.GoldAccent).text = "VS";
-            AddLabel(_rpgFaceoff, "Match", .12f, .77f, .88f, .90f, 27, color: DuelUiKit.GoldAccent).text = TitleOf(episode);
-            var start = AddButton(_rpgFaceoff, "Continue", "듀얼 시작", .39f, .13f, .61f, .24f, FinishRpgFaceoff, gold: true);
-            RpgUiStyle.Control(start, primary: true);
-            Focus(start);
+            var versus = AddLabel(content, "Versus", .416f, .39f, .586f, .66f, 96, color: RpgUiStyle.Gold);
+            RpgUiStyle.Display(versus);
+            versus.text = "VS";
+            var panel = Region(content, "MatchTitle", .15f, .065f, .85f, .18f);
+            RpgUiStyle.Dialogue(panel);
+            var match = AddLabel(panel, "DeckTitle", .039f, .10f, .961f, .90f, 32, color: Color.white);
+            RpgUiStyle.Display(match);
+            match.text = string.IsNullOrWhiteSpace(deckTitle) ? TitleOf(episode) : deckTitle;
+            _rpgFaceoffFlash = DuelUiKit.AddImage(DuelUiKit.FillRect("Flash", _rpgFaceoff).gameObject,
+                DuelUiKit.WhiteSprite, Color.clear, false, false);
+            DuelAudio.PlayTagForceSfx(TagForceSfx.DuelEncounter);
+            PaintRpgFaceoff();
 
             void Portrait(RectTransform card, Sprite art, string name)
             {
                 if (art != null)
                 {
-                    var image = DuelUiKit.CreateRect("Portrait", card, new Vector2(.13f, .18f),
-                        new Vector2(.87f, .91f), Vector2.zero, Vector2.zero);
+                    var image = DuelUiKit.CreateRect("Portrait", card, new Vector2(.04f, .145f),
+                        new Vector2(.96f, .99f), Vector2.zero, Vector2.zero);
                     DuelUiKit.AddImage(image.gameObject, art, Color.white, true, false);
                 }
-                var label = AddLabel(card, "Name", .04f, .028f, .96f, .18f, 25);
-                RpgUiStyle.Type(label, strong: true);
+                var plate = Region(card, "NamePlate", .12f, .016f, .88f, .155f);
+                RpgUiStyle.Speaker(plate);
+                var label = AddLabel(plate, "Name", .055f, .07f, .945f, .93f, 34);
+                RpgUiStyle.Display(label);
                 label.text = name;
             }
         }
@@ -72,8 +84,17 @@ namespace YGOPortable.UI
         {
             if (_rpgFaceoffFinish == null) return;
             _rpgFaceoffTime += delta;
-            _rpgFaceoffGroup.alpha = Mathf.Clamp01(_rpgFaceoffTime / .23f);
-            if (_rpgFaceoffTime >= 1.35f) FinishRpgFaceoff();
+            if (_rpgFaceoffTime >= RpgFaceoffDuration) FinishRpgFaceoff();
+            else PaintRpgFaceoff();
+        }
+
+        private void PaintRpgFaceoff()
+        {
+            float settle = 1f - Mathf.SmoothStep(0f, 1f, _rpgFaceoffTime / .19f);
+            _rpgChallengerBanner.anchoredPosition = Vector2.left * (148f * settle);
+            _rpgBossBanner.anchoredPosition = Vector2.right * (148f * settle);
+            _rpgFaceoffGroup.alpha = Mathf.Lerp(1f, .86f, Mathf.InverseLerp(.99f, RpgFaceoffDuration, _rpgFaceoffTime));
+            _rpgFaceoffFlash.color = new Color(.92f, .97f, 1f, .82f * Mathf.Clamp01(1f - _rpgFaceoffTime / .19f));
         }
 
         private void FinishRpgFaceoff()
@@ -92,6 +113,37 @@ namespace YGOPortable.UI
             else UnityEngine.Object.DestroyImmediate(_rpgFaceoff.gameObject);
             _rpgFaceoff = null;
             _rpgFaceoffGroup = null;
+            _rpgChallengerBanner = _rpgBossBanner = null;
+            _rpgFaceoffFlash = null;
+        }
+    }
+
+    [RequireComponent(typeof(CanvasRenderer))]
+    internal sealed class RpgFaceoffSplit : MaskableGraphic
+    {
+        protected override void OnPopulateMesh(VertexHelper mesh)
+        {
+            mesh.Clear();
+            var rect = rectTransform.rect;
+            var left = new Color32(20, 46, 72, 255);
+            var right = new Color32(65, 24, 46, 255);
+            var cool = new Color32(26, 96, 121, 255);
+            var warm = new Color32(136, 45, 61, 255);
+            var slash = new Color32(225, 171, 100, 255);
+            Quad(new(0f, 0f), new(.42f, 0f), new(.60f, 1f), new(0f, 1f), left, cool);
+            Quad(new(.42f, 0f), new(1f, 0f), new(1f, 1f), new(.60f, 1f), right, warm);
+            Quad(new(.415f, 0f), new(.424f, 0f), new(.604f, 1f), new(.595f, 1f), slash, slash);
+
+            void Quad(Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color32 bottom, Color32 top)
+            {
+                int i = mesh.currentVertCount;
+                mesh.AddVert(rect.min + Vector2.Scale(a, rect.size), bottom, Vector2.zero);
+                mesh.AddVert(rect.min + Vector2.Scale(b, rect.size), bottom, Vector2.zero);
+                mesh.AddVert(rect.min + Vector2.Scale(c, rect.size), top, Vector2.zero);
+                mesh.AddVert(rect.min + Vector2.Scale(d, rect.size), top, Vector2.zero);
+                mesh.AddTriangle(i, i + 1, i + 2);
+                mesh.AddTriangle(i, i + 2, i + 3);
+            }
         }
     }
 }

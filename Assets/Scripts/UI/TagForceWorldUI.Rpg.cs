@@ -196,13 +196,14 @@ namespace YGOPortable.UI
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(page != Page.Field);
             _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
-            DuelAudio.PlayTagForceBgm(_rpgLocation is RpgPoppo or RpgStadium or RpgMoment);
+            DuelAudio.PlayRpgFieldMusic(MusicForRpgRegion(_rpgLocation));
             switch (page)
             {
                 case Page.Map: BuildRpgMap(); break;
                 case Page.Field:
                     _rpgInspecting = false;
                     _rpgWorkbenchServices = false;
+                    _rpgChoosingCompanion = false;
                     _rpgServiceSpeaker = null;
                     BuildRpgField();
                     if (_rpgAnnounceArrival) BuildRpgArrivalBanner();
@@ -227,6 +228,14 @@ namespace YGOPortable.UI
                 _rpgToastTime = 4.5f;
             }
         }
+
+        internal static RpgFieldMusic MusicForRpgRegion(int region) => region switch
+        {
+            RpgAcademia or RpgGarage or RpgPoppo => RpgFieldMusic.Home,
+            RpgStadium or RpgWrgp => RpgFieldMusic.Circuit,
+            RpgPrison or RpgMoment or RpgArk => RpgFieldMusic.Crisis,
+            _ => RpgFieldMusic.Outskirts,
+        };
 
         private void BuildRpgMenuBackdrop()
         {
@@ -311,7 +320,7 @@ namespace YGOPortable.UI
                     (_rpgWorldDecks?.ContainsKey(episode.deckId) ?? false))
                 .GroupBy(episode => RpgResidentIdentity(episode.charId)).Select(group => group.First()).Take(2);
 
-        private static int? RpgResidentIdentity(int? id) => id is 220 or 221 ? 9 : id;
+        private static int? RpgResidentIdentity(int? id) => id is 220 or 221 or 230 ? 9 : id;
 
         private void CheckRpgSceneEncounter(Vector2 previous)
         {
@@ -371,18 +380,20 @@ namespace YGOPortable.UI
         private void BuildRpgTalk()
         {
             if (_rpgServiceSpeaker is int speakerId) { BuildRpgServiceTalk(speakerId); return; }
+            if (_rpgChoosingCompanion) { BuildRpgPartnerPicker(); return; }
             if (_rpgWorkbenchServices) { BuildRpgWorkbenchServices(); return; }
             if (_rpgInspecting) { BuildRpgLandmarkTalk(); return; }
             if (_resident == null && _rpgQuestResident == null) { Show(Page.Field); return; }
             BeginRpgTalkBackdrop();
             var quest = _rpgQuestResident;
             string name = quest == null ? _resident.opponentName : RpgQuestName(quest);
-            var panel = BuildRpgConversation(name, quest != null ? RpgQuestDialogue(quest) : "무슨 일로 왔어?",
-                out var conversation, quest?.Giver ?? _resident.charId);
+            int speaker = quest?.Giver ?? _resident.charId;
+            var panel = BuildRpgConversation(name, quest != null ? RpgQuestDialogue(quest) : RpgResidentLine(speaker, daily: false),
+                out var conversation, speaker);
             var actions = new List<(string Id, string Label, Action Select)>
             {
                 ("TalkDaily", "일상 대화", () => StartTypingDialogue(conversation, quest != null
-                    ? RpgQuestDialogue(quest) : $"이곳은 {RpgRegions[_rpgLocation].Name}이야. 덱을 시험해 보고 싶으면 한 판 하자.")),
+                    ? RpgQuestDialogue(quest) : RpgResidentLine(speaker, daily: true))),
             };
             if (quest == null) actions.Add(("Practice", "연습 듀얼", () => Show(Page.Duel)));
             else AppendRpgQuestActions(quest, actions);
@@ -416,19 +427,29 @@ namespace YGOPortable.UI
                 if (bust != null && bust != DuelProfileArt.MissingOpponent)
                 {
                     bool showOnLeft = speaker != null && speaker.anchorMin.x > .62f;
-                    var portrait = Area(_body, "ConversationPortrait", showOnLeft ? .025f : .765f, .35f,
-                        showOnLeft ? .235f : .975f, .97f);
+                    var fieldArt = speaker?.Find("SD") ?? speaker?.Find("Sprite");
+                    if (fieldArt != null) fieldArt.gameObject.SetActive(false);
+                    var portrait = Area(_body, "ConversationPortrait", showOnLeft ? .045f : .404f, .262f,
+                        showOnLeft ? .305f : .685f, .957f);
                     DuelUiKit.AddImage(portrait.gameObject, bust, Color.white, true, false);
                     UiEntranceMotion.Play(portrait.gameObject, .65f, .20f);
                 }
             }
-            var panel = Area(_body, "ResidentChoices", .065f, .025f, .935f, .35f);
-            RpgUiStyle.Panel(panel);
-            HudLabel(Area(panel, "Name", .04f, .74f, .96f, .94f), name, 24,
-                new Color(.57f, .86f, .89f), heading: true);
-            conversation = HudLabel(Area(panel, "DailyLine", .04f, .335f, .96f, .725f), line, 23,
+            var panel = DuelUiKit.FillRect("ResidentChoices", _body);
+            var window = Area(panel, "DialogueWindow", .065f, .029f, .683f, .265f);
+            RpgUiStyle.Dialogue(window);
+            var badge = Area(panel, "NamePlate", .093f, .236f, .365f, .310f);
+            RpgUiStyle.Speaker(badge);
+            var color = RpgUiStyle.SpeakerColor(name);
+            var stripe = Area(badge, "Signature", .069f, .22f, .085f, .78f);
+            stripe.localRotation = Quaternion.Euler(0f, 0f, -16f);
+            Tint(stripe, color);
+            var speakerLabel = HudLabel(Area(badge, "Name", .125f, .04f, .944f, .96f), name, 25, color);
+            RpgUiStyle.Display(speakerLabel);
+            conversation = HudLabel(Area(panel, "DailyLine", .103f, .051f, .648f, .232f), line, 25,
                 new Color(.90f, .94f, .97f));
-            conversation.lineSpacing = 1.16f;
+            RpgUiStyle.Reading(conversation);
+            conversation.lineSpacing = 1.28f;
             StartTypingDialogue(conversation, line);
             UiEntranceMotion.Play(panel.gameObject, .84f, .18f);
             return panel;
@@ -451,12 +472,16 @@ namespace YGOPortable.UI
         private static Button AddRpgConversationActions(RectTransform panel, List<(string Id, string Label, Action Select)> actions)
         {
             Button first = null;
-            float width = .93f / actions.Count;
+            const float bottom = .05f, stride = .076f;
+            float top = bottom + stride * actions.Count;
+            var surround = Area(panel, "ActionsFrame", .708f, bottom - .018f, .942f, top + .021f);
+            RpgUiStyle.Speaker(surround);
             for (int i = 0; i < actions.Count; i++)
             {
-                float left = .035f + i * width;
                 var (id, label, select) = actions[i];
-                var button = RpgButton(Area(panel, id, left, .065f, left + width - .014f, .278f), label, select);
+                float y = top - stride * (i + 1);
+                var button = RpgButton(Area(panel, id, .723f, y, .927f, y + .061f), label, select,
+                    primary: i == 0);
                 first ??= button;
             }
             DeckPadUi.LimitKeyboardNavigation(panel);

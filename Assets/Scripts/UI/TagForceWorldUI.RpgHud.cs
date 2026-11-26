@@ -158,7 +158,9 @@ namespace YGOPortable.UI
             if (rankProgress > 0f) Tint(Area(bar, "Fill", 0f, 0f, rankProgress, 1f), accent);
 
             var partner = Area(stats, "Partner", .733f, .307f, 1f, 1f);
-            var bust = _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgPartnerId}.png");
+            string outfit = FieldOutfit(RpgPartnerId);
+            var bust = (outfit == null ? null : _images.GetBust(RpgArt + RpgWardrobe.Preview(RpgPartnerId, outfit))) ??
+                _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgPartnerId}.png");
             if (bust != null)
             {
                 var frame = Area(partner, "PortraitFrame", .049f, .06f, .954f, .938f);
@@ -170,16 +172,16 @@ namespace YGOPortable.UI
                 DuelUiKit.AddImage(Area(inner, "Portrait", -.43f, -1.15f, 1.43f, 1.11f).gameObject,
                     bust, Color.white, false, false);
             }
-            else HudLabel(partner, "유세이", 16, soft, align: TextAnchor.MiddleCenter);
+            else HudLabel(partner, RpgPartnerName, 16, soft, align: TextAnchor.MiddleCenter);
             var affinity = Area(stats, "Affinity", .733f, .01f, 1f, .294f);
             RpgUiStyle.Panel(affinity);
             int hearts = Mathf.Clamp(CollectionProgress.RpgAffinity, 0, 100);
             for (int i = 0; i < 5; i++)
             {
-                int level = hearts - i * 20;
+                int level = hearts - i * CollectionProgress.RpgAffinityPerHeart;
                 HudLabel(Area(affinity, $"Heart{i}", .04f + i * .184f, 0f, .20f + i * .184f, 1f),
                     level > 0 ? "♥" : "♡", 13,
-                    level >= 20 ? new Color(1f, .52f, .62f) : level > 0 ? new Color(1f, .74f, .81f) : soft,
+                    level >= CollectionProgress.RpgAffinityPerHeart ? new Color(1f, .52f, .62f) : level > 0 ? new Color(1f, .74f, .81f) : soft,
                     align: TextAnchor.MiddleCenter);
             }
 

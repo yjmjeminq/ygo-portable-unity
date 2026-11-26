@@ -13,7 +13,8 @@ namespace YGOPortable.AI
         private const int MasterPlanningSliceMilliseconds = 8;
         internal const int KeepSetup = -1; // Planner decision, never sent to the duel engine.
         private const int MaxMainActions = 24;
-        private const int MaxResponses = 144;
+        internal const int DefaultResponseLimit = 144;
+        internal const int RpgResponseLimit = 128;
         private const int MaxLateLinkSearches = 2;
         private const int BranchMilliseconds = 46;
         private const int OpeningDevelopmentBranchMilliseconds = 105;
@@ -76,6 +77,7 @@ namespace YGOPortable.AI
         };
 
         private readonly float _planningScale;
+        private readonly int _responseLimit;
         private readonly int _searchLimit;
         private readonly Queue<(ulong state, int action)> _next = new();
         private (ulong State, int Index, int AfterMainActions)? _selectedTarget;
@@ -89,9 +91,10 @@ namespace YGOPortable.AI
         internal int ChangedLines { get; private set; }
         internal int ChosenAlternatives { get; private set; }
 
-        internal ComboSearch(float planningScale = 1f)
+        internal ComboSearch(float planningScale = 1f, int responseLimit = DefaultResponseLimit)
         {
             _planningScale = Math.Clamp(planningScale, 1f, MaxPlanningScale);
+            _responseLimit = responseLimit;
             _searchLimit = Scale(7);
         }
 
@@ -520,7 +523,7 @@ namespace YGOPortable.AI
                 if (LinkComboPolicy.IsDowngrade(rank, targetRank))
                     trades.Add((line.moves.Count - 1, rank, beforeLinkScore, beforeLink));
             };
-            for (int i = 0; i < MaxResponses && !expired() && trial.TurnNumber == startTurn &&
+            for (int i = 0; i < _responseLimit && !expired() && trial.TurnNumber == startTurn &&
                 trial.RetryCount == 0 && !trial.SpeculationUncertain; i++)
             {
                 if (trial.IsFinished)

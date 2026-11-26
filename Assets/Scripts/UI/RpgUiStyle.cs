@@ -10,6 +10,17 @@ namespace YGOPortable.UI
         private static readonly Color32 TextColor = new(239, 244, 252, 255);
         internal static readonly Color32 Cyan = new(111, 230, 244, 255);
         internal static readonly Color32 Gold = new(255, 205, 117, 255);
+
+        internal static Color SpeakerColor(string name) => name switch
+        {
+            "이자요이 아키" => new Color32(255, 64, 129, 255),
+            "후도 유세이" => new Color32(0, 229, 255, 255),
+            "잭 아틀라스" => new Color32(255, 82, 82, 255),
+            "크로우 호건" => new Color32(255, 160, 83, 255),
+            "예거" => new Color32(224, 64, 251, 255),
+            "카드 매점 직원" => new Color32(131, 232, 190, 255),
+            _ => new Color32(255, 193, 7, 255),
+        };
         internal enum Symbol { Dot, Arrow, Star, Hexagon, Ring, Lock, Alert, Chevron }
         private static readonly Sprite[] Symbols = new Sprite[(int)Symbol.Chevron + 1];
 

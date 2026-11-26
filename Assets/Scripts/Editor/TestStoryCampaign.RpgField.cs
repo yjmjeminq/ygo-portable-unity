@@ -6,6 +6,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using YGOPortable.AI;
 using YGOPortable.Core;
 using YGOPortable.UI;
 using static YGOPortable.UI.TagForceWorldUI;
@@ -72,7 +73,8 @@ namespace YGOPortable.Editor
             EventSystem.current = input;
             ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
             var app = canvas.AddComponent<GameAppController>();
-            var story = new StoryModeUI(app, canvas.transform);
+            app.AiDifficulty = AIDifficulty.Normal;
+            var story = new StoryModeUI(app, canvas.transform, new StoryHandSequence(0));
             var world = new TagForceWorldUI(app, canvas.transform);
             var menu = new TitleAndMenuUI(app, canvas.transform);
             var modals = new DuelPromptModals(canvas.transform, null, null);
@@ -153,12 +155,17 @@ namespace YGOPortable.Editor
                 Press(local, "SD");
                 world.Update(4f);
                 Press(panel, "ResidentChoices/TalkDaily");
-                Require(panel.Find("ResidentChoices/DailyLine/Label").GetComponent<Text>().text.Contains("아카데미아"),
-                    "The resident did not offer local dialogue.");
+                var ordinary = panel.Find("ResidentChoices");
+                Require(ordinary.Find("DailyLine/Label").GetComponent<Text>().text.Length > 18 &&
+                    ordinary.Find("DialogueWindow").GetComponent<Image>().sprite.name == "RPG dialogue glass" &&
+                    ordinary.Find("NamePlate/Signature") != null &&
+                    ((RectTransform)ordinary.Find("TalkDaily")).anchorMin.x > ((RectTransform)ordinary.Find("DialogueWindow")).anchorMax.x,
+                    "The resident's dialogue or floating action menu did not use the RPG layout.");
                 Press(panel, "ResidentChoices/Practice");
                 int balance = CollectionProgress.Balance;
                 int owned = decks[script.episodes[1].deckId].main.Distinct().Sum(CollectionProgress.GetTotalOwnedCount);
                 Press(panel, "StartPractice");
+                RequireMasterRpgAi();
                 AwardDuel(win: true);
                 Require(world.Root.activeSelf && world.RpgClears == 0 &&
                     CollectionProgress.Balance == balance + 300 &&
@@ -178,6 +185,7 @@ namespace YGOPortable.Editor
                 Require(world.EnterRpgRegion(RpgHideout) && world.CanStartRpgEpisode(5), "Episode 6 NPC was not in the hideout.");
                 OpenEpisode6();
                 app.StartStoryDuel(episode6, playerDeck, true);
+                RequireMasterRpgAi();
                 AwardDuel(win: false);
                 Require(storyRoot.gameObject.activeSelf && world.Root.activeSelf && !world.CanWalk && world.RpgClears == 5,
                     "A loss did not stage its dialogue in the locked field.");
@@ -215,6 +223,7 @@ namespace YGOPortable.Editor
                 VerifyRpgExploration();
                 VerifyRpgAdventure();
                 VerifyReturningEpisodes();
+                VerifyRpgPartnerPolish();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
             }
             finally
@@ -1008,8 +1017,8 @@ namespace YGOPortable.Editor
                         Press(panel, "ResidentChoices/AskCrow");
                         world.Update(4f);
                         Require(panel.Find("ConversationPortrait").GetComponent<Image>().sprite != null &&
-                            FieldScene().Find("QuestNpc_10/SD").GetComponent<Image>().enabled,
-                            "Choosing to ask Crow did not show both his field actor and his upper-body portrait.");
+                            !FieldScene().Find("QuestNpc_10/SD").gameObject.activeSelf,
+                            "Choosing to ask Crow did not replace his visible field sprite with his upper-body portrait.");
                         Press(panel, "ResidentChoices/AskCoupler");
                     }
                     else Press(panel, "ResidentChoices/ReadRunnerLog");
@@ -1193,10 +1202,15 @@ namespace YGOPortable.Editor
                 Require(world.CanWalk && world.RpgClears == 1, "Leaving a recap altered the story progress.");
                 int launches = 0;
                 typeof(StoryModeUI).GetMethod("PlayRpgFaceoff", flags).Invoke(story,
-                    new object[] { script.episodes[0], (Action)(() => launches++) });
+                    new object[] { script.episodes[0], rival.title, (Action)(() => launches++) });
                 story.Update(.19f);
-                Require(story.Root.transform.Find("RpgBossFaceoff") != null && launches == 0, "The boss faceoff skipped its presentation.");
-                story.Update(1.5f);
+                var faceoff = story.Root.transform.Find("RpgBossFaceoff");
+                Require(faceoff != null && launches == 0 && faceoff.Find("Split").GetComponent<RpgFaceoffSplit>() != null &&
+                    faceoff.Find("MatchTitle/DeckTitle/Label").GetComponent<Text>().text == rival.title,
+                    "The boss faceoff skipped the split presentation or showed the wrong opponent deck.");
+                story.Update(StoryModeUI.RpgFaceoffDuration - .20f);
+                Require(launches == 0, "The faceoff launched before its display interval elapsed.");
+                story.Update(.03f);
                 Require(launches == 1 && story.Root.transform.Find("RpgBossFaceoff") == null, "The boss faceoff did not dispatch once.");
 
                 var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
@@ -1227,6 +1241,102 @@ namespace YGOPortable.Editor
                     "The map nodes and lock symbols did not survive missing artwork.");
                 world.Back();
                 Debug.Log("[VERIFY 5DS ADVENTURE] Prologue and guide, map arrival, follower, affinity, saved cache, rank, workbench, shop, recap, faceoff and missing art passed.");
+            }
+
+            void RequireMasterRpgAi()
+            {
+                var ai = (TacticalAI)Get("_ai");
+                var planner = typeof(TacticalAI).GetField("_comboSearch", flags).GetValue(ai);
+                Require(ai.Difficulty == AIDifficulty.Master && planner != null &&
+                    (int)typeof(ComboSearch).GetField("_responseLimit", flags).GetValue(planner) == 128 &&
+                    (float)typeof(ComboSearch).GetField("_planningScale", flags).GetValue(planner) == ComboSearch.MaxPlanningScale,
+                    "The RPG match allowed the global difficulty to override Master planning.");
+            }
+
+            void VerifyRpgPartnerPolish()
+            {
+                var music = Enumerable.Range(0, regions.Length).Select(MusicForRpgRegion).ToArray();
+                Require(music.Distinct().Count() == 4 && music[RpgPoppo] != music[RpgMoment] &&
+                    music.Distinct().Select(DuelAudio.GetRpgFieldMusic).Distinct().Count() == 4,
+                    "The eleven fields did not resolve to four distinct background tracks.");
+                string audit = Path.Combine(save, "rpg-partners");
+                DeckRepository.Load(streaming, audit, seedDefaultDecks: false);
+                CollectionProgress.Load(audit);
+                Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out string error), error);
+                Require(CollectionProgress.ActiveRpgPartner.Id == 35 && !CollectionProgress.TrySwitchRpgPartner(1, out _),
+                    "A new profile did not honor the companion unlock gate.");
+                foreach (var episode in script.episodes.Take(35))
+                    Require(CollectionProgress.TryAwardStoryDuel(episode.id, true, null, decks[episode.deckId],
+                        default, out _, out error), error);
+                world.PrepareRpgField();
+                world.Open();
+                Require(world.EnterRpgRegion(RpgGarage), "The companion test could not reach the workbench.");
+                int[] choices = { 1, 10, 16, 35, 1 };
+                foreach (int id in choices)
+                {
+                    Sprite before = panel.Find("FieldHud/DuelistHud/Partner/PortraitFrame/Crop/Portrait").GetComponent<Image>().sprite;
+                    Press(FieldScene(), "Exploration/Landmark");
+                    world.Update(4f);
+                    Press(panel, "ResidentChoices/WorkbenchMenu");
+                    Press(panel, "ResidentChoices/ChangePartner");
+                    Press(panel, $"ResidentChoices/Partner_{id}");
+                    var companion = (RectTransform)typeof(TagForceWorldUI).GetField("_rpgCompanion", flags).GetValue(world);
+                    Require(world.CanWalk && CollectionProgress.ActiveRpgPartner.Id == id && companion != null &&
+                        panel.Find("FieldHud/DuelistHud/Partner/PortraitFrame/Crop/Portrait").GetComponent<Image>().sprite != before &&
+                        panel.Find("PartnerGreeting/Speech/Label").GetComponent<Text>().text.StartsWith(CollectionProgress.ActiveRpgPartner.Name),
+                        "Companion selection did not refresh the field, HUD portrait and region comment together.");
+                    var actor = (RectTransform)typeof(TagForceWorldUI).GetField("_player", flags).GetValue(world);
+                    var beforeWalk = actor.anchorMin;
+                    var beforeFollow = companion.anchorMin;
+                    var direction = beforeWalk.x < .5f ? Vector2.right : Vector2.left;
+                    for (int step = 0; step < 12; step++) world.Update(.075f, direction);
+                    Require(Vector2.Distance(beforeWalk, actor.anchorMin) > .15f &&
+                        Vector2.Distance(beforeFollow, companion.anchorMin) > .04f &&
+                        Vector2.Distance(actor.anchorMin, companion.anchorMin) < .13f,
+                        $"Companion {id} did not follow the player from {beforeWalk} to {actor.anchorMin}. " +
+                        $"Companion position: {beforeFollow} to {companion.anchorMin}.");
+                }
+                world.HandleFieldInput(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Alternate));
+                Require(CollectionProgress.RpgAffinity == 4 && CollectionProgress.RpgAffinityFor(35) == 0,
+                    "Partner affinity was not isolated by character.");
+                world.Back();
+                int tickets = CollectionProgress.PackUrTickets;
+                int balance = CollectionProgress.Balance;
+                for (int i = 0; i < 6; i++) Require(CollectionProgress.TryAwardRpgPractice(decks[59001], true, false, out error), error);
+                world.EnterRpgRegion(RpgGarage);
+                world.Update(.015f);
+                Require(CollectionProgress.RpgAffinity == 22 && CollectionProgress.PackUrTickets == tickets + 1 &&
+                    CollectionProgress.Balance >= balance + 1800 + 350 && panel.Find("PartnerBondReward/SpecialLine/Label") != null,
+                    "The first heart did not atomically award DP, a ticket and the special dialogue notice.");
+                CollectionProgress.Load(audit);
+                Require(CollectionProgress.ActiveRpgPartner.Id == 1 && CollectionProgress.RpgAffinity == 22 &&
+                    CollectionProgress.PackUrTickets == tickets + 1 && !CollectionProgress.TryTalkToRpgPartner(regions[RpgGarage].AdventureSlot, out _),
+                    "Reloading lost the selected companion or allowed a reward conversation to repeat.");
+                Require(world.EnterRpgRegion(RpgWrgp), "The timed duel check could not reach the WRGP field.");
+                app.OpenRpgFieldEpisode(35);
+                Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                if (!storyRoot.Find("DeckSelection").gameObject.activeSelf)
+                {
+                    Press(storyRoot, "Scene/Choices/Choice_0/Button");
+                    Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                }
+                Press(storyRoot, "DeckSelection/Window/Apply/Button");
+                Press(storyRoot, "Scene/Choices/Choice_0/Button");
+                Press(storyRoot, "Scene/Choices/Choice_1/Button");
+                Press(storyRoot, "Scene/Choices/Choice_0/Button");
+                Require(Get("_session") == null && story.Root.transform.Find("RpgBossFaceoff") != null,
+                    "Story choices bypassed the VS animation.");
+                story.Update(StoryModeUI.RpgFaceoffDuration + .02f);
+                var launched = Get("_session") as DuelSession;
+                Require(launched != null && launched.NativePtr != IntPtr.Zero && story.Root.transform.Find("RpgBossFaceoff") == null,
+                    "The timed VS animation did not launch the native duel.");
+                RequireMasterRpgAi();
+                story.Update(.3f);
+                Require(ReferenceEquals(launched, Get("_session")), "The VS animation launched twice.");
+                AwardDuel(win: false);
+                Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                Require(world.CanWalk && world.RpgClears == 35, "The VS match did not return to the field on defeat.");
+                Debug.Log("[VERIFY 5DS POLISH] Master settings, four regional themes, dialogue controls, timed faceoff and saved partner rewards passed.");
             }
 
             void VerifyStageExit()

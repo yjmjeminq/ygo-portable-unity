@@ -90,7 +90,7 @@ namespace YGOPortable.Editor
                     var match = story.GetOpponentMatch(episode).Deck;
                     Require(match?.id == 59001 + i && match.charId == episode.charId,
                         $"Wrong deck for RPG episode {i + 1}.");
-                    Require(match.main.Length is >= 40 and <= 60 && match.extra.Length <= 15 && match.side.Length <= 15,
+                    Require(match.main.Length == 40 && match.extra.Length <= 15 && match.side.Length <= 15,
                         $"Invalid deck size in 5D's RPG deck {match.id}.");
                     var cards = match.main.Concat(match.extra).Concat(match.side).ToArray();
                     Require(cards.Contains(match.sigCard), $"The signature card is absent from 5D's RPG deck {match.id}.");

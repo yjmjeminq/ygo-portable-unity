@@ -499,7 +499,10 @@ namespace YGOPortable.UI
             bool playerGoesFirst, bool isStoryDuel, float planningScale, bool isTournamentDuel = false, bool isRankedDuel = false,
             bool isTagForceDuel = false, AIDifficulty? opponentDifficulty = null)
         {
-            AIDifficulty duelDifficulty = opponentDifficulty ?? AiDifficulty;
+            bool rpgOpponent = (isStoryDuel && _storyMode.IsRpgCampaign) ||
+                (isTagForceDuel && _activeTagForce?.SeriesId == TagForceWorldUI.RpgPracticeId);
+            AIDifficulty duelDifficulty = rpgOpponent ? AIDifficulty.Master : opponentDifficulty ?? AiDifficulty;
+            if (rpgOpponent) planningScale = ComboSearch.MaxPlanningScale;
             bool isCampaignMatch = isStoryDuel || isTournamentDuel || isRankedDuel || isTagForceDuel;
             if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
                 (isStoryDuel && _activeStoryEpisode?.charId != oppChar.id) ||
@@ -556,7 +559,9 @@ namespace YGOPortable.UI
                 opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
             _session = new DuelSession(recordPlanningReplay: planCombos, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
-                searchCombos: planCombos, planningScale: planningScale) { Difficulty = duelDifficulty };
+                searchCombos: planCombos, planningScale: planningScale,
+                responseLimit: rpgOpponent ? ComboSearch.RpgResponseLimit : ComboSearch.DefaultResponseLimit)
+                { Difficulty = duelDifficulty };
             _shownHumanPrompt = null;
             _timedAiPrompt = null;
             _resultShown = false;

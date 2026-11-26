@@ -137,7 +137,7 @@ namespace YGOPortable.UI
         {
             _rpgDepthOrder.Clear();
             _rpgDepthOrder.AddRange(_rpgResidents.Values);
-            if (_rpgCompanion != null) _rpgDepthOrder.Add(_rpgCompanion);
+            if (_rpgCompanion != null && !_rpgDepthOrder.Contains(_rpgCompanion)) _rpgDepthOrder.Add(_rpgCompanion);
             _rpgDepthOrder.Add(_player);
             _rpgDepthOrder.Sort((left, right) => right.anchorMin.y.CompareTo(left.anchorMin.y));
             int first = _rpgSceneSpace.childCount - _rpgDepthOrder.Count;

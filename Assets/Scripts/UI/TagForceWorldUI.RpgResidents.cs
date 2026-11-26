@@ -85,6 +85,7 @@ namespace YGOPortable.UI
             if (_fieldMenu || delta <= 0f) return;
             foreach (var resident in _rpgResidentMotion)
             {
+                if (resident.Actor == _rpgCompanion) continue;
                 var position = resident.Actor.anchorMin;
                 var toPlayer = _position - position;
                 bool nearby = RpgArtDirection(toPlayer).sqrMagnitude <= .122f * .122f;

@@ -28,16 +28,18 @@ namespace YGOPortable.Core
             var state = (RpgQuestState)((int)from + 1);
             int dp = state == RpgQuestState.Complete ? Math.Min(int.MaxValue - Balance, quest.Reward) : 0;
             var next = WithBalance(Balance + dp);
+            RpgBondReward bondReward = default;
             if (state == RpgQuestState.Complete)
             {
                 next.rpgAdventure = next.rpgAdventure.Copy();
                 next.rpgAdventure.xp = Math.Min(RpgRankThreshold(RpgMaxRank), next.rpgAdventure.xp + quest.Experience);
-                next.rpgAdventure.affinity = Math.Min(RpgMaxAffinity, next.rpgAdventure.affinity + quest.Affinity);
+                bondReward = ApplyRpgAffinity(next, quest.Affinity);
                 if (quest.PackTicket) AwardRpgTicket(next);
             }
             next.rpgQuests = _profile.rpgQuests.Where(entry => entry.id != id).ToList();
             next.rpgQuests.Add(new RpgQuestRecord { id = id, state = state });
             if (!Write(next, _owned, out error)) return false;
+            PublishRpgBondReward(bondReward);
             reward = dp;
             return true;
         }
@@ -88,7 +90,8 @@ namespace YGOPortable.Core
             int dp = Math.Min(int.MaxValue - Balance, won ? 300 : draw ? 160 : 130);
             var next = WithBalance(Balance + dp);
             int previousXp = RpgExperience;
-            if (won) dp += ApplyRpgDuelGrowth(next, story: false);
+            RpgBondReward bondReward = default;
+            if (won) dp += ApplyRpgDuelGrowth(next, story: false, out bondReward);
             var owned = _owned;
             uint reward = 0;
             if (won)
@@ -103,6 +106,7 @@ namespace YGOPortable.Core
                 }
             }
             if (!Write(next, owned, out result)) return false;
+            PublishRpgBondReward(bondReward);
             string outcome = won ? "연습 듀얼 승리" : draw ? "연습 듀얼 무승부" : "연습 듀얼 패배";
             result = $"{outcome} · +{dp:N0} DP";
             if (RpgExperience > previousXp) result += $" · +{RpgExperience - previousXp} EXP";

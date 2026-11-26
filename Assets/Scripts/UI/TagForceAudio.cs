@@ -10,10 +10,12 @@ namespace YGOPortable.UI
         SandwichRoulette, SandwichWin, PartnerAccept,
     }
 
+    internal enum RpgFieldMusic { Home, Outskirts, Circuit, Crisis }
+
     public static partial class DuelAudio
     {
         private static readonly Dictionary<TagForceSfx, AudioClip> TagForceSfxClips = new();
-        private static AudioClip _clipWorldReward, _clipWorldDayBgm, _clipWorldNightBgm;
+        private static AudioClip _clipWorldReward, _clipWorldDayBgm, _clipWorldNightBgm, _clipRpgCircuit, _clipRpgCrisis;
 
         internal static AudioClip GetTagForceClip(TagForceSfx sfx)
         {
@@ -58,12 +60,23 @@ namespace YGOPortable.UI
                 Play(_clipWorldReward ??= DuelVisualAssets.LoadSound("Win") ?? MakeRewardJingle());
         }
 
-        internal static void PlayTagForceBgm(bool night)
+        internal static void PlayTagForceBgm(bool night) => PlayRpgFieldMusic(night ? RpgFieldMusic.Outskirts : RpgFieldMusic.Home);
+
+        internal static AudioClip GetRpgFieldMusic(RpgFieldMusic music) => music switch
+        {
+            RpgFieldMusic.Home => _clipWorldDayBgm ??= MakeAmbientBgm(22050, "tag_force_day", 1.6f, new[] { 146.83f, 130.81f, 164.81f, 196f }),
+            RpgFieldMusic.Outskirts => _clipWorldNightBgm ??= MakeAmbientBgm(22050, "tag_force_night", 3f, new[] { 98f, 82.41f, 87.31f, 110f }),
+            RpgFieldMusic.Circuit => _clipRpgCircuit ??= DuelVisualAssets.LoadSound("RpgCircuitMusic") ??
+                MakeAmbientBgm(22050, "5ds_rpg_circuit", 1.04f, new[] { 110f, 130.81f, 146.83f, 123.47f }, driving: true),
+            RpgFieldMusic.Crisis => _clipRpgCrisis ??= DuelVisualAssets.LoadSound("RpgCrisisMusic") ??
+                MakeAmbientBgm(22050, "5ds_rpg_crisis", 2.46f, new[] { 55f, 58.27f, 49f, 51.91f }, driving: true),
+            _ => throw new ArgumentOutOfRangeException(nameof(music)),
+        };
+
+        internal static void PlayRpgFieldMusic(RpgFieldMusic music)
         {
             if (_bgmSource == null) return;
-            var clip = night
-                ? (_clipWorldNightBgm ??= MakeAmbientBgm(22050, "tag_force_night", 3f, new[] { 98f, 82.41f, 87.31f, 110f }))
-                : (_clipWorldDayBgm ??= MakeAmbientBgm(22050, "tag_force_day", 1.6f, new[] { 146.83f, 130.81f, 164.81f, 196f }));
+            var clip = GetRpgFieldMusic(music);
             if (_bgmSource.clip != clip)
             {
                 _bgmSource.Stop();
@@ -95,7 +108,7 @@ namespace YGOPortable.UI
             return clip;
         }
 
-        private static AudioClip MakeAmbientBgm(int sr, string name, float secondsPerBar, float[] chords)
+        private static AudioClip MakeAmbientBgm(int sr, string name, float secondsPerBar, float[] chords, bool driving = false)
         {
             int n = Mathf.RoundToInt(sr * secondsPerBar * chords.Length);
             float[] samples = new float[n];
@@ -121,7 +134,8 @@ namespace YGOPortable.UI
                 if (i < 1000) loopFade = i / 1000f;
                 else if (i > n - 1000) loopFade = (n - i) / 1000f;
 
-                samples[i] = Mathf.Clamp((pad + pluck) * loopFade, -1f, 1f);
+                float kick = driving ? Mathf.Sin(pluckEnv * 23f) * Mathf.Exp(-pluckEnv * 10f) * .19f : 0f;
+                samples[i] = Mathf.Clamp((pad + pluck + kick) * loopFade, -1f, 1f);
             }
             var clip = AudioClip.Create(name, n, 1, sr, false);
             clip.SetData(samples, 0);

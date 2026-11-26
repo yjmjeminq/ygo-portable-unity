@@ -189,6 +189,7 @@ namespace YGOPortable.UI
 
         private Action _finishFieldResult;
         internal bool FromRpgField { get; private set; }
+        internal bool IsRpgCampaign => _rpgWorld;
 
         internal void UseRpgCampaign(bool enabled, bool fromField = false)
         {
@@ -344,8 +345,7 @@ namespace YGOPortable.UI
         {
             int episodeIndex = IndexOf(episode);
             if (episodeIndex < 0) return default;
-            if (_rpgWorld && _rpgDecks.TryGetValue(episode.deckId, out var dedicated))
-                return (dedicated, 0, 0);
+            if (_rpgWorld) return (_rpgDecks.GetValueOrDefault(episode.deckId), 0, 0);
 
             var decks = OpponentDeckLevels.GetDecks(episode.charId);
             if (decks.Count == 0) decks = DeckRepository.GetDecksForCharacter(episode.charId);
@@ -754,7 +754,7 @@ namespace YGOPortable.UI
             {
                 if (_returnFromTurnOrder == null) return;
                 ClearTurnOrder();
-                if (FromRpgField && GetRaid(episode).HasValue) PlayRpgFaceoff(episode, Launch);
+                if (FromRpgField) PlayRpgFaceoff(episode, rivalDeck.title, Launch);
                 else Launch();
 
                 void Launch()

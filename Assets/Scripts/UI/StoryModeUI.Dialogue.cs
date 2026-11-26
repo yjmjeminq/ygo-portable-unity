@@ -465,7 +465,7 @@ namespace YGOPortable.UI
                 var speaker = !narration && !_heroSpeaking && _rpg
                     ? FindSpeaker(line.speaker) : null;
                 _opponentSpeaking = !narration && !_heroSpeaking && (!_rpg || speaker != null);
-                _speaker.color = _heroSpeaking ? HeroColor : _rpg ? SpeakerColor(speaker?.name ?? line.speaker) : OpponentColor;
+                _speaker.color = _heroSpeaking ? HeroColor : _rpg ? RpgUiStyle.SpeakerColor(speaker?.name ?? line.speaker) : OpponentColor;
                 _speakerPlate.color = _rpg ? Color.white : new Color(.028f, .063f, .13f, .94f);
                 _speakerStripe.color = _speaker.color;
                 _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
@@ -675,15 +675,6 @@ namespace YGOPortable.UI
                     rect.offsetMin = rect.offsetMax = Vector2.zero;
                 }
             }
-
-            private static Color SpeakerColor(string name) => name switch
-            {
-                "이자요이 아키" => new Color32(0xFF, 0x40, 0x81, 255),
-                "후도 유세이" => new Color32(0x00, 0xE5, 0xFF, 255),
-                "잭 아틀라스" => new Color32(0xFF, 0x52, 0x52, 255),
-                "예거" => new Color32(0xE0, 0x40, 0xFB, 255),
-                _ => new Color32(0xFF, 0xC1, 0x07, 255),
-            };
 
             private void Advance()
             {

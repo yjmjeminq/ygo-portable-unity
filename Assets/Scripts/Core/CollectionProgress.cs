@@ -185,6 +185,7 @@ namespace YGOPortable.Core
 
         public static void Load(string persistentDataPath)
         {
+            RpgBondNotices.Clear();
             _profilePath = Path.Combine(persistentDataPath, ProfileFileName);
             _starters = null;
             _packs = null;
@@ -819,7 +820,8 @@ namespace YGOPortable.Core
                 if (candidates.Length > 0) theme = AwardCard(candidates[random.Next(candidates.Length)]);
             }
             var next = WithBalance(Balance + reward);
-            if (rpgField && won) reward += ApplyRpgDuelGrowth(next, story: true);
+            RpgBondReward bondReward = default;
+            if (rpgField && won) reward += ApplyRpgDuelGrowth(next, story: true, out bondReward);
             next.dust += dust;
             next.tactics = next.tactics.Copy();
             int bond = won && plan.Stance == StoryStance.Bond && opponentDeck != null
@@ -830,6 +832,7 @@ namespace YGOPortable.Core
             next.storyProgressMigrated = true;
             UnlockSecretPacks(next, new[] { bonus?.Code ?? 0, theme?.Code ?? 0 }.Where(code => code != 0));
             if (!Write(next, owned, out error, overframes)) return false;
+            PublishRpgBondReward(bondReward);
             prize = new StoryPrize(reward, dust, bonus, theme, drop, bond);
             return true;
 

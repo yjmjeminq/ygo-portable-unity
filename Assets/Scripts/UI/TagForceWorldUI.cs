@@ -126,6 +126,11 @@ namespace YGOPortable.UI
                 {
                     if (_rpgIntroDialogue?.ClosePopup() != true) FinishRpgIntro();
                 }
+                else if (_page == Page.Talk && _rpgChoosingCompanion)
+                {
+                    _rpgChoosingCompanion = false;
+                    Show(Page.Talk);
+                }
                 else if (_page is Page.Map or Page.Talk or Page.Ledger) Show(Page.Field);
                 else if (_page == Page.Duel) Show(Page.Talk);
                 else Show(Page.Map);
