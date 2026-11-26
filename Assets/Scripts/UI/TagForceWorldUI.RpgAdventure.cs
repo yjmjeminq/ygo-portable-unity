@@ -9,7 +9,9 @@ namespace YGOPortable.UI
     internal sealed partial class TagForceWorldUI
     {
         private const int RpgPartnerId = 35;
-        private const int RpgShopkeeperId = 13;
+        private const int RpgShopkeeperId = -1;
+        private const string RpgShopkeeperName = "카드 매점 직원";
+        private static string RpgArtKey(int id) => id == RpgShopkeeperId ? "shopkeeper" : id.ToString();
         private const string RpgPartnerName = "후도 유세이";
         private static readonly string[] RpgPartnerLines =
         {
@@ -122,7 +124,7 @@ namespace YGOPortable.UI
         private void AddRpgShopkeeper()
         {
             if (_rpgLocation != RpgGarage) return;
-            AddRpgResident(RpgShopkeeperId, "보머 · 카드 매점", "RpgCardMerchant", new Vector2(.82f, .38f),
+            AddRpgResident(RpgShopkeeperId, RpgShopkeeperName, "RpgCardMerchant", new Vector2(.82f, .38f),
                 RpgResidentRole.Shop, () => OpenRpgService(RpgShopkeeperId));
         }
 
@@ -141,7 +143,7 @@ namespace YGOPortable.UI
         {
             BeginRpgTalkBackdrop();
             bool partner = speaker == RpgPartnerId;
-            var panel = BuildRpgConversation(partner ? RpgPartnerName : "보머 · 카드 매점",
+            var panel = BuildRpgConversation(partner ? RpgPartnerName : RpgShopkeeperName,
                 partner ? RpgPartnerLines[_rpgLocation] : "시내까지 갈 필요 없어. 여기서도 DP로 팩을 살 수 있어.", out _, speaker);
             var actions = new List<(string Id, string Label, Action Select)>();
             if (!partner) actions.Add(("OpenCardShop", "카드 팩 보기", _app.OpenRpgCardShop));

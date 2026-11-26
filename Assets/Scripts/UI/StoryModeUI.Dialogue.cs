@@ -262,12 +262,12 @@ namespace YGOPortable.UI
                 _sceneOpponent = opponent;
                 _rpg = rpg;
                 ApplyDialogueStyle(rpg);
-                var bustMin = new Vector2(.24f, onField ? .295f : .378f);
-                var bustMax = new Vector2(.76f, onField ? .883f : .868f);
-                _hero.rectTransform.anchorMin = rpg ? bustMin : new Vector2(.07f, .26f);
-                _hero.rectTransform.anchorMax = rpg ? bustMax : new Vector2(.493f, .855f);
-                _opponent.rectTransform.anchorMin = rpg ? bustMin : new Vector2(.508f, .26f);
-                _opponent.rectTransform.anchorMax = rpg ? bustMax : new Vector2(.93f, .855f);
+                var bustMin = new Vector2(.24f, .378f);
+                var bustMax = new Vector2(.76f, .868f);
+                _hero.rectTransform.anchorMin = rpg ? (onField ? new Vector2(.025f, .32f) : bustMin) : new Vector2(.07f, .26f);
+                _hero.rectTransform.anchorMax = rpg ? (onField ? new Vector2(.235f, .91f) : bustMax) : new Vector2(.493f, .855f);
+                _opponent.rectTransform.anchorMin = rpg ? (onField ? new Vector2(.765f, .32f) : bustMin) : new Vector2(.508f, .26f);
+                _opponent.rectTransform.anchorMax = rpg ? (onField ? new Vector2(.975f, .91f) : bustMax) : new Vector2(.93f, .855f);
                 if (rpg && !onField)
                     SetSprite(_stage, LoadRpgSprite(rpgBackdrop));
                 if (!rpg && !onField)
@@ -341,9 +341,11 @@ namespace YGOPortable.UI
                 RefreshStageCaption();
                 _poseTime += delta;
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
-                _portraitGroup.alpha = 1f - _cutsceneOverlay.alpha;
-                _heading.canvasRenderer.SetAlpha(_portraitGroup.alpha);
-                _heroIdentity.canvasRenderer.SetAlpha(_portraitGroup.alpha);
+                float sceneAlpha = 1f - _cutsceneOverlay.alpha;
+                float portraitAlpha = _field?.RpgStageRunning == true ? 0f : sceneAlpha;
+                _portraitGroup.alpha = Mathf.MoveTowards(_portraitGroup.alpha, portraitAlpha, delta * 8f);
+                _heading.canvasRenderer.SetAlpha(sceneAlpha);
+                _heroIdentity.canvasRenderer.SetAlpha(sceneAlpha);
                 AnimatePortrait(_hero, _heroSpeaking, delta, _heroSpeaking ? _emotion : null, _poseTime);
                 AnimatePortrait(_opponent, _opponentSpeaking, delta, _opponentSpeaking ? _emotion : null, _poseTime);
                 AnimateHearts();

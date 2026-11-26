@@ -16,6 +16,7 @@ namespace YGOPortable.UI
         private RectTransform _rpgSceneSpace, _rpgViewport;
         private Vector2 _rpgCameraPan;
         private float _rpgBackdropAspect, _rpgCameraLead;
+        private bool UsesRpgDialogueCamera => _rpgDialogueCast != null || _page is Page.Talk or Page.Guide;
 
         private Image BuildRpgCamera(Sprite scenery)
         {
@@ -26,11 +27,16 @@ namespace YGOPortable.UI
             var floor = DuelUiKit.AddImage(DuelUiKit.FillRect("Scenery", _rpgSceneSpace).gameObject,
                 scenery, scenery == null ? new Color(.10f, .21f, .27f) : Color.white, false, false);
             _rpgBackdropAspect = scenery != null ? scenery.rect.width / scenery.rect.height : 16f / 9f;
+            FrameRpgCamera(_position);
+            return floor;
+        }
+
+        private void FrameRpgCamera(Vector2 focus)
+        {
             _rpgCameraLead = 0f;
             var span = RpgCameraSpan();
-            _rpgCameraPan = ClampRpgCameraPan(TargetRpgCameraPan(_position, span), span);
+            _rpgCameraPan = ClampRpgCameraPan(TargetRpgCameraPan(focus, span), span);
             ApplyRpgCameraPan(span);
-            return floor;
         }
 
         private Vector2 RpgCameraSpan()
@@ -46,7 +52,26 @@ namespace YGOPortable.UI
         private Vector2 TargetRpgCameraPan(Vector2 position, Vector2 span)
         {
             var center = new Vector2(.50f, .44f);
-            if (_page == Page.Field && _rpgDialogueCast == null)
+            if (UsesRpgDialogueCamera)
+            {
+                center.y = .61f;
+                if (_rpgDialogueCast != null)
+                {
+                    float lowest = _player.anchorMin.y;
+                    float highest = lowest;
+                    foreach (var actor in _rpgStageActors)
+                    {
+                        if (!actor.Root.gameObject.activeSelf) continue;
+                        float y = actor.Root.anchorMin.y;
+                        lowest = Mathf.Min(lowest, y);
+                        highest = Mathf.Max(highest, y);
+                    }
+                    float lowerCenter = .425f + (position.y - lowest) * span.y;
+                    float upperCenter = .875f + (position.y - highest) * span.y;
+                    center.y = Mathf.Clamp(center.y, lowerCenter, Mathf.Max(lowerCenter, upperCenter));
+                }
+            }
+            else if (_page == Page.Field)
             {
                 // Let the player walk beneath the landmarks without pushing the back wall offscreen at the entrance.
                 float sceneryHeight = (RpgSceneryFocusY - position.y) * span.y;
@@ -56,10 +81,12 @@ namespace YGOPortable.UI
                 Vector2.right * _rpgCameraLead;
         }
 
-        private static Vector2 ClampRpgCameraPan(Vector2 pan, Vector2 span)
+        private Vector2 ClampRpgCameraPan(Vector2 pan, Vector2 span)
         {
             var limit = Vector2.Max(Vector2.zero, (span - Vector2.one) * .5f);
-            return Vector2.Min(Vector2.Max(pan, -limit), limit);
+            // The dialogue panel occupies the lower part of the screen, so the shot can use that space for the matte.
+            var upper = limit + (UsesRpgDialogueCamera ? Vector2.up * .42f : Vector2.zero);
+            return Vector2.Min(Vector2.Max(pan, -limit), upper);
         }
 
         private void TrackRpgCamera(float delta, Vector2? focus = null, float horizontalTravel = 0f)

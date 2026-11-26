@@ -39,12 +39,21 @@ namespace YGOPortable.UI
             new("spot_kai_garage", "카이의 정비소", 0),
             new("spot_satellite_hideout", "새틀라이트 은신처", 0),
             new("spot_facility_prison", "시큐리티 수용소", 6),
-            new("spot_poppo_time", "폿포 타임", 9),
-            new("spot_fortune_stadium", "포춘 컵 스타디움", 11),
-            new("spot_old_moment", "구 모멘트 폐허", 19),
+            new("spot_poppo_time", "폿포 타임", 8),
+            new("spot_fortune_stadium", "포춘 컵 스타디움", 8),
+            new("spot_old_moment", "구 모멘트 폐허", 18),
             new("spot_daedalus_bridge", "다이달로스 브리지", 27),
-            new("spot_wrgp_circuit", "WRGP 서킷", 35),
+            new("spot_wrgp_circuit", "WRGP 서킷", 34),
             new("spot_ark_cradle", "아크 크레이들", 44),
+        };
+
+        private static readonly int[] EpisodeRegionMap =
+        {
+            0, 0, 0, 1, 1, 1, 2, 2, 4, 4, // 01–10
+            4, 4, 4, 3, 3, 3, 3, 3, 5, 5, // 11–20
+            5, 5, 5, 5, 5, 5, 5, 6, 6, 3, // 21–30
+            3, 0, 3, 0, 7, 7, 7, 7, 7, 7, // 31–40
+            7, 7, 7, 7, 8, 8, 8, 8, 8, 6, // 41–50
         };
 
         private static readonly Vector2[] RpgNpcSlots = { new(.48f, .40f), new(.23f, .33f), new(.74f, .36f) };
@@ -77,13 +86,8 @@ namespace YGOPortable.UI
             return cleared;
         }
 
-        internal static int RegionForEpisode(int episodeNumber)
-        {
-            if (episodeNumber <= 2) return 0;
-            for (int i = RpgRegions.Length - 1; i >= 2; i--)
-                if (episodeNumber > RpgRegions[i].RequiredEpisode) return i;
-            return 1;
-        }
+        internal static int RegionForEpisode(int episodeNumber) =>
+            EpisodeRegionMap[Mathf.Clamp(episodeNumber, 1, EpisodeRegionMap.Length) - 1];
 
         internal static string NewlyUnlockedRegions(int before, int after) => string.Join(" · ",
             RpgRegions.Where(region => !region.IsOpen(before) && region.IsOpen(after)).Select(region => region.Name));
@@ -214,7 +218,7 @@ namespace YGOPortable.UI
         {
             BuildRpgMenuBackdrop();
             int cleared = RpgClears;
-            int target = RegionForEpisode(cleared + 1);
+            int target = cleared < (_rpgCampaign?.episodes?.Length ?? 0) ? RegionForEpisode(cleared + 1) : -1;
             for (int i = 0; i < RpgRegions.Length; i++)
             {
                 int index = i;
@@ -222,7 +226,7 @@ namespace YGOPortable.UI
                 float x = .025f + i % 3 * .324f;
                 float y = .678f - i / 3 * .323f;
                 var tile = Area(_body, region.Id, x, y, x + .30f, y + .292f);
-                RpgUiStyle.Panel(tile, accent: i == target && cleared < 50);
+                RpgUiStyle.Panel(tile, accent: i == target);
                 bool open = region.IsOpen(cleared);
                 var poster = GetRpgFieldArt(region);
                 DuelUiKit.AddImage(Area(tile, "MapPreview", .036f, .292f, .964f, .947f).gameObject, poster,
@@ -236,7 +240,7 @@ namespace YGOPortable.UI
                     {
                         if (index == _rpgLocation) Show(Page.Field);
                         else BeginRpgTravel(index, RpgArrival);
-                    }, primary: i == target && cleared < 50);
+                    }, primary: i == target);
                 travel.interactable = open;
             }
         }
@@ -289,11 +293,10 @@ namespace YGOPortable.UI
             _rpgNearbyScene = questNpc?.sceneOnApproach == true ? questNpc : null;
             if (questNpc != null)
                 AddRpgResident(questNpc, RpgNpcSlots[0], true, () => _app.OpenRpgFieldEpisode(cleared));
-            var locals = episodes.Where((episode, i) => RegionForEpisode(i + 1) == _rpgLocation)
+            var locals = episodes.Where((episode, i) => i < cleared && RegionForEpisode(i + 1) == _rpgLocation)
                 .Concat(episodes.Take(cleared)).Concat(episodes.Take(2))
                 .Where(episode => episode.charId != questNpc?.charId && episode.charId != sideQuest?.Giver &&
                     (episode.charId != RpgPartnerId || _rpgLocation == RpgBridge) &&
-                    (episode.charId != RpgShopkeeperId || _rpgLocation != RpgGarage) &&
                     _rpgWorldDecks.ContainsKey(episode.deckId))
                 .GroupBy(episode => episode.charId).Select(group => group.First()).Take(2).ToArray();
             for (int i = 0; i < locals.Length; i++)
@@ -338,7 +341,7 @@ namespace YGOPortable.UI
             var actor = Anchor(_rpgSceneSpace, node, spot, RpgFieldActorSize);
             _rpgResidents[id] = actor;
             var art = DuelUiKit.FillRect("SD", actor);
-            var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{id}.png", name);
+            var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{RpgArtKey(id)}.png", name);
             PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact, actor);
             BindPortrait(art, Approach);
@@ -387,7 +390,7 @@ namespace YGOPortable.UI
         private void BeginRpgTalkBackdrop()
         {
             BuildRpgField();
-            HideRpgActorGraphics();
+            foreach (var resident in _rpgResidentMotion) resident.Marker.gameObject.SetActive(false);
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldHud.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(false);
@@ -401,11 +404,14 @@ namespace YGOPortable.UI
         {
             if (speakerId is int id)
             {
-                var bust = _images.GetBust(RpgArt + $"Characters_Standing/full_{id}.png") ??
-                    DuelProfileArt.Opponent(DeckRepository.GetCharacter(id));
+                var bust = _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgArtKey(id)}.png");
+                if (bust == null && id != RpgShopkeeperId)
+                    bust = DuelProfileArt.Opponent(DeckRepository.GetCharacter(id));
                 if (bust != null && bust != DuelProfileArt.MissingOpponent)
                 {
-                    var portrait = Area(_body, "ConversationPortrait", .25f, .31f, .75f, .96f);
+                    bool showOnLeft = _rpgResidents.TryGetValue(id, out var speaker) && speaker.anchorMin.x > .62f;
+                    var portrait = Area(_body, "ConversationPortrait", showOnLeft ? .025f : .765f, .35f,
+                        showOnLeft ? .235f : .975f, .97f);
                     DuelUiKit.AddImage(portrait.gameObject, bust, Color.white, true, false);
                     UiEntranceMotion.Play(portrait.gameObject, .65f, .20f);
                 }

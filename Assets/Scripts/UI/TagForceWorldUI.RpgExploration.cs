@@ -156,7 +156,7 @@ namespace YGOPortable.UI
                             Show(Page.Field);
                             if (_rpgResidents.TryGetValue(RpgCrow, out var crow))
                                 MoveTo(crow.anchorMin - new Vector2(0f, .06f), () => OpenRpgQuestTalk(
-                                    RpgSideQuest.Find("garage-tools")));
+                                    RpgSideQuest.Find("garage-tools")), crow);
                         }));
                         actions.Add(("ReadRunnerLog", "주행 일지 읽기", () => AdvanceRpgQuest(
                             quest, RpgQuestState.Available, Page.Talk, "수첩에 새 의뢰를 기록했습니다.")));

@@ -52,7 +52,7 @@ namespace YGOPortable.UI
         internal void BeginRpgDialogue(StoryEpisodeData episode, string hero, StoryDialogueLine[] lines)
         {
             Root.SetActive(true);
-            if (_player == null || _rpgDialogueCast != null) Show(Page.Field);
+            if (_player == null || _rpgDialogueCast != null || _page != Page.Field) Show(Page.Field);
 
             _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
             _rpgLastPlayedSceneId = episode.id;
@@ -60,6 +60,7 @@ namespace YGOPortable.UI
             _rpgLastLine = -1;
             _moving = _manualWalk = _fieldMenu = false;
             _onArrival = null;
+            _rpgApproachActor = null;
             _worldInput.interactable = _worldInput.blocksRaycasts = false;
             _header.gameObject.SetActive(false);
             _status.gameObject.SetActive(false);
@@ -83,12 +84,13 @@ namespace YGOPortable.UI
                 resident.Marker.gameObject.SetActive(false);
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldObjects?.gameObject.SetActive(false);
-            _rpgCompanion?.gameObject.SetActive(false);
             _rpgGreeting?.gameObject.SetActive(false);
             _rpgTravelBanner?.gameObject.SetActive(false);
             _rpgTravelFade?.gameObject.SetActive(false);
             _rpgRankBanner?.gameObject.SetActive(false);
 
+            var entrances = new HashSet<int>(lines.SelectMany(line => line.stage ?? Array.Empty<StoryStageAction>())
+                .Where(action => action?.action == "enter").Select(action => action.actor));
             foreach (var line in lines)
             {
                 string name = line.speaker;
@@ -98,13 +100,13 @@ namespace YGOPortable.UI
                     int? id = _rpgCampaign?.episodes.FirstOrDefault(item => item.opponentName == name)?.charId ??
                         DeckRepository.Characters.FirstOrDefault(character => character.name == name ||
                             character.aliases?.Contains(name) == true)?.id;
-                    _rpgStageSpeakers[name] = GetRpgStageGuest(name, id);
+                    _rpgStageSpeakers[name] = GetRpgStageGuest(name, id, id.HasValue && entrances.Contains(id.Value));
                 }
                 foreach (var action in line.stage ?? Array.Empty<StoryStageAction>())
                 {
                     if (action == null) continue;
-                    EnsureRpgStageGuest(action.actor);
-                    if (action.action == "face") EnsureRpgStageGuest(action.target);
+                    EnsureRpgStageGuest(action.actor, entrances);
+                    if (action.action == "face") EnsureRpgStageGuest(action.target, entrances);
                 }
             }
 
@@ -112,31 +114,21 @@ namespace YGOPortable.UI
                 _position - _rpgDialogueOpponent.anchorMin);
             PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, RpgNpcSlots[0] - _position);
             _player.SetAsLastSibling();
-            HideRpgActorGraphics();
-            HideRpgGraphics(_rpgDialogueCast);
+            foreach (var resident in _rpgResidents.Values)
+                if (!_rpgStageActors.Any(actor => actor.Root == resident)) resident.gameObject.SetActive(false);
+            if (_rpgCompanion != null && !_rpgStageActors.Any(actor => actor.Root == _rpgCompanion))
+                _rpgCompanion.gameObject.SetActive(false);
+            FrameRpgCamera(_player.anchorMin);
         }
 
-        private void HideRpgActorGraphics()
-        {
-            HideRpgGraphics(_player);
-            HideRpgGraphics(_rpgCompanion);
-            foreach (var resident in _rpgResidents.Values) HideRpgGraphics(resident);
-        }
-
-        private static void HideRpgGraphics(Transform actor)
-        {
-            if (actor == null) return;
-            foreach (var graphic in actor.GetComponentsInChildren<Graphic>(true)) graphic.enabled = false;
-        }
-
-        private void EnsureRpgStageGuest(int id)
+        private void EnsureRpgStageGuest(int id, HashSet<int> entrances)
         {
             if (_rpgStageIds.ContainsKey(id)) return;
             var character = DeckRepository.GetCharacter(id);
-            if (character != null) GetRpgStageGuest(character.name, character.id);
+            if (character != null) GetRpgStageGuest(character.name, character.id, entrances.Contains(id));
         }
 
-        private RpgStageActor GetRpgStageGuest(string name, int? id)
+        private RpgStageActor GetRpgStageGuest(string name, int? id, bool enters)
         {
             if (id.HasValue && _rpgStageIds.TryGetValue(id.Value, out var existing)) return existing;
             int slot = _rpgGuestSlots++;
@@ -146,7 +138,13 @@ namespace YGOPortable.UI
             var entry = new Vector2(left ? .052f : .948f, row);
             RectTransform actor, sprite;
             bool resident = false;
-            if (id.HasValue && _rpgResidents.TryGetValue(id.Value, out actor))
+            if (!enters && id == RpgPartnerId && _rpgCompanion != null)
+            {
+                actor = _rpgCompanion;
+                sprite = actor.Find("Sprite") as RectTransform;
+                resident = true;
+            }
+            else if (!enters && id.HasValue && _rpgResidents.TryGetValue(id.Value, out actor))
             {
                 sprite = actor.Find("SD") as RectTransform;
                 resident = true;

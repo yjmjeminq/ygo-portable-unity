@@ -97,7 +97,7 @@ namespace YGOPortable.UI
 
             bool hasEpisode = cleared < episodes.Length;
             string location = RpgRegions[_rpgLocation].Name;
-            string caption = hasEpisode ? $"EP {cleared + 1:00} · {location}" : location;
+            string caption = hasEpisode ? $"EP {cleared + 1:00} · {RpgRegions[targetRegion].Name}" : location;
             string objective = episodes.Length == 0 ? "대본을 불러오지 못했습니다." :
                 !hasEpisode ? "자유 탐험" :
                 _rpgLocation == targetRegion ? $"{episodes[cleared].opponentName}에게 다가가기" :

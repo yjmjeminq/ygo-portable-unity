@@ -20,7 +20,15 @@ namespace YGOPortable.Editor
             var script = StoryModeUI.LoadRpgScript(streaming);
             var decks = StoryModeUI.LoadRpgDecks(streaming);
             var regions = TagForceWorldUI.RpgRegions;
-            int[] gates = { 0, 0, 6, 9, 11, 19, 27, 35, 44 };
+            int[] gates = { 0, 0, 6, 8, 8, 18, 27, 34, 44 };
+            int[] expectedRegions =
+            {
+                0, 0, 0, 1, 1, 1, 2, 2, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 5, 5,
+                5, 5, 5, 5, 5, 5, 5, 6, 6, 3, 3, 0, 3, 0, 7, 7, 7, 7, 7, 7,
+                7, 7, 7, 7, 8, 8, 8, 8, 8, 6,
+            };
+            Require(Enumerable.Range(1, script.episodes.Length).Select(TagForceWorldUI.RegionForEpisode)
+                .SequenceEqual(expectedRegions), "A 5D's episode was routed to the wrong field.");
             Require(regions.Select(region => region.RequiredEpisode).SequenceEqual(gates),
                 "The nine RPG region gates did not match the campaign.");
             for (int i = 0; i <= 50; i++)
@@ -165,6 +173,7 @@ namespace YGOPortable.Editor
                 world.Back();
                 VerifyRpgExploration();
                 VerifyRpgAdventure();
+                VerifyReturningEpisodes();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
             }
             finally
@@ -506,8 +515,9 @@ namespace YGOPortable.Editor
                     field.Find("Player") == player && field.Find("MainQuestNpc") == opponent &&
                     !storyRoot.Find("Scene/Portraits/Protagonist").GetComponent<Image>().enabled &&
                     !storyRoot.Find("Scene/Portraits/Opponent").GetComponent<Image>().enabled &&
-                    !player.Find("Sprite").GetComponent<Image>().enabled &&
+                    player.Find("Sprite").GetComponent<Image>().enabled && opponent.Find("SD").GetComponent<Image>().enabled &&
                     !guest.gameObject.activeSelf && guest.Find("Sprite").GetComponent<Image>().sprite != null &&
+                    !field.Find("RpgCardMerchant").gameObject.activeSelf &&
                     !world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
                     "The conversation did not preserve the real field or hold Aki until her first line.");
                 world.Update(.5f, Vector2.right);
@@ -529,6 +539,7 @@ namespace YGOPortable.Editor
                 Vector2 cameraStart = ((RectTransform)field).anchorMin;
                 story.Update(.30f);
                 Require(guest.gameObject.activeSelf && guest.anchorMin != entry && lines[arrival].speaker == "" &&
+                    guest.Find("Sprite").GetComponent<Image>().enabled && guest.GetComponent<CanvasGroup>().alpha > 0f &&
                     opponent.gameObject.activeSelf && opponent.anchorMin == otherStart && player.gameObject.activeSelf &&
                     ((RectTransform)field).anchorMin != cameraStart,
                     "The first shot did not follow Aki as she entered before the other actor moved.");
@@ -546,8 +557,8 @@ namespace YGOPortable.Editor
                 AdvanceToLine(firstAkiLine);
                 var portrait = storyRoot.Find("Scene/Portraits/Opponent").GetComponent<Image>();
                 Require(portrait.enabled && portrait.sprite.rect.height < portrait.sprite.texture.height &&
-                    !guest.Find("Sprite").GetComponent<Image>().enabled,
-                    "Aki's dialogue did not replace the SD character with a portrait.");
+                    guest.Find("Sprite").GetComponent<Image>().enabled,
+                    "Aki's dialogue did not keep both the field actor and upper-body portrait visible.");
                 int shocked = Array.FindIndex(lines, firstAkiLine + 1,
                     line => line.speaker == "이자요이 아키" && line.emotion == "shock");
                 Require(shocked > firstAkiLine, "The narration fixture did not have an Aki reaction.");
@@ -570,7 +581,8 @@ namespace YGOPortable.Editor
                 Require(world.CanWalk && FieldScene().Find("DialogueCast") == null &&
                     FieldScene().Find("Player/Sprite").GetComponent<Image>().enabled &&
                     ((RectTransform)FieldScene().Find("Player")).anchorMin == position &&
-                    world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
+                    world.Root.GetComponent<CanvasGroup>().blocksRaycasts && panel.Find("FieldHud").gameObject.activeSelf &&
+                    FieldScene().Find("RpgCardMerchant").gameObject.activeInHierarchy,
                     "Leaving the conversation did not remove its cast and restore movement at the original location.");
                 world.Update(.25f, Vector2.down);
                 for (int frame = 0; frame < 3; frame++) world.Update(.15f, Vector2.up);
@@ -615,6 +627,42 @@ namespace YGOPortable.Editor
                     Require(world.CanWalk && world.RpgClears == index, $"Leaving {episode.id} lost the field or awarded a clear.");
                 }
                 Debug.Log($"[VERIFY 5DS AUTO SCENES] All {automatic.Length} scripted approaches, opening sequences and returns passed.");
+            }
+
+            void VerifyReturningEpisodes()
+            {
+                string audit = Path.Combine(save, "rpg-returning-episodes");
+                DeckRepository.Load(streaming, audit, seedDefaultDecks: false);
+                CollectionProgress.Load(audit);
+                Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out var error), error);
+                world.PrepareRpgField();
+                foreach (int number in new[] { 3, 9, 14, 19, 28, 30, 31, 32, 33, 34, 35, 45, 50 })
+                {
+                    int index = number - 1;
+                    for (int i = world.RpgClears; i < index; i++)
+                    {
+                        var prior = script.episodes[i];
+                        Require(CollectionProgress.TryAwardStoryDuel(prior.id, true, null, decks[prior.deckId],
+                            out _, out _, out _), $"Could not stage {prior.id}.");
+                    }
+
+                    int region = expectedRegions[index];
+                    string target = regions[region].Name;
+                    Require(world.EnterRpgRegion(region == 0 ? 1 : 0) && !world.CanStartRpgEpisode(index) &&
+                        FieldScene().Find("MainQuestNpc") == null &&
+                        panel.Find("FieldHud/QuestTrack/Chapter/Label").GetComponent<Text>().text == $"EP {number:00} · {target}" &&
+                        panel.Find("FieldHud/QuestTrack/Objective/Label").GetComponent<Text>().text == $"이동 · {target}",
+                        $"The field directed episode {number} to the wrong destination.");
+                    PressRpgNavigation("Map");
+                    foreach (var (area, i) in regions.Select((area, i) => (area, i)))
+                        Require((panel.Find(area.Id).GetComponent<Image>().sprite.name == "RPG active panel") == (i == region),
+                            $"The map highlighted the wrong location for episode {number}.");
+                    Require(world.EnterRpgRegion(region) && world.CanStartRpgEpisode(index) &&
+                        FieldScene().Find("MainQuestNpc") != null &&
+                        panel.Find("FieldHud/QuestTrack/Objective/Label").GetComponent<Text>().text.Contains(script.episodes[index].opponentName),
+                        $"Episode {number} did not place the main quest on its assigned field.");
+                }
+                Debug.Log("[VERIFY 5DS REGIONS] All 50 locations, unlock gates, and 13 in-game map/HUD routes passed.");
             }
 
             void VerifySideQuests()
@@ -717,8 +765,8 @@ namespace YGOPortable.Editor
                         Press(panel, "ResidentChoices/AskCrow");
                         world.Update(4f);
                         Require(panel.Find("ConversationPortrait").GetComponent<Image>().sprite != null &&
-                            !FieldScene().Find("QuestNpc_10/SD").GetComponent<Image>().enabled,
-                            "Choosing to ask Crow did not replace his SD art with the upper-body portrait.");
+                            FieldScene().Find("QuestNpc_10/SD").GetComponent<Image>().enabled,
+                            "Choosing to ask Crow did not show both his field actor and his upper-body portrait.");
                         Press(panel, "ResidentChoices/AskCoupler");
                     }
                     else Press(panel, "ResidentChoices/ReadRunnerLog");
@@ -742,7 +790,8 @@ namespace YGOPortable.Editor
                     var fit = panel.Find("ResidentChoices/FitCoupler").GetComponent<Button>();
                     Require(!fit.IsInteractable() && !world.CanWalk, "The workbench cutscene allowed input while Crow was moving.");
                     world.Update(.31f, Vector2.right);
-                    Require(crow.anchorMin != start && !fit.IsInteractable(), "Crow did not walk to the workbench.");
+                    Require(crow.anchorMin != start && !fit.IsInteractable() && crow.Find("SD").GetComponent<Image>().enabled,
+                        "Crow did not visibly walk to the workbench.");
                     world.Update(.9f);
                     int balance = CollectionProgress.Balance;
                     Press(panel, "ResidentChoices/FitCoupler");
@@ -810,9 +859,9 @@ namespace YGOPortable.Editor
                 app.OpenRpgField();
                 for (int i = 0; i < 4; i++) Press(panel, "StoryDialogue/Scene/DialogueBox/Next/Button");
                 Require(!world.CanWalk && FieldScene().Find("RpgCompanion") != null &&
-                    !FieldScene().Find("RpgCompanion/Sprite").GetComponent<Image>().enabled &&
+                    FieldScene().Find("RpgCompanion/Sprite").GetComponent<Image>().enabled &&
                     panel.Find("StoryDialogue/Scene/Portraits/Opponent").GetComponent<Image>().enabled,
-                    "The prologue did not lead into the workshop guide with only Yusei's portrait.");
+                    "The prologue did not lead into the workshop guide with Yusei on the field and in the dialogue.");
                 Press(panel, "StoryDialogue/Scene/DialogueBox/Skip/Button");
                 CollectionProgress.Load(audit);
                 app.OpenRpgField();
@@ -982,20 +1031,27 @@ namespace YGOPortable.Editor
             void OpenEpisode6()
             {
                 var field = FieldScene();
-                var resident = (RectTransform)field.Find("Resident_1");
-                Require(resident != null, "Aki was missing from the hideout before the conversation.");
-                Vector2 residentPosition = resident.anchorMin;
                 Press(field, "MainQuestNpc/SD");
                 world.Update(4f);
                 Require(storyRoot.gameObject.activeSelf && story.FromRpgField && world.Root.activeSelf && !world.CanWalk &&
                     story.GetOpponentMatch(episode6).Deck.id == 59006,
                     "The current field NPC did not open the corresponding cinematic and RPG deck.");
-                Require(resident.gameObject.activeInHierarchy && field.Find("DialogueCast/Guest_1") == null,
-                    "The dialogue replaced an existing field resident with a duplicate.");
+                var guest = (RectTransform)field.Find("DialogueCast/Guest_1");
+                Require(guest != null && !guest.gameObject.activeSelf &&
+                    field.Find("Resident_1")?.gameObject.activeInHierarchy != true,
+                    "Aki was visible before her scripted entrance in the hideout.");
+                int entrance = Array.FindIndex(episode6.preDialogues,
+                    line => line.stage?.Any(action => action.actor == 1 && action.action == "enter") == true);
+                Require(entrance >= 0, "Episode six lost Aki's entrance.");
+                Vector2 entryPosition = guest.anchorMin;
+                AdvanceToLine(entrance);
+                story.Update(2f);
+                Require(guest.gameObject.activeInHierarchy && guest.anchorMin != entryPosition &&
+                    guest.Find("Sprite").GetComponent<Image>().enabled,
+                    "Aki did not visibly enter during the hideout conversation.");
                 Press(storyRoot, "Scene/DialogueBox/Skip/Button");
                 Press(storyRoot, "Scene/Choices/Choice_0/Button");
                 Press(storyRoot, "Scene/DialogueBox/Skip/Button");
-                Require(resident.anchorMin != residentPosition, "The resident did not join the conversation.");
                 Press(storyRoot, "DeckSelection/Window/Apply/Button");
             }
 
