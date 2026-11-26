@@ -1156,6 +1156,9 @@ namespace YGOPortable.AI
         internal static int SummonMaterialPriority(DuelSession duel, byte player, SelectableCardItem option,
             uint source, ulong hint)
         {
+            if (DuelAiPolicy.IsMachineAngelRitual(source) &&
+                DuelAiPolicy.IsProtectedRitualMaterial(duel.Players[player], player, option))
+                return -20000;
             if (option.controller != player) return 10000 + SelectionPriority(duel, player, option, Destroy);
             var info = CardDatabase.Get(option.code);
             int score = -(Math.Max(0, info?.atk ?? 1000) + Math.Max(0, info?.def ?? 0) / 3);

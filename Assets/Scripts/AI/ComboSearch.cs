@@ -783,6 +783,10 @@ namespace YGOPortable.AI
         {
             state = 0;
             alternatives = Array.Empty<int>();
+            if (prompt.SelectionHint is DuelTactics.Release or 509 &&
+                duel.SelectionChainLink is { } ritual && ritual.triggerPlayer == prompt.playerId &&
+                DuelAiPolicy.IsMachineAngelRitual(ritual.code) &&
+                duel.Players[prompt.playerId].mzone.Any(DuelAiPolicy.IsEstablishedRitualAce)) return false;
             if (prompt.messageType == YgoConstants.MSG_SELECT_POSITION && response.Length == 4 &&
                 BitConverter.ToInt32(response, 0) == YgoConstants.POS_FACEUP_DEFENSE &&
                 (prompt.allowedPositions & YgoConstants.POS_FACEUP_ATTACK) != 0 &&

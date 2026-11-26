@@ -758,6 +758,7 @@ namespace YGOPortable.AI
         }
 
         private bool CanActivate(DuelSession session, DuelPrompt prompt, SelectableCardItem item) =>
+            DuelAiPolicy.CanActivateMachineAngelRitual(session.Players[prompt.playerId], item) &&
             SynchroTurnPlan.CanActivate(session, prompt, item) && (UsesTacticalRules
                 ? DuelTactics.CanActivate(session, prompt, item)
                 : !DuelTactics.IsTemporaryFieldNegation(item) || DuelTactics.CanSpendFieldNegation(session, prompt, item));
@@ -1127,16 +1128,17 @@ namespace YGOPortable.AI
                         card.location == YgoConstants.LOCATION_GRAVE && card.code == _calledByTarget);
                 if (graveTarget >= 0) return PackIndexList(new[] { graveTarget });
             }
-            if (UsesTacticalRules && DuelAiPolicy.ChooseSummonTarget(s, p, effect) is int ace)
+            if ((UsesTacticalRules || DuelAiPolicy.IsMachineAngelRitual(effect)) &&
+                DuelAiPolicy.ChooseSummonTarget(s, p, effect) is int ace)
                 return PackIndexList(new[] { ace });
             if (UsesTacticalRules && effect == DuelAiPolicy.Nasateiya && p.min == 1 && p.max == 1 &&
                 p.candidates.Count > 1 && p.candidates.All(card => card.controller != p.playerId && card.location == YgoConstants.LOCATION_MZONE))
                 return PackIndexList(new[] { Enumerable.Range(0, p.candidates.Count).OrderByDescending(index =>
                     DuelTactics.SelectionPriority(s, p.playerId, p.candidates[index], DuelTactics.Destroy)).First() });
-            bool material = IsThemedMaterialSelection(effect, hint);
-            bool dropletCost = effect == DuelTactics.ForbiddenDroplet && hint == DuelTactics.SendToGrave &&
+            bool material = ShouldRankThemedMaterials(effect, hint);
+            bool dropletCost = UsesTacticalRules && effect == DuelTactics.ForbiddenDroplet && hint == DuelTactics.SendToGrave &&
                 p.candidates.All(card => card.controller == p.playerId);
-            if (UsesTacticalRules && (material || dropletCost))
+            if (material || dropletCost)
             {
                 if (p.min == 0 && p.cancelable) return BitConverter.GetBytes(-1);
                 return PackIndexList(Enumerable.Range(0, p.candidates.Count).OrderByDescending(index =>
@@ -1293,8 +1295,8 @@ namespace YGOPortable.AI
             if (p.candidates.Count > 0)
             {
                 uint effect = SelectionEffect(s, p);
-                if (UsesTacticalRules && (IsThemedMaterialSelection(effect, p.SelectionHint) ||
-                    p.SelectionHint == DuelTactics.SendToGrave && effect == DuelTactics.ForbiddenDroplet))
+                if (ShouldRankThemedMaterials(effect, p.SelectionHint) ||
+                    (UsesTacticalRules && p.SelectionHint == DuelTactics.SendToGrave && effect == DuelTactics.ForbiddenDroplet))
                 {
                     int index = Enumerable.Range(0, p.candidates.Count).OrderByDescending(i =>
                         DuelTactics.SummonMaterialPriority(s, p.playerId, p.candidates[i], effect, p.SelectionHint)).First();
@@ -1342,8 +1344,9 @@ namespace YGOPortable.AI
         private uint SelectionEffect(DuelSession duel, DuelPrompt prompt) =>
             duel.SelectionChainLink is { } link && link.triggerPlayer == prompt.playerId ? link.code : _lastAnnouncedEffect;
 
-        private static bool IsThemedMaterialSelection(uint effect, ulong hint) =>
-            hint == DuelTactics.Release && DuelAiPolicy.IsRitualSpell(effect) || hint == 511 && effect is
+        private bool ShouldRankThemedMaterials(uint effect, ulong hint) =>
+            hint == DuelTactics.Release && (DuelAiPolicy.IsMachineAngelRitual(effect) ||
+                UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect)) || UsesTacticalRules && hint == 511 && effect is
                 DuelAiPolicy.BrandedFusion or DuelAiPolicy.Lubellion or DuelAiPolicy.Albion or DuelAiPolicy.FusionDestiny or
                 DuelAiPolicy.MiracleFusion or DuelAiPolicy.SuperPoly or DuelAiPolicy.PowerBond;
 
@@ -1351,34 +1354,35 @@ namespace YGOPortable.AI
         {
             int n = p.candidates.Count;
             int minCnt = (int)p.min;
-            int maxCnt = p.max > 0 ? Math.Min(n, (int)p.max) : n;
             int target = (int)(p.acc & 0xFFFF);
 
             var mustParams = p.mustSelect.Select(m => ((int)(m.sumParam & 0xFFFF), (int)((m.sumParam >> 16) & 0xFFFF))).ToList();
             uint effect = SelectionEffect(s, p);
             var order = Enumerable.Range(0, n);
-            if (UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect))
+            bool machineAngel = DuelAiPolicy.IsMachineAngelRitual(effect);
+            if (machineAngel || UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect))
                 order = order.OrderByDescending(i => DuelTactics.SummonMaterialPriority(
                     s, p.playerId, p.candidates[i], effect, DuelTactics.Release));
             int[] indices = order.ToArray();
-            var candParams = indices.Select(i => p.candidates[i]).Select(c =>
-                ((int)(c.sumParam & 0xFFFF), (int)((c.sumParam >> 16) & 0xFFFF))).ToList();
-            var picked = new List<int>();
-
-            if (!p.sumExactCountZeroAny && p.max > 0)
+            if (machineAngel)
             {
-                if (SolveExactSum(mustParams, candParams, target, minCnt, maxCnt, picked))
-                    return PackIndexList(picked.Select(i => indices[i]));
-            }
-            else
-            {
-                if (SolveOverflowSum(mustParams, candParams, target, picked))
-                    return PackIndexList(picked.Select(i => indices[i]));
+                var own = s.Players[p.playerId];
+                var reserveAce = indices.Where(i => !DuelAiPolicy.IsProtectedRitualMaterial(own, p.playerId, p.candidates[i])).ToArray();
+                if (reserveAce.Length != indices.Length && Select(reserveAce) is { } safe) return safe;
             }
 
-            // Fallback subset
-            var fallback = Enumerable.Range(0, Math.Min(n, Math.Max(1, minCnt)));
-            return PackIndexList(fallback);
+            return Select(indices) ?? PackIndexList(Enumerable.Range(0, Math.Min(n, Math.Max(1, minCnt))));
+
+            byte[] Select(int[] pool)
+            {
+                var candParams = pool.Select(i => p.candidates[i]).Select(c =>
+                    ((int)(c.sumParam & 0xFFFF), (int)((c.sumParam >> 16) & 0xFFFF))).ToList();
+                var picked = new List<int>();
+                bool solved = !p.sumExactCountZeroAny && p.max > 0
+                    ? SolveExactSum(mustParams, candParams, target, minCnt, Math.Min(pool.Length, (int)p.max), picked)
+                    : SolveOverflowSum(mustParams, candParams, target, picked);
+                return solved ? PackIndexList(picked.Select(i => pool[i])) : null;
+            }
         }
 
         private static bool CanReachExact(List<(int o1, int o2)> items, int idx, int rem)

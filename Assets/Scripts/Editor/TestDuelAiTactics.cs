@@ -59,6 +59,8 @@ namespace YGOPortable.Editor
             VerifyGxResponses();
             VerifyGxSummonChoices();
             VerifyNativeBentenSearch();
+            VerifyNativeRitualAcePreservation();
+            VerifyNativeRitualWithSpareMaterials();
             VerifyGxBattlePriority();
             Debug.Log("[VERIFY AI TACTICS] Ash conservation, Baronne bait, summon budget, revealed sweeper and chain ordering passed. Retry=0");
         }
@@ -204,6 +206,77 @@ namespace YGOPortable.Editor
                 duel.Players[0].grave.Any(card => card.code == benten) && searched &&
                 duel.RetryCount == 0, "Native Dakini must use Benten and resolve the resulting LIGHT Fairy search.");
             Debug.Log("[VERIFY GX AI RITUAL] Native Dakini summoned and Benten's search resolved. Retry=0");
+        }
+
+        private static void VerifyNativeRitualAcePreservation()
+        {
+            const uint ritual = 39996157, vishnu = 78316184, idaten = 3629090, tribute = 98777036;
+            var deck = Deck(ritual, ritual, vishnu, idaten, tribute);
+            using var duel = YgoProjectBuilder.StartSeedMatching("Vishnu into Idaten", deck, Empty, Deck(GeminiElf), Empty, true,
+                current => current.Players[0].hand.Count(card => card.code == ritual) == 2 &&
+                    new[] { vishnu, idaten, tribute }.All(code => current.Players[0].hand.Any(card => card.code == code)));
+            SubmitIdle(duel, 5, ritual);
+            Drive(duel, IsIdle, vishnu);
+            var own = duel.Players[0];
+            var idle = duel.ActivePrompt;
+            Require(own.mzone.Any(card => card is { code: vishnu, IsFaceUp: true }) &&
+                idle.activatable.Any(card => card.code == ritual && card.location == YgoConstants.LOCATION_HAND),
+                "The native engine must offer a second Ritual while Vishnu is the only usable material.");
+            var ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(), searchCombos: true)
+            {
+                Difficulty = AIDifficulty.Master,
+            };
+            int choice = Read(ai.ComputeResponse(duel, idle));
+            Require(choice == 7, $"With only Vishnu as material, the AI must end its turn instead of summoning Idaten. Choice={choice}");
+            duel.SubmitResponseInt(choice);
+            Drive(duel, IsIdle);
+            Require(duel.TurnNumber == 2 && own.mzone.Any(card => card is { code: vishnu, IsFaceUp: true }) &&
+                own.hand.Any(card => card.code == idaten) && duel.RetryCount == 0, "Vishnu did not survive the turn.");
+            Debug.Log("[VERIFY GX AI RITUAL] Kept Vishnu when the only available follow-up would tribute it for Idaten. Retry=0");
+        }
+
+        private static void VerifyNativeRitualWithSpareMaterials()
+        {
+            const uint ritual = 39996157, absolute = 11398951, vishnu = 78316184, idaten = 3629090,
+                tribute = 98777036, petitAngel = 76103404;
+            foreach (uint secondSpell in new[] { ritual, absolute })
+            {
+                uint[] openingHand = { ritual, secondSpell, vishnu, idaten, tribute, GeminiElf, petitAngel };
+                using var duel = new DuelSession(recordPlanningReplay: true);
+                var deck = Deck(openingHand);
+                var opponent = Deck(GeminiElf);
+                bool found = false;
+                for (ulong n = 1; n <= 600 && !found; n++)
+                {
+                    Require(duel.StartNewDuel(deck, Empty, opponent, Empty, seed: new[] { n * 29 + 101, n * 47 + 7, n * 71 + 13, n * 97 + 3 },
+                        playerOpening: new DuelOpening(8000, openingHand.Length, 0)), "Could not start the prepared Ritual duel.");
+                    found = duel.Players[0].hand.Select(card => card.code).OrderBy(code => code)
+                        .SequenceEqual(openingHand.OrderBy(code => code));
+                }
+                Require(found, "Could not draw the prepared Ritual opening.");
+                SubmitIdle(duel, 5, ritual);
+                var material = Drive(duel, prompt => prompt.messageType == YgoConstants.MSG_SELECT_SUM, vishnu);
+                int tributeIndex = material.candidates.FindIndex(card => card.code == tribute);
+                Require(tributeIndex >= 0, "Vishnu's initial tribute was absent.");
+                duel.SubmitResponse(DuelSession.PackCardSelection(tributeIndex));
+                var idle = Drive(duel, IsIdle);
+                var second = idle.activatable.Find(card => card.code == secondSpell && card.location == YgoConstants.LOCATION_HAND);
+                Require(second != null && DuelAiPolicy.CanActivateMachineAngelRitual(duel.Players[0], second),
+                    "The AI blocked a Ritual with enough affordable materials to keep Vishnu.");
+                SubmitIdle(duel, 5, secondSpell);
+                var ai = Smart();
+                for (int step = 0; step < 25 && !duel.IsFinished && duel.RetryCount == 0; step++)
+                {
+                    var prompt = duel.ActivePrompt;
+                    if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                    if (IsIdle(prompt)) break;
+                    duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                }
+                Require(duel.Players[0].mzone.Any(card => card is { code: vishnu, IsFaceUp: true }) &&
+                    duel.Players[0].mzone.Any(card => card is { code: idaten, IsFaceUp: true }) && duel.RetryCount == 0,
+                    $"The native Ritual {secondSpell} did not summon Idaten while keeping Vishnu. " + string.Join(" | ", duel.Logs.TakeLast(8)));
+                Debug.Log($"[VERIFY GX AI RITUAL] {secondSpell} summoned Idaten with spare materials while Vishnu stayed on the field. Retry=0");
+            }
         }
 
         private static void VerifyNegationTargets()

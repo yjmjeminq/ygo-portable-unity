@@ -18,7 +18,9 @@ namespace YGOPortable.AI
         internal const uint FusionDestiny = 52947044, DestroyerPhoenix = 60461804, MiracleFusion = 45906428;
         internal const uint MaskChange = 21143940, DarkLaw = 58481572, PowerBond = 37630732, SuperPoly = 48130397;
         internal const uint MachineAngelRitual = 39996157, MeteonisDrytron = 22398665, Benten = 77235086;
+        private const uint MachineAngelAbsoluteRitual = 11398951;
         internal const uint Dakini = 39618799, Nasateiya = 99427357, Vishnu = 78316184;
+        private const ushort CyberAngelSet = 0x2093;
         private const uint PhantomOfYubel = 80453041;
         private const uint Garura = 11765832, Mudragon = 54757758, StarvingVenom = 41209827, LovingDefender = 47172959;
         private const uint CyberTwin = 74157028, ChimeratechRampage = 84058253, WakeUpHero = 32828466;
@@ -271,7 +273,46 @@ namespace YGOPortable.AI
             return score;
         }
 
-        internal static bool IsRitualSpell(uint code) => code is MachineAngelRitual or MeteonisDrytron;
+        internal static bool IsRitualSpell(uint code) => IsMachineAngelRitual(code) || code == MeteonisDrytron;
+
+        internal static bool IsMachineAngelRitual(uint code) => code is MachineAngelRitual or MachineAngelAbsoluteRitual;
+
+        internal static bool IsEstablishedRitualAce(LiveCardState card) => card is { IsFaceUp: true, code: Vishnu or Dakini };
+
+        internal static bool IsProtectedRitualMaterial(PlayerFieldSnapshot own, byte player, SelectableCardItem card) =>
+            card.controller == player && card.location == YgoConstants.LOCATION_MZONE &&
+            card.sequence < own.mzone.Length && IsEstablishedRitualAce(own.mzone[card.sequence]);
+
+        internal static bool CanActivateMachineAngelRitual(PlayerFieldSnapshot own, SelectableCardItem spell) =>
+            !IsMachineAngelRitual(spell.code) || spell.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE) ||
+            !own.mzone.Any(IsEstablishedRitualAce) ||
+            own.hand.Any(target => CanPayWithoutRitualAce(own, spell.code, target));
+
+        private static bool CanPayWithoutRitualAce(PlayerFieldSnapshot own, uint spell, LiveCardState target)
+        {
+            var info = CardDatabase.Get(target.code);
+            if (info == null || (info.type & YgoConstants.TYPE_RITUAL) == 0 || info.level is 0 or > 31) return false;
+            bool exact = spell == MachineAngelAbsoluteRitual;
+            if (exact && !CardDatabase.ExtractSetcodes(info.setcode).Contains(CyberAngelSet)) return false;
+
+            var materials = own.hand.Where(card => card != target)
+                .Concat(own.mzone.Where(card => card != null && !IsEstablishedRitualAce(card)));
+            if (exact)
+                materials = materials.Concat(own.grave.Where(card => card.race is YgoConstants.RACE_FAIRY or YgoConstants.RACE_WARRIOR));
+            ulong reachable = 1;
+            int total = 0;
+            foreach (var card in materials)
+            {
+                // Hand and face-down cards may carry their printed level only in the database.
+                if ((card.type & (YgoConstants.TYPE_LINK | YgoConstants.TYPE_XYZ)) != 0) continue;
+                uint level = card.level > 0 ? card.level : CardDatabase.Get(card.code)?.level ?? 0;
+                if (level is 0 or > 31) continue;
+                reachable |= reachable << (int)level;
+                total += (int)level;
+                if (exact ? (reachable & (1UL << (int)info.level)) != 0 : total >= info.level) return true;
+            }
+            return false;
+        }
 
         internal static bool CanRiskPowerBond(DuelSession duel, DuelPrompt prompt)
         {
@@ -344,7 +385,9 @@ namespace YGOPortable.AI
             }
             if (IsRitualSpell(source) && prompt.SelectionHint == 509 &&
                 prompt.candidates.All(item => (CardDatabase.Get(item.code)?.type & YgoConstants.TYPE_RITUAL) != 0))
-                return Best(item => item.code switch
+            {
+                bool preserveAce = IsMachineAngelRitual(source) && own.mzone.Any(IsEstablishedRitualAce);
+                return Best(item => (item.code switch
                 {
                     Dakini or Vishnu when rival.mzone.Any(card => card != null) => 5,
                     48546368 when own.hand.Any(card => CardDatabase.Get(card.code)?.race == YgoConstants.RACE_FAIRY) => 5,
@@ -352,7 +395,9 @@ namespace YGOPortable.AI
                     Nasateiya when rival.mzone.Any(card => card != null) => 2,
                     Benten => 1,
                     _ => 3,
-                });
+                }) + (preserveAce && own.hand.FirstOrDefault(card => card.code == item.code) is { } target &&
+                    CanPayWithoutRitualAce(own, source, target) ? 10 : 0));
+            }
             return null;
 
             int PowerBondTarget(SelectableCardItem item)
