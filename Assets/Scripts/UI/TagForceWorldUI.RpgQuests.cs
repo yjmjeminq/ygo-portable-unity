@@ -151,8 +151,8 @@ namespace YGOPortable.UI
             DuelAudio.PlayTagForceReward();
             string received = FormatRpgQuestReward(reward, CollectionProgress.RpgExperience - experience,
                 CollectionProgress.RpgAffinity - affinity, CollectionProgress.PackUrTickets > tickets);
-            _rpgQuestRewardBanner = Area(_body, "QuestRewardBanner", .25f, .865f, .75f, .962f);
-            PaintRpgHudPlate(_rpgQuestRewardBanner);
+            _rpgQuestRewardBanner = Area(_body, "QuestRewardBanner", .327f, .852f, .778f, .953f);
+            RpgUiStyle.Panel(_rpgQuestRewardBanner, gold: true);
             HudLabel(_rpgQuestRewardBanner, $"의뢰 완료!  {quest.Title}\n{received}", 21, Color.white,
                 align: TextAnchor.MiddleCenter, heading: true);
             _rpgQuestRewardTime = 3.4f;

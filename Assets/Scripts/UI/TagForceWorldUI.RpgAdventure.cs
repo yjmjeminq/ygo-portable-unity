@@ -100,7 +100,9 @@ namespace YGOPortable.UI
                 ShowStatus(result);
             }
             void Search() => MoveTo(point, Take);
-            var click = DuelUiKit.AddImage(cache.gameObject, DuelUiKit.WhiteSprite, new Color(.05f, .15f, .215f, .48f), false, true);
+            var click = DuelUiKit.AddImage(cache.gameObject, DuelUiKit.WhiteSprite, Color.clear, false, true);
+            DuelUiKit.AddImage(DuelUiKit.FillRect("Glint", cache).gameObject, RpgSoftLight,
+                new Color(1f, .76f, .33f, .62f), false, false);
             var open = cache.gameObject.AddComponent<Button>();
             open.targetGraphic = click;
             open.onClick.AddListener(Search);
@@ -132,9 +134,11 @@ namespace YGOPortable.UI
             PoseRpgWalker(_rpgCompanion, _rpgCompanionArt, _rpgCompanionPoint, step, step.sqrMagnitude > .000001f, gap);
         }
 
+        private static bool HasRpgMerchant(int region, int clears) => region == RpgGarage || region == RpgPoppo && clears >= 27;
+
         private void AddRpgShopkeeper()
         {
-            if (_rpgLocation != RpgGarage) return;
+            if (!HasRpgMerchant(_rpgLocation, RpgClears)) return;
             AddRpgResident(RpgShopkeeperId, RpgShopkeeperName, "RpgCardMerchant", new Vector2(.82f, .38f),
                 RpgResidentRole.Shop, () => OpenRpgService(RpgShopkeeperId));
         }
@@ -286,7 +290,7 @@ namespace YGOPortable.UI
             if (speaker == null) return;
             Vector2 point = Rect.PointToNormalized(_body.rect, _body.InverseTransformPoint(speaker.position));
             float x = Mathf.Clamp(point.x - .06f, .215f, .785f);
-            float y = Mathf.Clamp(point.y + .145f, .20f, .69f);
+            float y = Mathf.Clamp(point.y + .145f, .20f, .58f);
             _rpgGreeting.anchorMin = new Vector2(x - .205f, y);
             _rpgGreeting.anchorMax = new Vector2(x + .205f, y + .075f);
         }

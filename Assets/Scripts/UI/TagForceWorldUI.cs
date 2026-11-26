@@ -463,6 +463,16 @@ namespace YGOPortable.UI
             bool traveling = _rpgPendingRegion >= 0;
             if (_rpgField) UpdateRpgField(delta);
             if (traveling || !CanWalk) return;
+            if (_rpgField && Input.GetKeyDown(KeyCode.M))
+            {
+                Show(Page.Map);
+                return;
+            }
+            if (_rpgField && Input.GetKeyDown(KeyCode.Tab))
+            {
+                ToggleFieldMenu();
+                return;
+            }
             if (_rpgField && !_fieldMenu && (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) ||
                 Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Z)))
             {

@@ -182,10 +182,13 @@ namespace YGOPortable.Editor
                         Require(!badge.activeSelf && playerPortrait.enabled && speakerPortrait.enabled &&
                             scene.Find("ProtagonistSD") == null && scene.Find("OpponentSD") == null,
                             "Narration lost the two stage portraits or displayed an SD character inside the panel.");
-                        Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.25f) &&
+                        Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.28f) &&
                             body.font == Resources.Load<Font>("StoryFonts/Pretendard-Medium") &&
                             scene.Find("DialogueBox").GetComponent<Image>() is { type: Image.Type.Sliced } panel &&
-                            panel.sprite.name == "RPG panel" &&
+                            panel.sprite.name == "RPG dialogue glass" &&
+                            scene.Find("DialogueTools").GetComponentsInChildren<Button>().Length == 4 &&
+                            ((Image)next.targetGraphic).color.a == 0f &&
+                            string.IsNullOrEmpty(next.GetComponentInChildren<Text>().text) &&
                             badge.GetComponentInChildren<Text>(true).font == Resources.Load<Font>("StoryFonts/Pretendard-SemiBold") &&
                             body.GetComponent<Shadow>().effectDistance == new Vector2(1.5f, -1.5f) &&
                             body.color == new Color(.92f, .93f, .96f) && !caret.enabled &&
@@ -242,7 +245,7 @@ namespace YGOPortable.Editor
                 root.Find("StoryBrowser/EpisodeDetails/StartEpisode/Button").GetComponent<Button>().onClick.Invoke();
                 var preparation = root.Find("StoryDialogue");
                 var preparationScene = preparation.Find("Scene");
-                var skip = preparationScene.Find("DialogueBox/Skip/Button").GetComponent<Button>();
+                var skip = preparationScene.Find("DialogueTools/Skip/Button").GetComponent<Button>();
                 skip.onClick.Invoke();
                 preparationScene.Find("Choices/Choice_0/Button").GetComponent<Button>().onClick.Invoke();
                 skip.onClick.Invoke();
@@ -280,7 +283,8 @@ namespace YGOPortable.Editor
                 var story = new StoryModeUI(app, canvas.transform, new StoryHandSequence(0, 0, 2));
                 var root = story.Root.transform;
                 Transform dialogue = root.Find("StoryDialogue");
-                Button Control(Transform scope, string path) => scope.Find(path + "/Button").GetComponent<Button>();
+                Button Control(Transform scope, string path) => (scope.Find(path + "/Button") ??
+                    scope.Find(path.Replace("DialogueBox/", "DialogueTools/") + "/Button")).GetComponent<Button>();
                 story.Open();
                 foreach (string id in new[] { "gx", "5ds", "zexal", "arcv", "vrains", "dm" })
                 {

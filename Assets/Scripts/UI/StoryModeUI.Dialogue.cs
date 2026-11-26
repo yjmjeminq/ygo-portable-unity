@@ -55,7 +55,10 @@ namespace YGOPortable.UI
             private readonly StoryDialogueFx _fx;
             private readonly Image _dialoguePanel;
             private readonly Image _speakerPlate;
+            private readonly Image _speakerStripe;
+            private readonly Image _headingPlate;
             private readonly GameObject _speakerBadge;
+            private readonly RectTransform _rpgTools;
             private readonly Dictionary<string, Sprite> _rpgSprites = new(StringComparer.Ordinal);
             private readonly Text _speaker;
             private readonly Text _text;
@@ -148,6 +151,7 @@ namespace YGOPortable.UI
                 var content = Application.isMobilePlatform ? MobileSafeArea.Create(scene) : scene;
                 _scene = content.gameObject.AddComponent<CanvasGroup>();
                 _heading = AddLabel(content, "Episode", .06f, .88f, .94f, .965f, 29, color: DuelUiKit.GoldAccent);
+                _headingPlate = DuelUiKit.AddImage(_heading.transform.parent.gameObject, null, Color.white, false, false);
                 _heroIdentity = AddLabel(content, "ProtagonistIdentity", .065f, .837f, .495f, .884f, 17, color: HeroColor);
                 var portraits = DuelUiKit.FillRect("Portraits", content);
                 _portraitGroup = portraits.gameObject.AddComponent<CanvasGroup>();
@@ -172,7 +176,10 @@ namespace YGOPortable.UI
                 _speakerBadge = speakerPlate.gameObject;
                 _speakerPlate = DuelUiKit.AddImage(speakerPlate.gameObject, DuelUiKit.WhiteSprite,
                     new Color(.028f, .063f, .13f, .94f), false, false);
-                _speaker = AddLabel(speakerPlate, "Speaker", .08f, .05f, .94f, .95f, 23, TextAnchor.MiddleLeft);
+                _speakerStripe = DuelUiKit.AddImage(Region(speakerPlate, "Signature", .07f, .24f, .091f, .81f).gameObject,
+                    DuelUiKit.WhiteSprite, HeroColor, false, false);
+                _speakerStripe.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -16f);
+                _speaker = AddLabel(speakerPlate, "Speaker", .128f, .05f, .94f, .95f, 23, TextAnchor.MiddleLeft);
                 var body = Region(dialogue, "Text", .047f, .234f, .947f, .69f);
                 _text = DuelUiKit.AddFittedText(body, "Label", "", 29, 13, TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
                 var shadow = _text.gameObject.AddComponent<Shadow>();
@@ -187,6 +194,7 @@ namespace YGOPortable.UI
                 _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, () =>
                     (_onSkip ?? Finish).Invoke());
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
+                _rpgTools = Region(content, "DialogueTools", .690f, .920f, .973f, .970f);
                 var flash = DuelUiKit.AddImage(DuelUiKit.FillRect("DialogueFlash", scene).gameObject, DuelUiKit.WhiteSprite,
                     Color.clear, false, false);
                 _fx = scene.gameObject.AddComponent<StoryDialogueFx>();
@@ -254,16 +262,16 @@ namespace YGOPortable.UI
                 _heroIdentity.gameObject.SetActive(!rpg && !onField);
                 _portraitGroup.gameObject.SetActive(rpg || !onField);
                 _shade.color = new Color(.014f, .026f, .058f, onField ? .14f : .95f);
-                _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, onField ? .32f : .406f);
+                _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, onField ? rpg ? .281f : .32f : rpg ? .322f : .406f);
                 _protagonist = protagonist;
                 _sceneOpponent = opponent;
                 _rpg = rpg;
                 _rpgEpisode = rpgEpisode;
                 ApplyDialogueStyle(rpg);
-                _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, onField ? .32f : .385f) : new Vector2(.07f, .26f);
-                _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .91f) : new Vector2(.493f, .855f);
-                _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, onField ? .32f : .385f) : new Vector2(.508f, .26f);
-                _opponent.rectTransform.anchorMax = rpg ? new Vector2(.975f, .91f) : new Vector2(.93f, .855f);
+                _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, onField ? .267f : .309f) : new Vector2(.07f, .26f);
+                _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .859f) : new Vector2(.493f, .855f);
+                _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, onField ? .267f : .309f) : new Vector2(.508f, .26f);
+                _opponent.rectTransform.anchorMax = rpg ? new Vector2(.975f, .859f) : new Vector2(.93f, .855f);
                 if (rpg && !onField)
                 {
                     var preferred = preferredRpgBackdrop == null ? null : LoadRpgSprite(preferredRpgBackdrop);
@@ -350,6 +358,7 @@ namespace YGOPortable.UI
                 float portraitAlpha = _field?.RpgStageRunning == true ? sceneAlpha * .16f : sceneAlpha;
                 _portraitGroup.alpha = Mathf.MoveTowards(_portraitGroup.alpha, portraitAlpha, delta * 8f);
                 _heading.canvasRenderer.SetAlpha(sceneAlpha);
+                _headingPlate.canvasRenderer.SetAlpha(sceneAlpha);
                 _heroIdentity.canvasRenderer.SetAlpha(sceneAlpha);
                 AnimatePortrait(_hero, _heroPrevious, _heroReaction, _heroSpeaking, delta,
                     _heroSpeaking ? _emotion : null, _poseTime, -1f, ref _heroFade, ref _heroSlide);
@@ -457,9 +466,8 @@ namespace YGOPortable.UI
                     ? FindSpeaker(line.speaker) : null;
                 _opponentSpeaking = !narration && !_heroSpeaking && (!_rpg || speaker != null);
                 _speaker.color = _heroSpeaking ? HeroColor : _rpg ? SpeakerColor(speaker?.name ?? line.speaker) : OpponentColor;
-                _speakerPlate.color = _rpg
-                    ? Color.Lerp(new Color(.028f, .063f, .13f, 1f), _speaker.color, .12f)
-                    : new Color(.028f, .063f, .13f, .94f);
+                _speakerPlate.color = _rpg ? Color.white : new Color(.028f, .063f, .13f, .94f);
+                _speakerStripe.color = _speaker.color;
                 _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
@@ -534,12 +542,14 @@ namespace YGOPortable.UI
                 bool playing = _field?.RpgStageRunning == true;
                 if (_stageCaption == playing) return;
                 _stageCaption = playing;
-                _next.GetComponentInChildren<Text>().text = playing ? "연출 중" : "다음 ▶";
+                if (!_rpg) _next.GetComponentInChildren<Text>().text = playing ? "연출 중" : "다음 ▶";
             }
 
             private void ApplyDialogueStyle(bool rpg)
             {
-                foreach (var panel in new[] { _dialoguePanel.rectTransform, (RectTransform)_choiceRoot.transform,
+                if (rpg) RpgUiStyle.Dialogue(_dialoguePanel.rectTransform);
+                else _dialoguePanel.sprite = DuelUiChrome.Panel;
+                foreach (var panel in new[] { (RectTransform)_choiceRoot.transform,
                     (RectTransform)_logRoot.transform.Find("Window"), (RectTransform)_pickerRoot.transform.Find("Window") })
                 {
                     if (rpg) RpgUiStyle.Panel(panel);
@@ -554,11 +564,12 @@ namespace YGOPortable.UI
                         label.fontStyle = label == _logText ? FontStyle.Normal : FontStyle.Bold;
                     }
                 }
-                _text.lineSpacing = rpg ? 1.25f : 1f;
+                _text.lineSpacing = rpg ? 1.28f : 1f;
                 _text.supportRichText = rpg;
                 foreach (var button in new[] { _previous, _logButton, _auto, _skip })
                     StyleButton(button);
                 StyleButton(_next, primary: true);
+                LayoutDialogueControls(rpg);
                 for (int i = 0; i < _choiceButtons.Length; i++)
                     StyleButton(_choiceButtons[i], primary: i == 0);
                 foreach (var popup in new[] { _logRoot, _pickerRoot })
@@ -589,6 +600,74 @@ namespace YGOPortable.UI
                     label.font = DuelUiKit.FontKR;
                     label.fontStyle = FontStyle.Bold;
                     label.color = DuelUiKit.TextPrimary;
+                }
+            }
+
+            private void LayoutDialogueControls(bool rpg)
+            {
+                var panel = _dialoguePanel.rectTransform;
+                _rpgTools.gameObject.SetActive(rpg);
+                _counter.gameObject.SetActive(!rpg);
+                _speakerStripe.enabled = rpg;
+                _headingPlate.enabled = rpg;
+                _heading.alignment = rpg ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
+                Place(_heading.rectTransform.parent, panel.parent, rpg ? new Rect(.044f, .916f, .354f, .057f) : new Rect(.06f, .88f, .88f, .085f));
+                _heading.rectTransform.anchorMin = rpg ? new Vector2(.057f, .05f) : Vector2.zero;
+                _heading.rectTransform.anchorMax = rpg ? new Vector2(.957f, .95f) : Vector2.one;
+                Place(_speakerBadge.transform, panel, rpg ? new Rect(.032f, .897f, .235f, .221f) : new Rect(.038f, .703f, .312f, .247f));
+                Place(_text.rectTransform.parent, panel, rpg ? new Rect(.041f, .225f, .906f, .555f) : new Rect(.047f, .234f, .90f, .456f));
+                Place(_caret.rectTransform.parent, panel, rpg ? new Rect(.905f, .066f, .050f, .142f) : new Rect(.724f, .046f, .048f, .165f));
+                if (rpg)
+                {
+                    RpgUiStyle.Speaker(_speakerPlate.rectTransform);
+                    RpgUiStyle.Panel(_headingPlate.rectTransform, gold: true);
+                }
+                else
+                {
+                    _speakerPlate.sprite = DuelUiKit.WhiteSprite;
+                    _speakerPlate.type = Image.Type.Simple;
+                }
+                var tools = new[] { _previous, _logButton, _auto, _skip };
+                var legacy = new[] { new Rect(.36f, .727f, .14f, .20f), new Rect(.51f, .727f, .137f, .20f),
+                    new Rect(.657f, .727f, .13f, .20f), new Rect(.797f, .727f, .155f, .20f) };
+                var captions = new[] { rpg ? "이전" : "◀ 이전 대사", rpg ? "로그" : "대화 로그", "오토 꺼짐", rpg ? "스킵" : "건너뛰기" };
+                for (int i = 0; i < tools.Length; i++)
+                {
+                    Place(tools[i].transform.parent, rpg ? _rpgTools : panel,
+                        rpg ? new Rect(i * .253f, .04f, .235f, .92f) : legacy[i]);
+                    var label = tools[i].GetComponentInChildren<Text>();
+                    label.text = captions[i];
+                    label.fontSize = label.resizeTextMaxSize = rpg ? 18 : 22;
+                }
+
+                Place(_next.transform.parent, panel, rpg ? new Rect(0f, 0f, 1f, 1f) : new Rect(.778f, .042f, .174f, .172f));
+                var hit = (Image)_next.targetGraphic;
+                if (rpg)
+                {
+                    hit.color = Color.clear;
+                    _next.transition = Selectable.Transition.None;
+                    _next.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _logButton };
+                    for (int index = 0; index < tools.Length; index++)
+                    {
+                        tools[index].navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnDown = _next,
+                            selectOnLeft = index == 0 ? null : tools[index - 1],
+                            selectOnRight = index == tools.Length - 1 ? null : tools[index + 1] };
+                    }
+                }
+                else
+                {
+                    _next.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+                    foreach (var tool in tools) tool.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+                }
+                _next.GetComponentInChildren<Text>().text = rpg ? string.Empty : "다음 ▶";
+
+                static void Place(Transform child, Transform parent, Rect area)
+                {
+                    var rect = (RectTransform)child;
+                    if (rect.parent != parent) rect.SetParent(parent, false);
+                    rect.anchorMin = area.min;
+                    rect.anchorMax = area.max;
+                    rect.offsetMin = rect.offsetMax = Vector2.zero;
                 }
             }
 
@@ -913,7 +992,7 @@ namespace YGOPortable.UI
                     "shock" => ("!?", new Color(1f, .82f, .54f)),
                     "determined" => ("✧", new Color(1f, .72f, .31f)),
                     "smile" => ("✦", new Color(1f, .91f, .55f)),
-                    "sad" => ("●", new Color(.51f, .80f, 1f)),
+                    "sad" => ("…", new Color(.68f, .85f, .99f)),
                     "hurt" => ("✷", new Color(1f, .43f, .45f)),
                     "blush" => ("♥", new Color(1f, .48f, .69f)),
                     _ => ("", Color.clear),

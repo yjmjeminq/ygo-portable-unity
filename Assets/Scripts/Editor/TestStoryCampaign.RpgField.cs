@@ -14,6 +14,8 @@ namespace YGOPortable.Editor
 {
     internal static partial class TestStoryCampaign
     {
+        private const string MapNodes = "Atlas/MapInset/MapArt/Nodes";
+
         private static void VerifyRpgField(UserDeck playerDeck, string save)
         {
             const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -101,21 +103,37 @@ namespace YGOPortable.Editor
                 entry.onClick.Invoke();
                 Require(!world.CanWalk && panel.Find("StoryDialogue/Scene/DialogueBox") != null,
                     "A new RPG save did not enter the skippable prologue.");
-                Press(panel, "StoryDialogue/Scene/DialogueBox/Skip/Button");
+                Press(panel, "StoryDialogue/Scene/DialogueTools/Skip/Button");
                 Require(CollectionProgress.RpgIntroSeen, "Skipping the prologue did not persist completion.");
                 Require(world.Root.activeSelf && FieldScene().Find("Player/Sprite").GetComponent<Image>().sprite != null &&
                     FieldScene().Find("MainQuestNpc/MainQuestMarker").GetComponent<Image>().sprite != null &&
                     world.CanStartRpgEpisode(0) && !world.CanStartRpgEpisode(1),
                     "RPG did not start as a walkable field with the first main quest.");
                 PressRpgNavigation("Map");
-                Require(panel.Find("spot_kai_garage/Travel").GetComponent<Button>().interactable &&
-                    panel.Find("spot_duel_academia/Travel").GetComponent<Button>().interactable &&
-                    !panel.Find("spot_satellite_hideout/Travel").GetComponent<Button>().interactable &&
-                    panel.Find("spot_facility_prison/MapLock").GetComponent<Image>().sprite != null &&
-                    !world.EnterRpgRegion(RpgPrison), "The world map allowed early entry to the prison.");
+                var nodes = panel.Find(MapNodes);
+                Require(nodes.childCount == regions.Length && nodes.GetComponentsInChildren<Button>().Length == 11,
+                    "The world map did not contain eleven selectable locations.");
+                var currentPulse = nodes.Find("spot_duel_academia/CurrentPulse").GetComponent<Image>();
+                var goalPulse = nodes.Find("spot_duel_academia/GoalPulse").GetComponent<Image>();
+                float currentAlpha = currentPulse.color.a, goalAlpha = goalPulse.color.a;
+                world.Update(.23f);
+                Require(currentPulse.color.a != currentAlpha && goalPulse.color.a != goalAlpha,
+                    "The current position and the objective did not pulse independently.");
+                var travel = panel.Find("RegionPreview/Travel").GetComponent<Button>();
+                foreach (var region in regions)
+                {
+                    Press(nodes, region.Id);
+                    Require(travel.interactable == region.IsOpen(0) &&
+                        panel.Find("RegionPreview/RegionName/Label").GetComponent<Text>().text == region.Name,
+                        "A world map pin selected an incorrect preview or did not respect its unlock gate.");
+                }
+                Press(nodes, "spot_facility_prison");
+                travel.onClick.Invoke();
+                Require(nodes.Find("spot_facility_prison/MapLock").GetComponent<Image>().sprite != null &&
+                    !world.CanWalk && !world.EnterRpgRegion(RpgPrison), "The world map allowed early entry to the prison.");
                 PressRpgNavigation("Decks");
                 app.CloseDeckEditor();
-                Require(panel.Find("spot_facility_prison/MapLock") != null,
+                Require(panel.Find(MapNodes + "/spot_facility_prison/MapLock") != null,
                     "Returning from deck editing did not restore the RPG world map.");
                 world.Back();
 
@@ -163,7 +181,7 @@ namespace YGOPortable.Editor
                 AwardDuel(win: false);
                 Require(storyRoot.gameObject.activeSelf && world.Root.activeSelf && !world.CanWalk && world.RpgClears == 5,
                     "A loss did not stage its dialogue in the locked field.");
-                Press(storyRoot, "Scene/DialogueBox/Skip/Button");
+                Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                 Require(world.Root.activeSelf && world.CanStartRpgEpisode(5) && !world.EnterRpgRegion(RpgPrison),
                     "A loss changed the active NPC or unlocked the next region.");
 
@@ -173,7 +191,7 @@ namespace YGOPortable.Editor
                 AwardDuel(win: true);
                 Require(storyRoot.gameObject.activeSelf && world.RpgClears == 5 && CollectionProgress.Balance == balance,
                     "The win was settled before the post-win dialogue.");
-                Press(storyRoot, "Scene/DialogueBox/Skip/Button");
+                Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                 Require(world.Root.activeSelf && world.RpgClears == 6 && CollectionProgress.Balance > balance &&
                     panel.Find("RegionUnlockToast/Label").GetComponent<Text>().text.Contains("시큐리티 수용소"),
                     "Winning did not save the clear, pay DP and announce the new region.");
@@ -249,12 +267,21 @@ namespace YGOPortable.Editor
                 PressRpgNavigation("Map");
                 foreach (var region in regions.Where(region => region.LightingBackdrop != null))
                 {
+                    Press(panel, MapNodes + "/" + region.Id);
                     var lighting = LightingForEpisode(region, world.RpgClears + 1);
                     string path = lighting == null ? region.FieldBackground : "TagForce/5DS/" + lighting;
-                    Require(panel.Find($"{region.Id}/MapPreview").GetComponent<Image>().sprite ==
+                    Require(panel.Find("RegionPreview/Thumbnail").GetComponent<Image>().sprite ==
                         images.Get(path), $"The map preview used old artwork for {region.Id}.");
                 }
-                world.Back();
+                Press(panel, MapNodes + "/spot_kai_garage");
+                Press(panel, "RegionPreview/Travel");
+                PressRpgNavigation("Quests");
+                world.Update(.3f);
+                world.Update(.6f);
+                Require(world.CanWalk && FieldScene().Find("RpgCardMerchant") != null,
+                    "The unlocked map pin did not start the normal travel sequence.");
+                Require(world.EnterRpgRegion(RpgPoppo) && FieldScene().Find("RpgCardMerchant") != null,
+                    "The late-campaign merchant was missing from Poppo Time.");
                 Debug.Log("[VERIFY 5DS MAP LIGHTING] All eleven fields and the four revised map previews loaded with the original framing.");
             }
 
@@ -279,11 +306,19 @@ namespace YGOPortable.Editor
                     mapButton.GetComponentInChildren<Text>().font == Resources.Load<Font>("StoryFonts/Pretendard-Medium"),
                     "RPG navigation lost its rounded treatment or visible controller focus.");
                 var player = (RectTransform)FieldScene().Find("Player");
+                var radarPlayer = (RectTransform)hud.Find("Minimap/Radar/Points/Player");
+                var points = radarPlayer.parent;
+                Require(points.Find("Story").GetComponent<Image>().sprite == RpgUiStyle.Glyph(RpgUiStyle.Symbol.Alert) &&
+                    points.Find("Cache").GetComponent<Image>().sprite == RpgUiStyle.Glyph(RpgUiStyle.Symbol.Star) &&
+                    points.Find($"Exit_{RpgGarage}").GetComponent<Image>().sprite == RpgUiStyle.Glyph(RpgUiStyle.Symbol.Arrow) &&
+                    points.GetComponentsInChildren<Image>().Any(icon => icon.sprite == RpgUiStyle.Glyph(RpgUiStyle.Symbol.Dot) &&
+                        icon.transform != radarPlayer), "The radar did not expose the required live field marker types.");
+                var radarStart = radarPlayer.anchorMin;
                 var start = player.anchorMin;
                 Require(action.gameObject.activeSelf && !action.GetComponent<Button>().interactable && !mapButton.gameObject.activeInHierarchy &&
                     panel.Find("FieldViewport").GetComponent<CanvasGroup>().blocksRaycasts &&
                     hud.Find("Deck/DeckName/Label").GetComponent<Text>().text == playerDeck.name &&
-                    hud.Find("DuelistHud/Partner/PortraitFrame/Portrait").GetComponent<Image>().sprite != null &&
+                    hud.Find("DuelistHud/Partner/PortraitFrame/Crop/Portrait").GetComponent<Image>().sprite != null &&
                     hud.Find("QuestTrack/Objective/Label").GetComponent<Text>().text.Contains(script.episodes[0].opponentName) &&
                     hud.Find("QuestTrack/GoalIcon").GetComponent<Image>().sprite != null,
                     "The field HUD exposed a far interaction, a duplicate map, or omitted the objective.");
@@ -294,6 +329,9 @@ namespace YGOPortable.Editor
                 var landmark = (RectTransform)FieldScene().Find("Exploration/Landmark");
                 FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(landmark.anchorMin);
                 world.Update(4f);
+                Require(radarPlayer.anchorMin != radarStart && radarPlayer.anchorMin == new Vector2(
+                    Mathf.InverseLerp(.06f, .94f, player.anchorMin.x), Mathf.InverseLerp(.095f, .455f, player.anchorMin.y)),
+                    "The radar did not track the player proportionally while walking.");
                 Require(action.gameObject.activeSelf && action.Find("Label").GetComponent<Text>().text == "교정 게시판 · 조사",
                     "The prompt did not identify the nearby landmark.");
                 var menuToggle = new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Search);
@@ -615,7 +653,7 @@ namespace YGOPortable.Editor
                 story.Update(.57f);
                 Require(world.RpgStageRunning && opponent.anchorMin != otherStart,
                     "The second actor did not move automatically after the first beat.");
-                Press(storyRoot, "Scene/DialogueBox/Previous/Button");
+                Press(storyRoot, "Scene/DialogueTools/Previous/Button");
                 Require(!guest.gameObject.activeSelf && opponent.anchorMin == otherStart && !world.RpgStageRunning,
                     "Rewinding did not restore the actors before the two-beat scene.");
                 Press(storyRoot, "Scene/DialogueBox/Next/Button");
@@ -831,7 +869,7 @@ namespace YGOPortable.Editor
                         $"The field directed episode {number} to the wrong destination.");
                     PressRpgNavigation("Map");
                     foreach (var (area, i) in regions.Select((area, i) => (area, i)))
-                        Require((panel.Find(area.Id).GetComponent<Image>().sprite.name == "RPG active panel") == (i == region),
+                        Require((panel.Find($"{MapNodes}/{area.Id}/GoalPulse") != null) == (i == region),
                             $"The map highlighted the wrong location for episode {number}.");
                     Require(world.EnterRpgRegion(region) && world.CanStartRpgEpisode(index) &&
                         FieldScene().Find("MainQuestNpc") != null &&
@@ -1056,7 +1094,7 @@ namespace YGOPortable.Editor
                     FieldScene().Find("RpgCompanion/Sprite").GetComponent<Image>().enabled &&
                     panel.Find("StoryDialogue/Scene/Portraits/Opponent").GetComponent<Image>().enabled,
                     "The prologue did not lead into the workshop guide with Yusei on the field and in the dialogue.");
-                Press(panel, "StoryDialogue/Scene/DialogueBox/Skip/Button");
+                Press(panel, "StoryDialogue/Scene/DialogueTools/Skip/Button");
                 CollectionProgress.Load(audit);
                 app.OpenRpgField();
                 Require(world.CanWalk && CollectionProgress.RpgIntroSeen && panel.Find("FieldHud/DuelistHud") != null,
@@ -1171,10 +1209,11 @@ namespace YGOPortable.Editor
                     FieldScene().Find("Scenery").GetComponent<Image>().color != Color.white &&
                     panel.Find("FieldHud/QuestTrack/GoalIcon/Label").GetComponent<Text>().text == "!",
                     "Missing optional map or quest-icon art did not fall back to colors and text.");
-                loadedArt["TagForce/UI/icon_map_lock.png"] = null;
+                loadedArt["TagForce/5DS/Maps/world_map_5ds.png"] = null;
                 PressRpgNavigation("Map");
-                Require(panel.Find("spot_facility_prison/MapLock/Label") != null,
-                    "The locked map needed external icon art.");
+                Require(panel.Find(MapNodes + "/spot_facility_prison/MapLock").GetComponent<Image>().sprite != null &&
+                    panel.Find("Atlas/MapInset/MapArt").GetComponent<Image>().sprite == DuelUiKit.WhiteSprite,
+                    "The map nodes and lock symbols did not survive missing artwork.");
                 world.Back();
                 Debug.Log("[VERIFY 5DS ADVENTURE] Prologue and guide, map arrival, follower, affinity, saved cache, rank, workbench, shop, recap, faceoff and missing art passed.");
             }
@@ -1197,10 +1236,10 @@ namespace YGOPortable.Editor
                 story.Update(.40f);
                 Require(!opponent.gameObject.activeSelf && world.RpgStageRunning,
                     "The opponent did not finish leaving before the player's next beat.");
-                Press(storyRoot, "Scene/DialogueBox/Previous/Button");
+                Press(storyRoot, "Scene/DialogueTools/Previous/Button");
                 Require(opponent.gameObject.activeSelf && opponent.anchorMin == before,
                     "Rewinding did not restore the actor before the exit.");
-                Press(storyRoot, "Scene/DialogueBox/Skip/Button");
+                Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                 Require(world.CanWalk && FieldScene().Find("DialogueCast") == null,
                     "Skipping a staged exit did not restore control of the field.");
             }
@@ -1268,9 +1307,9 @@ namespace YGOPortable.Editor
                 Require(guest.gameObject.activeInHierarchy && guest.anchorMin != entryPosition &&
                     guest.Find("Sprite").GetComponent<Image>().enabled,
                     "Aki did not visibly enter during the hideout conversation.");
-                Press(storyRoot, "Scene/DialogueBox/Skip/Button");
+                Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                 Press(storyRoot, "Scene/Choices/Choice_0/Button");
-                Press(storyRoot, "Scene/DialogueBox/Skip/Button");
+                Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                 Press(storyRoot, "DeckSelection/Window/Apply/Button");
             }
 

@@ -138,7 +138,7 @@ namespace YGOPortable.UI
             void Add(int index, string id, string caption, Action action)
             {
                 _rpgNavItems[index] = DuelUiKit.FillRect(id, bar);
-                RpgButton(_rpgNavItems[index], caption, action, 20);
+                RpgButton(_rpgNavItems[index], caption, () => { if (_rpgPendingRegion < 0) action(); }, 20);
             }
         }
 
@@ -154,6 +154,7 @@ namespace YGOPortable.UI
             _rpgNavigation.anchorMax = field ? new Vector2(.973f, .409f) : new Vector2(.95f, .101f);
             for (int i = 0; i < _rpgNavItems.Length; i++)
             {
+                _rpgNavItems[i].gameObject.SetActive(true);
                 _rpgNavItems[i].anchorMin = field ? new Vector2(0f, .773f - .254f * i) : new Vector2(.255f * i, 0f);
                 _rpgNavItems[i].anchorMax = field ? new Vector2(1f, 1f - .254f * i) : new Vector2(.235f + .255f * i, 1f);
             }
@@ -193,6 +194,7 @@ namespace YGOPortable.UI
         {
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(page != Page.Field);
+            RpgUiStyle.Control(_back, beveled: page == Page.Map);
             _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
             DuelAudio.PlayTagForceBgm(_rpgLocation is RpgPoppo or RpgStadium or RpgMoment);
             switch (page)
@@ -218,42 +220,11 @@ namespace YGOPortable.UI
             _observedRpgClears = clears;
             if (opened.Length > 0)
             {
-                var toast = Area(_body, "RegionUnlockToast", .19f, .79f, .81f, .93f);
+                var toast = Area(_body, "RegionUnlockToast", .327f, .852f, .778f, .953f);
                 RpgUiStyle.Panel(toast, accent: true);
                 _rpgToast = HudLabel(toast, $"신규 지역 개방!  ·  {opened}", 21, DuelUiKit.GoldAccent,
                     align: TextAnchor.MiddleCenter, heading: true);
                 _rpgToastTime = 4.5f;
-            }
-        }
-
-        private void BuildRpgMap()
-        {
-            BuildRpgMenuBackdrop();
-            int cleared = RpgClears;
-            int target = cleared < (_rpgCampaign?.episodes?.Length ?? 0) ? RegionForEpisode(cleared + 1) : -1;
-            for (int i = 0; i < RpgRegions.Length; i++)
-            {
-                int index = i;
-                var region = RpgRegions[i];
-                float x = .022f + i % 4 * .242f;
-                float y = .678f - i / 4 * .323f;
-                var tile = Area(_body, region.Id, x, y, x + .228f, y + .292f);
-                RpgUiStyle.Panel(tile, accent: i == target);
-                bool open = region.IsOpen(cleared);
-                var poster = GetRpgFieldArt(region);
-                DuelUiKit.AddImage(Area(tile, "MapPreview", .036f, .292f, .964f, .947f).gameObject, poster,
-                    poster == null ? new Color(.09f, .18f, .24f) : open ? Color.white : new Color(.24f, .26f, .30f),
-                    false, false);
-                if (!open)
-                    DrawRpgIcon(Area(tile, "MapLock", .413f, .47f, .587f, .83f), "icon_map_lock.png", "잠김", DuelUiKit.GoldAccent);
-                var travel = RpgButton(Area(tile, "Travel", .037f, .047f, .965f, .273f),
-                    open ? i == _rpgLocation ? $"{region.Name} · 현재" : region.Name :
-                        $"{region.Name} · 이야기 진행 시 개방", () =>
-                    {
-                        if (index == _rpgLocation) Show(Page.Field);
-                        else BeginRpgTravel(index, RpgArrival);
-                    }, primary: i == target);
-                travel.interactable = open;
             }
         }
 
@@ -309,12 +280,7 @@ namespace YGOPortable.UI
             _rpgNearbyScene = questNpc?.sceneOnApproach == true ? questNpc : null;
             if (questNpc != null)
                 AddRpgResident(questNpc, RpgNpcSlots[0], true, () => _app.OpenRpgFieldEpisode(cleared));
-            var locals = episodes.Where((episode, i) => i < cleared && RegionForEpisode(i + 1) == _rpgLocation)
-                .Concat(episodes.Take(cleared)).Concat(episodes.Take(2))
-                .Where(episode => episode.charId != questNpc?.charId && episode.charId != sideQuest?.Giver &&
-                    (episode.charId != RpgPartnerId || _rpgLocation == RpgBridge) &&
-                    _rpgWorldDecks.ContainsKey(episode.deckId))
-                .GroupBy(episode => episode.charId).Select(group => group.First()).Take(2).ToArray();
+            var locals = RpgLocalResidents(episodes, _rpgLocation, cleared, questNpc, sideQuest).ToArray();
             for (int i = 0; i < locals.Length; i++)
             {
                 var resident = locals[i];
@@ -334,6 +300,18 @@ namespace YGOPortable.UI
             OrderRpgFieldActors();
             BuildRpgFieldHud(cleared, targetRegion, episodes, sideObjective);
         }
+
+        private IEnumerable<StoryEpisodeData> RpgLocalResidents(StoryEpisodeData[] episodes, int region, int cleared,
+            StoryEpisodeData questNpc, RpgSideQuest sideQuest) =>
+            episodes.Where((episode, i) => i < cleared && RegionForEpisode(i + 1) == region)
+                .Concat(episodes.Take(cleared)).Concat(episodes.Take(2))
+                .Where(episode => RpgResidentIdentity(episode.charId) != RpgResidentIdentity(questNpc?.charId) &&
+                    RpgResidentIdentity(episode.charId) != RpgResidentIdentity(sideQuest?.Giver) &&
+                    (episode.charId != RpgPartnerId || region == RpgBridge) &&
+                    (_rpgWorldDecks?.ContainsKey(episode.deckId) ?? false))
+                .GroupBy(episode => RpgResidentIdentity(episode.charId)).Select(group => group.First()).Take(2);
+
+        private static int? RpgResidentIdentity(int? id) => id is 220 or 221 ? 9 : id;
 
         private void CheckRpgSceneEncounter(Vector2 previous)
         {
@@ -524,6 +502,7 @@ namespace YGOPortable.UI
 
         private void UpdateRpgField(float delta)
         {
+            if (_page == Page.Map) UpdateRpgMapPulse(delta);
             UpdateRpgQuestReward(delta);
             UpdateRpgAtmosphere(delta);
             UpdateRpgExploration(delta);
