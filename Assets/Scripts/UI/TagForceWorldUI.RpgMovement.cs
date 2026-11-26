@@ -212,6 +212,12 @@ namespace YGOPortable.UI
             var sides = path == null || directions != null ? null : _images.GetSlices(cycle + ".png", 2, 2);
             var profile = path == null || directions != null ? null : _images.GetSlices(cycle + "_side_idle.png", 1, 1)?[0];
             var idle = directions?[0] ?? profile ?? _images.GetSlices(path, 1, 1)?[0] ?? _images.Get(path);
+            if (idle == null && IsGxCampaign && path != null)
+            {
+                // GX visitors outside the field roster may only have the original SD sprite.
+                var legacy = RpgArt + "SD/" + Path.GetFileName(path);
+                idle = _images.GetSlices(legacy, 1, 1)?[0] ?? _images.Get(legacy);
+            }
             if (idle == null)
             {
                 Portrait(art, path, name);

@@ -337,6 +337,11 @@ namespace YGOPortable.Editor
                                 Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
                                     .text == "오토 2배", "The cutscene did not switch to double speed.");
                             }
+                            if (episode.id == "gx_cutscene_02_season2_arrival")
+                            {
+                                VerifyGxGuestArt(episode.preDialogues, "세레나 (여성 프로)", 213);
+                                dialogueType.GetMethod("BindLine", flags).Invoke(dialogue, new object[] { 0, false });
+                            }
                             ReadDialogue(episode);
                             Require(world.RpgClears == index + 1 && WorldInputRestored() && Get("_session") == null,
                                 $"A cutscene did not advance directly at {episode.id}.");
@@ -419,6 +424,7 @@ namespace YGOPortable.Editor
                                     $"The field actors for Yun and Asuka were not separate at {episode.id}.");
                             }
                         }
+                        if (episode.id == "gx_ep_02") VerifyGxGuestArt(episode.preDialogues, "준코", 205);
                         VerifyGxDuelDialogueArt(episode);
                         app.StartStoryDuel(episode, startingDeck, true);
                         Require(Get("_ai") is TacticalAI { Difficulty: AIDifficulty.Master } &&
@@ -609,6 +615,20 @@ namespace YGOPortable.Editor
                     string speaking = player ? "_heroSpeaking" : "_opponentSpeaking";
                     Require(name.text == speaker && (bool)dialogueType.GetField(speaking, flags).GetValue(dialogue),
                         $"The dialogue assigned the wrong portrait slot to {speaker}.");
+                }
+
+                void VerifyGxGuestArt(StoryDialogueLine[] lines, string speaker, int id)
+                {
+                    VerifySpeaker(lines, speaker, player: false);
+                    var portrait = (Image)dialogueType.GetField("_opponent", flags).GetValue(dialogue);
+                    var sprites = (Dictionary<string, Sprite>)dialogueType.GetField("_rpgSprites", flags).GetValue(dialogue);
+                    var path = Path.Combine(streaming, "TagForce/GX", $"DialoguePortraits/bust_{id}.png");
+                    Require(sprites.TryGetValue(path, out var expected) && expected != null && portrait.sprite == expected,
+                        $"The dialogue did not display the portrait for {speaker}.");
+                    var guest = FieldScene().Find($"DialogueCast/Guest_{id}");
+                    Require(guest != null && guest.gameObject.activeInHierarchy &&
+                        guest.Find("Sprite").GetComponent<Image>().sprite != null,
+                        $"The stage did not display the SD sprite for {speaker}.");
                 }
 
                 void VerifyDisplayedText(StoryDialogueLine line)
