@@ -506,7 +506,6 @@ namespace YGOPortable.UI
             var towardSpeaker = speaker.anchorMin - _position;
             PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, towardSpeaker);
             PoseRpgWalker(speaker, art, speaker.anchorMin, Vector2.zero, false, -towardSpeaker);
-            FrameRpgCamera(Vector2.Lerp(_position, speaker.anchorMin, .32f));
             return speaker;
         }
 

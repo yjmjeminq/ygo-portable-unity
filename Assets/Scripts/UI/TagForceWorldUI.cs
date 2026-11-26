@@ -209,6 +209,8 @@ namespace YGOPortable.UI
         private void Show(Page page)
         {
             bool openConversation = page == Page.Talk && _page == Page.Field;
+            _preserveRpgCamera = _rpgField && _rpgSceneSpace != null && !_rpgAnnounceArrival &&
+                (openConversation || _page == Page.Talk && page is (Page.Talk or Page.Field));
             _page = page;
             UpdateRpgWorldChrome();
             ClearBody();

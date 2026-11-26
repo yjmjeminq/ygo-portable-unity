@@ -154,12 +154,17 @@ namespace YGOPortable.Editor
                 var fieldViewportSize = ViewportSize();
                 var local = FieldScene().Find($"Resident_{script.episodes[1].charId}");
                 Require(local.Find("ResidentMarker").GetComponent<Image>().sprite != null, "The resident marker was missing.");
-                Press(local, "SD");
+                var floor = FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>();
+                floor.Click(((RectTransform)local).anchorMin - new Vector2(0f, .06f));
                 world.Update(4f);
-                Require(ViewportSize() == fieldViewportSize, "Opening NPC dialogue resized the RPG viewport.");
+                var fieldFrame = CameraFrame();
+                Press(local, "SD");
+                world.Update(0f);
+                Require(panel.Find("ResidentChoices") != null && ViewportSize() == fieldViewportSize &&
+                    CameraFrame() == fieldFrame, "Opening NPC dialogue changed the viewport or camera framing.");
                 world.Back();
-                Require(world.CanWalk && ViewportSize() == fieldViewportSize && WorldInputRestored(),
-                    "Returning from NPC dialogue resized the field or left input blocked.");
+                Require(world.CanWalk && ViewportSize() == fieldViewportSize && CameraFrame() == fieldFrame && WorldInputRestored(),
+                    "Returning from NPC dialogue changed the framing or left input blocked.");
                 Press(FieldScene().Find($"Resident_{script.episodes[1].charId}"), "SD");
                 world.Update(4f);
                 Press(panel, "ResidentChoices/TalkDaily");
@@ -685,6 +690,12 @@ namespace YGOPortable.Editor
 
             Transform FieldScene() => panel.Find("FieldViewport/Camera");
 
+            (Vector2 Min, Vector2 Max) CameraFrame()
+            {
+                var camera = (RectTransform)FieldScene();
+                return (camera.anchorMin, camera.anchorMax);
+            }
+
             Vector2 ViewportSize()
             {
                 Canvas.ForceUpdateCanvases();
@@ -1167,6 +1178,18 @@ namespace YGOPortable.Editor
                     Require(horizontal > .015f && horizontal < .985f && normalized.y > .34f && normalized.y < .96f,
                         $"{actor.name} left the safe stage area while the camera followed the guest.");
                 }
+                var cameraFrame = CameraFrame();
+                var playerMark = player.anchorMin;
+                var guestMark = guest.anchorMin;
+                player.anchorMin = player.anchorMax = new Vector2(.08f, playerMark.y);
+                guest.anchorMin = guest.anchorMax = new Vector2(.92f, guestMark.y);
+                story.Update(0f);
+                var wideFrame = CameraFrame();
+                Require(wideFrame.Max - wideFrame.Min == cameraFrame.Max - cameraFrame.Min,
+                    "A wide cast changed the story camera zoom during dialogue.");
+                player.anchorMin = player.anchorMax = playerMark;
+                guest.anchorMin = guest.anchorMax = guestMark;
+                story.Update(0f);
                 int firstKaiLine = Array.FindIndex(lines, line => line.speaker == "카이" && line.emotion == "determined");
                 AdvanceToLine(firstKaiLine);
                 var kaiPortrait = storyRoot.Find("Scene/Portraits/Protagonist").GetComponent<Image>();

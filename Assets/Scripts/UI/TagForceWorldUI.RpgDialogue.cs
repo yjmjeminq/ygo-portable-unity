@@ -137,7 +137,6 @@ namespace YGOPortable.UI
                 if (!_rpgStageActors.Any(actor => actor.Root == resident)) resident.gameObject.SetActive(false);
             if (_rpgCompanion != null && !_rpgStageActors.Any(actor => actor.Root == _rpgCompanion))
                 _rpgCompanion.gameObject.SetActive(false);
-            FrameRpgCamera(_player.anchorMin);
         }
 
         private void EnsureRpgStageGuest(int id, HashSet<int> entrances)

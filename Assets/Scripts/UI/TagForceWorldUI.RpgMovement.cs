@@ -18,7 +18,8 @@ namespace YGOPortable.UI
         private Image _rpgFieldScenery;
         private Vector2 _rpgCameraPan;
         private float _rpgBackdropAspect, _rpgCameraLead;
-        private bool UsesRpgDialogueCamera => _rpgDialogueCast != null || _page is Page.Talk or Page.Guide;
+        private bool _preserveRpgCamera;
+        private bool UsesRpgDialogueCamera => _rpgDialogueCast != null || _page == Page.Guide;
 
         private Image BuildRpgCamera(Sprite scenery)
         {
@@ -29,7 +30,13 @@ namespace YGOPortable.UI
             _rpgFieldScenery = DuelUiKit.AddImage(DuelUiKit.FillRect("Scenery", _rpgSceneSpace).gameObject,
                 scenery, scenery == null ? new Color(.10f, .21f, .27f) : Color.white, false, false);
             _rpgBackdropAspect = scenery != null ? scenery.rect.width / scenery.rect.height : 16f / 9f;
-            FrameRpgCamera(_position);
+            if (_preserveRpgCamera)
+            {
+                var span = RpgCameraSpan();
+                _rpgCameraPan = ClampRpgCameraPan(_rpgCameraPan, span);
+                ApplyRpgCameraPan(span);
+            }
+            else FrameRpgCamera(_position);
             return _rpgFieldScenery;
         }
 
@@ -46,14 +53,8 @@ namespace YGOPortable.UI
             var viewport = _rpgViewport.rect;
             float aspect = viewport.width > 0f && viewport.height > 0f ? viewport.width / viewport.height : 16f / 9f;
             float coverWidth = _rpgBackdropAspect / aspect;
-            // Keep some horizontal travel on wide displays while limiting how much scenery is cropped vertically.
+            // Match the exploration zoom even when several actors enter or leave the dialogue.
             float width = Mathf.Max(coverWidth, Mathf.Clamp(1.77f * coverWidth, 1.12f, 1.32f));
-            if (_rpgDialogueCast != null)
-            {
-                var (min, max) = RpgStageBounds();
-                float castWidth = Mathf.Max(.01f, max.x - min.x);
-                width = Mathf.Max(Mathf.Max(1f, coverWidth), Mathf.Min(width, .86f / castWidth));
-            }
             return new Vector2(width, width / coverWidth);
         }
 
