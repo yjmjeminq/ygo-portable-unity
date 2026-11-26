@@ -21,9 +21,6 @@ namespace YGOPortable.UI
         public string fx;
         public StoryStageAction[] stage;
 
-        internal bool IsInternalMonologue => text?.Trim() is { Length: > 2 } line &&
-            ((line[0] == '(' && line[^1] == ')') || (line[0] == '（' && line[^1] == '）'));
-
         internal string SceneMapPath => !string.IsNullOrEmpty(sceneMap) &&
             sceneMap.All(c => char.IsLetterOrDigit(c) || c is '_' or '-') ? $"Maps/{sceneMap}.png" : null;
     }
@@ -944,7 +941,8 @@ namespace YGOPortable.UI
             }
             _dialogue.Open(heading, hero, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field,
                 rpgEpisode: RpgWardrobe.EpisodeNumber(episode), playAsCharacterId: episode.playAsCharacterId,
-                autoPlay: episode.isCutsceneOnly, originalProtagonist: Script.protagonist, opponentName: episode.opponentName);
+                autoPlay: episode.isCutsceneOnly, originalProtagonist: Script.protagonist, opponentName: episode.opponentName,
+                waitForOpponentGreeting: IsGxRpg && episode.id == "gx_cutscene_00_prologue");
         }
 
         private void ReturnToEpisodes()

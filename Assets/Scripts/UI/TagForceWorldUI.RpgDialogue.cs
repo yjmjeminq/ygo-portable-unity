@@ -25,8 +25,6 @@ namespace YGOPortable.UI
         private int _rpgGuestSlots;
         private int _rpgSceneEpisode, _rpgSceneHeroId;
         internal bool RpgStageRunning => _rpgBeatRemaining > 0f;
-        internal bool RpgHasSingleSpeaker => _rpgSpeakingActor?.Target.Visible == true &&
-            !_rpgStageActors.Any(actor => actor != _rpgSpeakingActor && actor.Target.Visible);
 
         private readonly struct RpgStagePose
         {
@@ -144,8 +142,6 @@ namespace YGOPortable.UI
             if (_rpgCompanion != null && !_rpgStageActors.Any(actor => actor.Root == _rpgCompanion))
                 _rpgCompanion.gameObject.SetActive(false);
             OrderRpgFieldActors();
-            // GX uses speaking portraits. Keep the field marks available for camera and stage cues.
-            if (IsGxCampaign) _rpgDialogueCast.gameObject.SetActive(false);
         }
 
         private void EnsureRpgStageGuest(int id, HashSet<int> entrances)
@@ -437,7 +433,7 @@ namespace YGOPortable.UI
             actor.Visibility.alpha = actor.Target.Visible
                 ? Mathf.Lerp(actor.StartAlpha, 1f, Mathf.Clamp01(actor.Progress * 4f))
                 : Mathf.Lerp(actor.StartAlpha, 0f, Mathf.Clamp01(actor.Progress * 2f - 1f));
-            PoseRpgWalker(actor.Root, actor.Art, position, position - actor.Root.anchorMin, walking && !IsGxCampaign, heading);
+            PoseRpgWalker(actor.Root, actor.Art, position, position - actor.Root.anchorMin, walking, heading);
             if (actor.Progress >= 1f && !actor.Target.Visible) actor.Root.gameObject.SetActive(false);
         }
 

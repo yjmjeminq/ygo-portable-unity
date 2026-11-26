@@ -336,7 +336,6 @@ namespace YGOPortable.Editor
                     Require(gxMenu.IsInteractable(), "The GX campaign entry was unavailable on the main menu.");
                     gxMenu.onClick.Invoke();
                     Require(world.Root.activeSelf && world.RpgCampaignId == gx && !world.CanWalk, "GX prologue did not start automatically.");
-                    VerifyGxCgAndPortraitTransitions();
                     int scenes = 0, duels = 0, pov = 0, defeats = 0, retries = 0;
                     for (int index = 0; index < gxScript.episodes.Length; index++)
                     {
@@ -604,6 +603,7 @@ namespace YGOPortable.Editor
                     VerifyGxArtwork(gxMap, expectedCg);
                     VerifyGxMemories();
                     VerifyGxAspectLayouts(everyMap: true);
+                    VerifyGxCgAndPortraitTransitions();
                     VerifyEveryStageFootprint(gxScript);
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
                     Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master wins, 34 surrender/retry routes, 19 lockouts, 12 grounded fields and three POV decks passed.");
@@ -748,16 +748,9 @@ namespace YGOPortable.Editor
                     world.Update(0f);
                     Require(panel.Find("ResidentChoices") != null && ViewportSize() == viewport && CameraFrame() == framing,
                         "The field shrank or moved when a GX NPC began talking.");
-                    var residentPortrait = panel.Find("ConversationPortrait")?.GetComponent<Image>();
-                    Require(residentPortrait != null && residentPortrait.sprite != null &&
-                        !FieldScene().Find("Player").gameObject.activeSelf &&
-                        FieldScene().Cast<Transform>().Where(child => child.name.StartsWith("Resident_", StringComparison.Ordinal))
-                            .All(child => !child.gameObject.activeSelf),
-                        "A GX field conversation showed silent residents alongside the speaking NPC.");
                     world.Back();
-                    Require(world.CanWalk && WorldInputRestored() && ViewportSize() == viewport && CameraFrame() == framing &&
-                        FieldScene().Find("Player").gameObject.activeSelf && FieldScene().Find("Resident_107").gameObject.activeSelf,
-                        "The GX NPC dialogue did not restore the field, actors and camera.");
+                    Require(world.CanWalk && WorldInputRestored() && ViewportSize() == viewport && CameraFrame() == framing,
+                        "The GX NPC dialogue did not restore the field and its camera.");
                     WalkOnGxMap(new Vector2(.5f, .16f));
                 }
 
@@ -903,7 +896,7 @@ namespace YGOPortable.Editor
                     var hero = (Image)dialogueType.GetField("_hero", flags).GetValue(view);
                     var sprites = (Dictionary<string, Sprite>)dialogueType.GetField("_rpgSprites", flags).GetValue(view);
                     var lines = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
-                            .Concat(episode.postLoseDialogues)).Where(line => !string.IsNullOrEmpty(line.cutscene) && !line.IsInternalMonologue)
+                            .Concat(episode.postLoseDialogues)).Where(line => !string.IsNullOrEmpty(line.cutscene))
                         .GroupBy(line => line.cutscene).Select(group => group.First()).ToList();
                     int cgCount = lines.Count;
                     lines.Add(new StoryDialogueLine { speaker = "", text = "대화 장면" });
@@ -972,7 +965,6 @@ namespace YGOPortable.Editor
                         Require((int)dialogueType.GetField("_index", flags).GetValue(view) == 1 &&
                             (int)visible.GetValue(view) < "대사 입력 확인".Length,
                             "The next valid GX input did not start the next line.");
-                        VerifyGxSpeakerShots();
                     }
                     finally
                     {
@@ -980,54 +972,9 @@ namespace YGOPortable.Editor
                         UnityEngine.Object.DestroyImmediate(host.gameObject);
                     }
 
-                    void Open(StoryDialogueLine[] dialogueLines, int playAs = 0) => view.Open("GX rendering verification",
-                        playAs == 0 ? gxScript.protagonist : DeckRepository.GetCharacter(playAs).name,
-                        (OpponentCharacter)null, dialogueLines, null, rpg: true, backdropBelow: true, playAsCharacterId: playAs,
-                        rpgAssetFolder: world.RpgAssetFolder, originalProtagonist: gxScript.protagonist);
-
-                    void VerifyGxSpeakerShots()
-                    {
-                        var opponent = (Image)dialogueType.GetField("_opponent", flags).GetValue(view);
-                        var heroGhost = (Image)dialogueType.GetField("_heroPrevious", flags).GetValue(view);
-                        var opponentGhost = (Image)dialogueType.GetField("_opponentPrevious", flags).GetValue(view);
-                        var showCg = dialogueType.GetField("_showCutscene", flags);
-                        var sceneOpponent = dialogueType.GetField("_sceneOpponent", flags);
-                        var sceneOpponentName = dialogueType.GetField("_sceneOpponentName", flags);
-                        int checkedLines = 0;
-                        foreach (var pov in gxScript.episodes.GroupBy(episode => episode.playAsCharacterId))
-                        {
-                            var all = pov.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
-                                .Concat(episode.postLoseDialogues).Select(line => (episode, line))).ToArray();
-                            Open(all.Select(entry => entry.line).ToArray(), pov.Key);
-                            string character = pov.Key == 0 ? gxScript.protagonist : DeckRepository.GetCharacter(pov.Key).name;
-                            string preceding = null;
-                            for (int i = 0; i < all.Length; ++i)
-                            {
-                                var (episode, line) = all[i];
-                                sceneOpponent.SetValue(view, DeckRepository.GetCharacter(episode.charId));
-                                sceneOpponentName.SetValue(view, episode.opponentName);
-                                bind.Invoke(view, new object[] { i, false });
-                                bool narration = string.IsNullOrWhiteSpace(line.speaker) || line.speaker is "설명" or "내레이션" or "나레이션";
-                                bool player = !narration && (line.speaker == character || (pov.Key == 107 && line.speaker is "아스카" or "텐죠인 아스카"));
-                                Require(hero.enabled == player && opponent.enabled == (!narration && !player),
-                                    $"Wrong visible portrait for {line.speaker} at {episode.id}.");
-                                if (preceding != line.speaker || narration)
-                                    Require(!heroGhost.enabled && !opponentGhost.enabled,
-                                        $"The previous speaker's portrait persisted at {episode.id}.");
-                                if (!narration && line.IsInternalMonologue)
-                                {
-                                    var face = player ? hero : opponent;
-                                    Require(face.rectTransform.anchorMin.x == .355f && !((bool)showCg.GetValue(view)) && alpha.alpha == 0f,
-                                        $"A GX monologue at {episode.id} did not use a single centered character.");
-                                }
-                                else if (!string.IsNullOrEmpty(line.cutscene))
-                                    Require((bool)showCg.GetValue(view), $"An authored CG disappeared from {episode.id}.");
-                                checkedLines++;
-                                preceding = line.speaker;
-                            }
-                        }
-                        Debug.Log($"[VERIFY GX SPEAKERS] All {checkedLines} story lines checked for visible portraits, monologues, CGs and POV changes.");
-                    }
+                    void Open(StoryDialogueLine[] dialogueLines) => view.Open("GX rendering verification",
+                        gxScript.protagonist, (OpponentCharacter)null, dialogueLines, null, rpg: true,
+                        backdropBelow: true, rpgAssetFolder: world.RpgAssetFolder);
                 }
 
                 void VerifyGxHarborWalk()
@@ -1087,12 +1034,16 @@ namespace YGOPortable.Editor
                     var bind = dialogueType.GetMethod("BindLine", flags);
                     var scenery = FieldScene().Find("Scenery").GetComponent<Image>();
                     var tournament = scenery.sprite;
+                    var opponentPortrait = (Image)dialogueType.GetField("_opponent", flags).GetValue(dialogue);
+                    var previousPortrait = (Image)dialogueType.GetField("_opponentPrevious", flags).GetValue(dialogue);
+                    Require(!opponentPortrait.enabled, "Crowler's portrait appeared in the opening stadium.");
                     int backstageIndex = Array.FindIndex(lines, line => line.sceneMap == "spot_pro_backstage");
                     int harborIndex = Array.FindIndex(lines, line => line.sceneMap == null);
                     Require(tournament != null && lines[0].sceneMap == "spot_pro_tournament" &&
                         backstageIndex > 0 && harborIndex > backstageIndex, "The GX opening maps were in the wrong order.");
                     bind.Invoke(dialogue, new object[] { backstageIndex, false });
                     var backstage = scenery.sprite;
+                    Require(!opponentPortrait.enabled, "Crowler's portrait appeared in the backstage room.");
                     bind.Invoke(dialogue, new object[] { harborIndex, false });
                     var harbor = scenery.sprite;
                     Require(backstage != null && harbor != null && backstage != tournament &&
@@ -1100,42 +1051,32 @@ namespace YGOPortable.Editor
                     int teacherEntrance = Array.FindIndex(lines, harborIndex, line =>
                         line.stage?.Any(action => action.actor == 133 && action.action == "enter") == true);
                     var teacher = (Transform)typeof(TagForceWorldUI).GetField("_rpgDialogueOpponent", flags).GetValue(world);
-                    Require(teacherEntrance > harborIndex && teacher != null && !teacher.gameObject.activeSelf,
-                        "Crowler appeared before his scripted harbor entrance.");
-                    var stage = FieldScene().Find("DialogueCast");
-                    var hero = (Image)dialogueType.GetField("_hero", flags).GetValue(dialogue);
-                    var opponent = (Image)dialogueType.GetField("_opponent", flags).GetValue(dialogue);
-                    bind.Invoke(dialogue, new object[] { teacherEntrance, true });
-                    story.Update(.20f);
-                    Require(!stage.gameObject.activeInHierarchy && !hero.enabled && !opponent.enabled,
-                        "An actor appeared during the narrated GX harbor entrance.");
-                    story.Update(.8f);
-                    Require(teacher.gameObject.activeSelf && !teacher.gameObject.activeInHierarchy,
-                        "The harbor entrance did not set the character's mark while keeping the walker hidden.");
-                    VerifyDisplayedText(lines[teacherEntrance]);
-                    CaptureGx("08-harbor-narration");
+                    Require(teacherEntrance > harborIndex && teacher != null && !teacher.gameObject.activeSelf &&
+                        !opponentPortrait.enabled, "Crowler appeared before his scripted harbor entrance.");
+                    bind.Invoke(dialogue, new object[] { teacherEntrance, false });
+                    Require(teacher.gameObject.activeInHierarchy && !opponentPortrait.enabled,
+                        "Crowler's walker and portrait did not follow the port arrival and greeting separately.");
                     int greeting = Array.FindIndex(lines, teacherEntrance + 1, line => line.speaker == "크로노스 데 메디치");
                     Require(greeting > teacherEntrance && greeting + 1 < lines.Length && lines[greeting + 1].speaker == "윤",
                         "Crowler's scripted greeting did not receive Yun's reply.");
                     bind.Invoke(dialogue, new object[] { greeting, false });
                     VerifyDisplayedText(lines[greeting]);
-                    Require(!stage.gameObject.activeInHierarchy && !hero.enabled && opponent.enabled &&
-                        (bool)dialogueType.GetField("_opponentSpeaking", flags).GetValue(dialogue),
-                        "Crowler did not appear by himself when delivering the greeting.");
-                    CaptureGx("09-crowler-speaking");
+                    Require(opponentPortrait.enabled && (bool)dialogueType.GetField("_opponentSpeaking", flags).GetValue(dialogue),
+                        "Crowler's portrait did not appear on his first greeting.");
                     bind.Invoke(dialogue, new object[] { greeting + 1, false });
                     VerifyDisplayedText(lines[greeting + 1]);
-                    Require(!stage.gameObject.activeInHierarchy && hero.enabled && !opponent.enabled &&
-                        (bool)dialogueType.GetField("_heroSpeaking", flags).GetValue(dialogue),
-                        "Crowler stayed visible after Yun started replying.");
-                    CaptureGx("10-yun-reply");
+                    Require(opponentPortrait.enabled && (bool)dialogueType.GetField("_heroSpeaking", flags).GetValue(dialogue),
+                        "The original shared dialogue presentation did not resume after Crowler's greeting.");
                     int castEntrance = Array.FindIndex(lines, harborIndex, line => line.stage?.Length > 1 &&
                         line.stage.Any(action => action.actor == 119));
                     bind.Invoke(dialogue, new object[] { harborIndex, false });
+                    Require(!opponentPortrait.enabled && !previousPortrait.enabled,
+                        "Crowler's portrait persisted when rewinding to before his entrance.");
                     Require(!FieldScene().Find("DialogueCast/Guest_107").gameObject.activeSelf &&
                         !FieldScene().Find("DialogueCast/Guest_119").gameObject.activeSelf,
                         "Asuka or Jaden appeared before the scripted meeting.");
                     bind.Invoke(dialogue, new object[] { castEntrance, false });
+                    var stage = FieldScene().Find("DialogueCast");
                     Require(stage.Find("Guest_107").gameObject.activeSelf && stage.Find("Guest_119").gameObject.activeSelf,
                         "Asuka or Jaden was missing at the scripted meeting.");
                     foreach (var actor in stage.Cast<RectTransform>().Where(actor => actor.gameObject.activeSelf))
@@ -1143,29 +1084,6 @@ namespace YGOPortable.Editor
                             actor.anchorMin.y is > .195f and < .395f, "An actor stood off of dry ground in the GX harbor.");
                     bind.Invoke(dialogue, new object[] { 0, false });
                     Require(scenery.sprite == tournament, "Rewinding the opening did not restore the tournament map.");
-                    int openingSolo = Array.FindIndex(lines, line => line.speaker == "윤" && line.sceneMap == "spot_pro_tournament");
-                    bind.Invoke(dialogue, new object[] { openingSolo, false });
-                    VerifySoloShot("_hero", "_opponent");
-                    VerifyDisplayedText(lines[openingSolo]);
-                    CaptureGx("06-yun-alone");
-                    int asukaThought = Array.FindIndex(lines, castEntrance, line => line.IsInternalMonologue && line.speaker == "텐죠인 아스카");
-                    bind.Invoke(dialogue, new object[] { asukaThought, false });
-                    VerifySoloShot("_opponent", "_hero");
-                    VerifyDisplayedText(lines[asukaThought]);
-                    CaptureGx("07-asuka-monologue");
-                    bind.Invoke(dialogue, new object[] { greeting, false });
-                    Require(!stage.gameObject.activeInHierarchy && !hero.enabled && opponent.enabled,
-                        "Returning from a GX monologue showed the silent cast again.");
-                    bind.Invoke(dialogue, new object[] { 0, false });
-
-                    void VerifySoloShot(string shown, string hidden)
-                    {
-                        var visible = (Image)dialogueType.GetField(shown, flags).GetValue(dialogue);
-                        var silent = (Image)dialogueType.GetField(hidden, flags).GetValue(dialogue);
-                        Require(!stage.gameObject.activeInHierarchy && visible.enabled && !silent.enabled &&
-                            visible.rectTransform.anchorMin.x == .355f,
-                            "A GX monologue showed an extra portrait or stage walker.");
-                    }
                 }
 
                 void VerifyGxWalkerSizes()
@@ -1217,9 +1135,9 @@ namespace YGOPortable.Editor
                     Require(sprites.TryGetValue(path, out var expected) && expected != null && portrait.sprite == expected,
                         $"The dialogue did not display the portrait for {speaker}.");
                     var guest = FieldScene().Find($"DialogueCast/Guest_{id}");
-                    Require(guest != null && guest.gameObject.activeSelf && !guest.gameObject.activeInHierarchy &&
+                    Require(guest != null && guest.gameObject.activeInHierarchy &&
                         guest.Find("Sprite").GetComponent<Image>().sprite != null,
-                        $"The stage did not preserve the camera mark for {speaker} with the walker hidden.");
+                        $"The stage did not display the SD sprite for {speaker}.");
                 }
 
                 void VerifyDisplayedText(StoryDialogueLine line)
@@ -1237,17 +1155,17 @@ namespace YGOPortable.Editor
                     for (int tick = 0; tick < lines.Length * 5 + 5 && storyRoot.gameObject.activeInHierarchy; ++tick)
                     {
                         string scene = lines[CurrentLine()].cutscene;
-                        if (!string.IsNullOrEmpty(scene) && !lines[CurrentLine()].IsInternalMonologue && checkedScenes.Add(scene))
+                        if (!string.IsNullOrEmpty(scene) && checkedScenes.Add(scene))
                             VerifyGxDialogueArt(episode, scene);
                         story.Update(4f);
                     }
-                    Require(lines.All(line => string.IsNullOrEmpty(line.cutscene) || line.IsInternalMonologue || checkedScenes.Contains(line.cutscene)),
+                    Require(lines.All(line => string.IsNullOrEmpty(line.cutscene) || checkedScenes.Contains(line.cutscene)),
                         $"Automatic playback skipped a CG in {episode.id}.");
                 }
 
                 void VerifyGxDuelDialogueArt(StoryEpisodeData episode)
                 {
-                    int index = Array.FindIndex(episode.preDialogues, line => !string.IsNullOrEmpty(line.cutscene) && !line.IsInternalMonologue);
+                    int index = Array.FindIndex(episode.preDialogues, line => !string.IsNullOrEmpty(line.cutscene));
                     if (index < 0) return;
                     dialogueType.GetMethod("BindLine", flags).Invoke(dialogue, new object[] { index, false });
                     VerifyGxDialogueArt(episode, episode.preDialogues[index].cutscene);
@@ -1303,17 +1221,17 @@ namespace YGOPortable.Editor
 
                     var view = new StoryModeUI.StoryDialogueView(canvas.transform);
                     var example = cutscenes.Select(id => new StoryDialogueLine { speaker = "주인공", text = id, cutscene = id })
-                        .Append(new StoryDialogueLine { speaker = "주인공", text = "필드로 돌아갑니다." })
-                        .Append(new StoryDialogueLine { speaker = "텐죠인 아스카", text = "아스카의 대사입니다." }).ToArray();
+                        .Append(new StoryDialogueLine { speaker = "주인공", text = "필드로 돌아갑니다." }).ToArray();
                     view.Open("GX CG verification", "주인공", DeckRepository.GetCharacter(107), example, null,
                         rpg: true, rpgBackdrop: "Maps/spot_main_academy.png", rpgAssetFolder: "GX");
                     var viewType = typeof(StoryModeUI.StoryDialogueView);
                     var hero = (Image)viewType.GetField("_hero", flags).GetValue(view);
                     var opponent = (Image)viewType.GetField("_opponent", flags).GetValue(view);
-                    Require(hero.enabled && !opponent.enabled && hero.sprite.rect.width == hero.sprite.rect.height &&
+                    Require(hero.sprite != null && opponent.sprite != null && hero.sprite.rect.width == hero.sprite.rect.height &&
+                        opponent.sprite.rect.width == opponent.sprite.rect.height &&
                         hero.rectTransform.anchorMin.y == opponent.rectTransform.anchorMin.y &&
                         hero.rectTransform.pivot.y == 0f && opponent.rectTransform.pivot.y == 0f,
-                        "The GX protagonist did not have a square portrait with the shared baseline.");
+                        "GX conversation portraits did not share a square frame and bottom edge.");
                     var current = (Image)viewType.GetField("_cutsceneImage", flags).GetValue(view);
                     var previous = (Image)viewType.GetField("_cutscenePrevious", flags).GetValue(view);
                     var alpha = (CanvasGroup)viewType.GetField("_cutsceneOverlay", flags).GetValue(view);
@@ -1330,9 +1248,6 @@ namespace YGOPortable.Editor
                     }
                     view.Update(.5f);
                     Require(alpha.alpha == 0f, "CG did not fade back to the field.");
-                    viewType.GetMethod("BindLine", flags).Invoke(view, new object[] { example.Length - 1, false });
-                    Require(!hero.enabled && opponent.enabled && opponent.sprite.rect.width == opponent.sprite.rect.height,
-                        "The GX dialogue guest did not show a square portrait by herself.");
                     view.Close();
                     Debug.Log($"[VERIFY GX ART] All 27 sets of standing and directional character assets and all {cutscenes.Length} CG transition paths passed.");
                 }
@@ -1506,8 +1421,6 @@ namespace YGOPortable.Editor
                             previousMap = line.SceneMapPath;
                             var terrain = CurrentTerrain();
                             var cast = FieldScene().Find("DialogueCast");
-                            if (world.IsGxCampaign)
-                                Require(!cast.gameObject.activeInHierarchy, $"GX stage walkers appeared in {episode.id} line {index + 1}.");
                             foreach (RectTransform actor in cast)
                                 Require(terrain.Contains(actor.anchorMin),
                                     $"{actor.name} was outside the floor of {terrain.Spot.spotId} at {episode.id} line {index + 1}.");
