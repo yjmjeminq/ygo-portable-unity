@@ -15,6 +15,7 @@ namespace YGOPortable.UI
         private static readonly Vector2 GxFieldActorSize = new(224f, 228f);
         private readonly List<RectTransform> _rpgDepthOrder = new();
         private RectTransform _rpgSceneSpace, _rpgViewport;
+        private Image _rpgFieldScenery;
         private Vector2 _rpgCameraPan;
         private float _rpgBackdropAspect, _rpgCameraLead;
         private bool UsesRpgDialogueCamera => _rpgDialogueCast != null || _page is Page.Talk or Page.Guide;
@@ -25,11 +26,11 @@ namespace YGOPortable.UI
             _rpgViewport.gameObject.AddComponent<RectMask2D>();
             _rpgSceneSpace = DuelUiKit.FillRect("Camera", _rpgViewport);
             _rpgSceneSpace.localScale = Vector3.one * RpgActorScale;
-            var floor = DuelUiKit.AddImage(DuelUiKit.FillRect("Scenery", _rpgSceneSpace).gameObject,
+            _rpgFieldScenery = DuelUiKit.AddImage(DuelUiKit.FillRect("Scenery", _rpgSceneSpace).gameObject,
                 scenery, scenery == null ? new Color(.10f, .21f, .27f) : Color.white, false, false);
             _rpgBackdropAspect = scenery != null ? scenery.rect.width / scenery.rect.height : 16f / 9f;
             FrameRpgCamera(_position);
-            return floor;
+            return _rpgFieldScenery;
         }
 
         private void FrameRpgCamera(Vector2 focus)

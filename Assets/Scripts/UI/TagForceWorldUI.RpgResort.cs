@@ -161,7 +161,7 @@ namespace YGOPortable.UI
             };
             void ReturnToWorkbench() => Show(Page.Talk);
             _rpgIntroDialogue.Open(title, "카이", DeckRepository.GetCharacter(id), lines, ReturnToWorkbench,
-                rpg: true, onSkip: ReturnToWorkbench, rpgEpisode: 50, compactRpgDialogue: true,
+                rpg: true, onSkip: ReturnToWorkbench, rpgEpisode: 50,
                 rpgBackdrop: "Cutscenes/cg_summer_guest_room_night.jpg");
         }
     }

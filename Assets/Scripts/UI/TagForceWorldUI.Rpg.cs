@@ -66,6 +66,8 @@ namespace YGOPortable.UI
         };
 
         private static readonly Vector2[] RpgNpcSlots = { new(.48f, .40f), new(.23f, .33f), new(.74f, .36f) };
+        private static readonly Vector2[] GxHarborNpcSlots = { new(.50f, .30f), new(.24f, .32f), new(.43f, .345f) };
+        private Vector2 RpgNpcPoint(int index) => (IsGxHarbor(_rpgLocation) ? GxHarborNpcSlots : RpgNpcSlots)[index];
         private readonly List<RectTransform> _questMarkers = new();
         private readonly Dictionary<int, RectTransform> _rpgResidents = new();
         private RectTransform _rpgNavigation;
@@ -127,7 +129,7 @@ namespace YGOPortable.UI
                 _rpgLocation = CampaignRegionForEpisode(_observedRpgClears + 1);
             if (_rpgIntroOnOpen) _rpgLocation = RpgGarage;
             _rpgAnnounceArrival = openIntro;
-            _position = RpgArrival;
+            _position = RpgGroundPoint(_rpgLocation, RpgArrival);
             _resident = null;
             _rpgQuestResident = null;
             _rpgLastPlayedSceneId = null;
@@ -155,14 +157,16 @@ namespace YGOPortable.UI
             }
         }
 
-        private void LayoutRpgField(bool field)
+        private void LayoutRpgField(Page page)
         {
-            _body.anchorMin = field ? new Vector2(.012f, .012f) : new Vector2(.05f, .174f);
-            _body.anchorMax = field ? new Vector2(.988f, .988f) : new Vector2(.95f, .895f);
-            _status.rectTransform.anchorMin = field ? new Vector2(.025f, .105f) : new Vector2(.05f, .112f);
-            _status.rectTransform.anchorMax = field ? new Vector2(.46f, .151f) : new Vector2(.95f, .168f);
-            _header.gameObject.SetActive(!field);
-            _back.gameObject.SetActive(!field);
+            bool field = _rpgField && page == Page.Field;
+            bool fullScreen = _rpgField && page is Page.Field or Page.Talk or Page.Prologue or Page.Guide or Page.SummerEpilogue;
+            _body.anchorMin = fullScreen ? new Vector2(.012f, .012f) : new Vector2(.05f, .174f);
+            _body.anchorMax = fullScreen ? new Vector2(.988f, .988f) : new Vector2(.95f, .895f);
+            _status.rectTransform.anchorMin = fullScreen ? new Vector2(.025f, .105f) : new Vector2(.05f, .112f);
+            _status.rectTransform.anchorMax = fullScreen ? new Vector2(.46f, .151f) : new Vector2(.95f, .168f);
+            _header.gameObject.SetActive(!fullScreen);
+            _back.gameObject.SetActive(!fullScreen);
             _rpgNavigation.anchorMin = field ? new Vector2(.777f, .113f) : new Vector2(.05f, .027f);
             _rpgNavigation.anchorMax = field ? new Vector2(.973f, .409f) : new Vector2(.95f, .101f);
             for (int i = 0; i < _rpgNavItems.Length; i++)
@@ -207,7 +211,8 @@ namespace YGOPortable.UI
         private void ShowRpgPage(Page page)
         {
             _navigation.gameObject.SetActive(false);
-            _rpgNavigation.gameObject.SetActive(page is not (Page.Field or Page.ResortWardrobe or Page.SummerEpilogue));
+            _rpgNavigation.gameObject.SetActive(page is not
+                (Page.Field or Page.Talk or Page.Prologue or Page.Guide or Page.ResortWardrobe or Page.SummerEpilogue));
             _header.text = $"{(IsGxCampaign ? "GX" : "5D's")} RPG 월드 · {CampaignRegions[_rpgLocation].Name}";
             DuelAudio.PlayRpgFieldMusic(IsGxCampaign ? GxFieldMusic(CampaignFieldTheme) : MusicForRpgRegion(_rpgLocation));
             switch (page)
@@ -219,7 +224,7 @@ namespace YGOPortable.UI
                     _rpgChoosingCompanion = false;
                     _rpgServiceSpeaker = null;
                     BuildRpgField();
-                    if (_rpgAnnounceArrival) BuildRpgArrivalBanner();
+                    if (_rpgAnnounceArrival && !AutomaticRpgScenePending) BuildRpgArrivalBanner();
                     if (_rpgRankNotice > 0) BuildRpgRankNotice();
                     break;
                 case Page.Prologue: BuildRpgIntro(false); break;
@@ -276,7 +281,7 @@ namespace YGOPortable.UI
                 return false;
             if (index != _rpgLocation)
             {
-                _position = arrival;
+                _position = RpgGroundPoint(index, arrival);
                 _rpgAnnounceArrival = true;
             }
             _rpgLocation = index;
@@ -286,6 +291,9 @@ namespace YGOPortable.UI
             return true;
         }
 
+        private Sprite GetRpgDialogueScenery(string sceneMapPath) =>
+            (sceneMapPath == null ? null : _images.Get(RpgArt + sceneMapPath)) ?? GetRpgFieldArt(CampaignRegions[_rpgLocation]);
+
         private Sprite GetRpgFieldArt(RpgRegion region) =>
             (!IsGxCampaign && LightingForEpisode(region, RpgClears + 1) is string lighting ? _images.Get(RpgArt + lighting) : null) ??
             _images.Get(region.FieldBackground) ?? _images.Get(region.Background);
@@ -294,7 +302,9 @@ namespace YGOPortable.UI
 
         private void BuildRpgField()
         {
-            var floor = BuildRpgCamera(GetRpgFieldArt(CampaignRegions[_rpgLocation]));
+            var opening = AutomaticRpgScenePending && _rpgLocation == CampaignRegionForEpisode(RpgClears + 1)
+                ? CurrentRpgEpisode.preDialogues[0].SceneMapPath : null;
+            var floor = BuildRpgCamera(GetRpgDialogueScenery(opening));
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
@@ -312,12 +322,12 @@ namespace YGOPortable.UI
             }
             _rpgNearbyScene = questNpc?.sceneOnApproach == true ? questNpc : null;
             if (questNpc != null)
-                AddRpgResident(questNpc, RpgNpcSlots[0], true, () => _app.OpenRpgFieldEpisode(cleared));
+                AddRpgResident(questNpc, RpgNpcPoint(0), true, () => _app.OpenRpgFieldEpisode(cleared));
             var locals = RpgLocalResidents(episodes, _rpgLocation, cleared, questNpc, sideQuest).ToArray();
             for (int i = 0; i < locals.Length; i++)
             {
                 var resident = locals[i];
-                AddRpgResident(resident, RpgNpcSlots[i + 1], false, () =>
+                AddRpgResident(resident, RpgNpcPoint(i + 1), false, () =>
                 {
                     _resident = resident;
                     _rpgQuestResident = null;
@@ -332,6 +342,13 @@ namespace YGOPortable.UI
             PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false);
             OrderRpgFieldActors();
             BuildRpgFieldHud(cleared, targetRegion, episodes, sideObjective);
+            if (opening != null)
+            {
+                _rpgAtmosphereLayer.gameObject.SetActive(false);
+                _rpgFieldHud.gameObject.SetActive(false);
+                _rpgFieldObjects.gameObject.SetActive(false);
+                foreach (var resident in _rpgResidents.Values) resident.gameObject.SetActive(false);
+            }
         }
 
         private IEnumerable<StoryEpisodeData> RpgLocalResidents(StoryEpisodeData[] episodes, int region, int cleared,
@@ -349,7 +366,7 @@ namespace YGOPortable.UI
         private void CheckRpgSceneEncounter(Vector2 previous)
         {
             if (_rpgNearbyScene == null || _rpgNearbyScene.id == _rpgLastPlayedSceneId || !CanWalk) return;
-            var distance = RpgNpcSlots[0] - previous;
+            var distance = RpgNpcPoint(0) - previous;
             var step = _position - previous;
             if (step.sqrMagnitude < 1e-8f || distance.sqrMagnitude <= RpgSceneRadius * RpgSceneRadius) return;
             float closest = Mathf.Clamp01(Vector2.Dot(distance, step) / step.sqrMagnitude);
@@ -460,9 +477,9 @@ namespace YGOPortable.UI
                 }
             }
             var panel = DuelUiKit.FillRect("ResidentChoices", _body);
-            var window = Area(panel, "DialogueWindow", .065f, .029f, .683f, .265f);
+            var window = Area(panel, "DialogueWindow", .065f, .029f, .683f, .315f);
             RpgUiStyle.Dialogue(window);
-            var badge = Area(panel, "NamePlate", .093f, .236f, .365f, .310f);
+            var badge = Area(panel, "NamePlate", .093f, .287f, .365f, .361f);
             RpgUiStyle.Speaker(badge);
             var color = RpgUiStyle.SpeakerColor(name);
             var stripe = Area(badge, "Signature", .069f, .22f, .085f, .78f);
@@ -470,7 +487,7 @@ namespace YGOPortable.UI
             Tint(stripe, color);
             var speakerLabel = HudLabel(Area(badge, "Name", .125f, .04f, .944f, .96f), name, 25, color);
             RpgUiStyle.Display(speakerLabel);
-            conversation = HudLabel(Area(panel, "DailyLine", .103f, .051f, .648f, .232f), line, 25,
+            conversation = HudLabel(Area(panel, "DailyLine", .103f, .056f, .648f, .271f), line, 25,
                 new Color(.90f, .94f, .97f));
             RpgUiStyle.Reading(conversation);
             conversation.lineSpacing = 1.28f;

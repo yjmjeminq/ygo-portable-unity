@@ -212,7 +212,7 @@ namespace YGOPortable.UI
             _page = page;
             UpdateRpgWorldChrome();
             ClearBody();
-            LayoutRpgField(_rpgField && page == Page.Field);
+            LayoutRpgField(page);
             _images.BeginPage();
             if (_rpgField)
             {
@@ -258,6 +258,7 @@ namespace YGOPortable.UI
         private void ClearBody()
         {
             ClearRpgDialogue();
+            _worldInput.interactable = _worldInput.blocksRaycasts = true;
             ClearRpgAtmosphere();
             ClearRpgExploration();
             ClearRpgResidentMotion();
@@ -266,6 +267,7 @@ namespace YGOPortable.UI
             _rpgResidents.Clear();
             _rpgNearbyScene = null;
             _rpgSceneSpace = _rpgViewport = null;
+            _rpgFieldScenery = null;
             _interactions.Clear();
             _visitors.Clear();
             _questMarkers.Clear();
@@ -465,6 +467,7 @@ namespace YGOPortable.UI
             if (!CanWalk || (_rpgField && _fieldMenu)) return;
             _manualWalk = false;
             _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
+            if (_rpgField) _destination = RpgGroundPoint(_rpgLocation, _destination);
             _moving = true;
             _onArrival = arrive;
             _rpgApproachActor = approachActor;

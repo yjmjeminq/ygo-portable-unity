@@ -94,10 +94,11 @@ namespace YGOPortable.UI
             private Match[] _formatting = Array.Empty<Match>();
             private int _index;
             private int _readThrough;
+            private int _advanceFrame = -1;
             private int _visible;
             private float _typed;
             private float _readTime;
-            private bool _autoPlay;
+            private int _autoSpeed;
             private bool _finished;
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
@@ -111,6 +112,7 @@ namespace YGOPortable.UI
             private float _heroFade, _opponentFade, _heroSlide, _opponentSlide;
             private TagForceWorldUI _field;
             private bool _stageCaption;
+            private Sprite _defaultRpgStage;
             private OpponentCharacter _sceneOpponent;
             private string _sceneOpponentName;
             private string _protagonist;
@@ -258,7 +260,7 @@ namespace YGOPortable.UI
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
                 Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
                 string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
-                string preferredRpgBackdrop = null, int rpgEpisode = 0, bool compactRpgDialogue = false,
+                string preferredRpgBackdrop = null, int rpgEpisode = 0,
                 int playAsCharacterId = 0, bool autoPlay = false, string rpgAssetFolder = null,
                 string originalProtagonist = null, string opponentName = null)
             {
@@ -270,8 +272,7 @@ namespace YGOPortable.UI
                 _heroIdentity.gameObject.SetActive(!rpg && !onField);
                 _portraitGroup.gameObject.SetActive(rpg || !onField);
                 _shade.color = new Color(.014f, .026f, .058f, onField ? .14f : .95f);
-                float dialogueTop = onField ? rpg ? .281f : .32f : rpg ? .322f : .406f;
-                if (rpg && compactRpgDialogue) dialogueTop = .236f;
+                float dialogueTop = rpg ? .405f : onField ? .32f : .406f;
                 _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, dialogueTop);
                 _protagonist = protagonist;
                 _originalProtagonist = originalProtagonist;
@@ -283,15 +284,15 @@ namespace YGOPortable.UI
                 _playAsCharacterId = playAsCharacterId;
                 ApplyDialogueStyle(rpg);
                 if (autoPlay) ToggleAuto();
-                _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, onField ? .267f : .309f) : new Vector2(.07f, .26f);
+                _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, dialogueTop - .018f) : new Vector2(.07f, .26f);
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .859f) : new Vector2(.493f, .855f);
-                _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, onField ? .267f : .309f) : new Vector2(.508f, .26f);
+                _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, dialogueTop - .018f) : new Vector2(.508f, .26f);
                 _opponent.rectTransform.anchorMax = rpg ? new Vector2(.975f, .859f) : new Vector2(.93f, .855f);
                 bool gxPortraits = rpg && _rpgAssetFolder == "GX";
                 _hero.rectTransform.pivot = _opponent.rectTransform.pivot = new Vector2(.5f, gxPortraits ? 0f : .5f);
                 if (gxPortraits)
                 {
-                    float baseline = dialogueTop - .036f;
+                    float baseline = dialogueTop - .008f;
                     _hero.rectTransform.anchorMin = new Vector2(.066f, baseline);
                     _hero.rectTransform.anchorMax = new Vector2(.314f, .853f);
                     _opponent.rectTransform.anchorMin = new Vector2(.686f, baseline);
@@ -300,7 +301,8 @@ namespace YGOPortable.UI
                 if (rpg && !onField)
                 {
                     var preferred = preferredRpgBackdrop == null ? null : LoadRpgSprite(preferredRpgBackdrop);
-                    SetSprite(_stage, preferred ?? LoadRpgSprite(rpgBackdrop));
+                    _defaultRpgStage = preferred ?? LoadRpgSprite(rpgBackdrop);
+                    SetSprite(_stage, _defaultRpgStage);
                 }
                 if (!rpg && !onField)
                 {
@@ -336,6 +338,7 @@ namespace YGOPortable.UI
                 SetSprite(_cutscenePrevious, null);
                 _cutsceneBlend = 1f;
                 _cutsceneImage.color = Color.white;
+                _defaultRpgStage = null;
                 SetSprite(_stage, null);
                 SetSprite(_hero, null);
                 SetSprite(_opponent, null);
@@ -361,6 +364,7 @@ namespace YGOPortable.UI
                 _supports.Root.SetActive(false);
                 _scene.interactable = _scene.blocksRaycasts = true;
                 _dialogue = null;
+                _advanceFrame = -1;
                 _onEnd = null;
                 _onSkip = null;
                 _choices = null;
@@ -369,7 +373,7 @@ namespace YGOPortable.UI
                 _waitingBranch = false;
                 _popupReturn = null;
                 _finished = false;
-                _autoPlay = false;
+                _autoSpeed = 0;
                 _auto.GetComponentInChildren<Text>().text = "오토 꺼짐";
                 _auto.interactable = _skip.interactable = _next.interactable = true;
                 _advanceSurface.interactable = true;
@@ -405,12 +409,12 @@ namespace YGOPortable.UI
                     _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
-                    _typed += delta * CharactersPerSecond;
+                    _typed += delta * CharactersPerSecond * Mathf.Max(1, _autoSpeed);
                     Reveal(Mathf.Min(_characters.Length, (int)_typed));
                 }
-                else if (_autoPlay)
+                else if (_autoSpeed > 0)
                 {
-                    _readTime += delta;
+                    _readTime += delta * _autoSpeed;
                     if (_readTime >= Mathf.Max(1.05f, _characters.Length * .037f)) Advance();
                 }
             }
@@ -441,7 +445,8 @@ namespace YGOPortable.UI
                     button.GetComponentInChildren<Text>().text = _choices[i].Label;
                     button.interactable = _choices[i].Available?.Invoke() != false;
                 }
-                Focus(_choiceButtons.First(button => button.gameObject.activeSelf && button.interactable));
+                if (_choiceButtons.FirstOrDefault(button => button.gameObject.activeSelf && button.interactable) is { } available)
+                    Focus(available);
             }
 
             internal void OpenDeckPicker(IReadOnlyList<UserDeck> decks, int selected, Action<int> apply, Action edit,
@@ -512,6 +517,8 @@ namespace YGOPortable.UI
                 _speakerUsesPaintedExpression = speaker?.id == 1 || (_rpgAssetFolder == "GX" && speaker?.id is 107 or 119);
                 _opponentReaction.enabled = false;
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
+                if (_rpg && _field == null && _defaultRpgStage != null)
+                    SetSprite(_stage, (line.SceneMapPath is string map ? LoadRpgSprite(map) : null) ?? _defaultRpgStage);
                 if (_rpg)
                 {
                     if (_heroSpeaking || _hero.sprite == null)
@@ -609,6 +616,7 @@ namespace YGOPortable.UI
                         label.fontStyle = label == _logText ? FontStyle.Normal : FontStyle.Bold;
                     }
                 }
+                _text.resizeTextMinSize = rpg ? 23 : 13;
                 _text.lineSpacing = rpg ? 1.28f : 1f;
                 _text.supportRichText = rpg;
                 foreach (var button in new[] { _previous, _logButton, _auto, _skip })
@@ -661,7 +669,7 @@ namespace YGOPortable.UI
                 _heading.rectTransform.anchorMin = rpg ? new Vector2(.057f, .05f) : Vector2.zero;
                 _heading.rectTransform.anchorMax = rpg ? new Vector2(.957f, .95f) : Vector2.one;
                 Place(_speakerBadge.transform, panel, rpg ? new Rect(.032f, .897f, .235f, .221f) : new Rect(.038f, .703f, .312f, .247f));
-                Place(_text.rectTransform.parent, panel, rpg ? new Rect(.041f, .225f, .906f, .555f) : new Rect(.047f, .234f, .90f, .456f));
+                Place(_text.rectTransform.parent, panel, rpg ? new Rect(.041f, .126f, .906f, .705f) : new Rect(.047f, .234f, .90f, .456f));
                 Place(_caret.rectTransform.parent, panel, rpg ? new Rect(.905f, .066f, .050f, .142f) : new Rect(.724f, .046f, .048f, .165f));
                 if (rpg)
                 {
@@ -719,7 +727,12 @@ namespace YGOPortable.UI
 
             private void Advance()
             {
-                if (_stageCaption || _finished || _waitingBranch || _dialogue == null) return;
+                if (_stageCaption || _finished || _waitingBranch || _dialogue == null || ActiveRoot != _root) return;
+                if (Application.isPlaying)
+                {
+                    if (_advanceFrame == Time.frameCount) return;
+                    _advanceFrame = Time.frameCount;
+                }
                 if (_visible < _characters.Length) Reveal(_characters.Length);
                 else if (_branch != null && _index == _branchLine) OfferBranch();
                 else if (_index + 1 == _dialogue.Length) Finish();
@@ -728,15 +741,20 @@ namespace YGOPortable.UI
 
             private void Previous()
             {
-                if (_index <= 0 || _finished) return;
+                if (_index <= 0 || _finished || ActiveRoot != _root) return;
                 BindLine(_index - 1, playStageMotion: false);
                 Reveal(_characters.Length);
             }
 
             private void ToggleAuto()
             {
-                _autoPlay = !_autoPlay;
-                _auto.GetComponentInChildren<Text>().text = _autoPlay ? "오토 켜짐" : "오토 꺼짐";
+                _autoSpeed = _autoSpeed == 0 ? 1 : _rpg && _autoSpeed == 1 ? 2 : 0;
+                _auto.GetComponentInChildren<Text>().text = _autoSpeed switch
+                {
+                    1 => "오토 켜짐",
+                    2 => "오토 2배",
+                    _ => "오토 꺼짐",
+                };
             }
 
             private void Finish()
@@ -753,8 +771,9 @@ namespace YGOPortable.UI
                 _fx.ShowCaret(_caret, false);
                 _advanceSurface.interactable = false;
                 _previous.interactable = _auto.interactable = _next.interactable = _skip.interactable = false;
-                _onEnd?.Invoke();
+                var onEnd = _onEnd;
                 _onEnd = null;
+                onEnd?.Invoke();
             }
 
             internal void SetBranch(int line, Action present)

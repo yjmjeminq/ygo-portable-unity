@@ -150,9 +150,17 @@ namespace YGOPortable.Editor
                 VerifySceneGuests();
                 VerifyStageExit();
 
+                VerifyDialogueBounds(script, "5DS");
+                var fieldViewportSize = ViewportSize();
                 var local = FieldScene().Find($"Resident_{script.episodes[1].charId}");
                 Require(local.Find("ResidentMarker").GetComponent<Image>().sprite != null, "The resident marker was missing.");
                 Press(local, "SD");
+                world.Update(4f);
+                Require(ViewportSize() == fieldViewportSize, "Opening NPC dialogue resized the RPG viewport.");
+                world.Back();
+                Require(world.CanWalk && ViewportSize() == fieldViewportSize && WorldInputRestored(),
+                    "Returning from NPC dialogue resized the field or left input blocked.");
+                Press(FieldScene().Find($"Resident_{script.episodes[1].charId}"), "SD");
                 world.Update(4f);
                 Press(panel, "ResidentChoices/TalkDaily");
                 var ordinary = panel.Find("ResidentChoices");
@@ -190,7 +198,20 @@ namespace YGOPortable.Editor
                 Require(storyRoot.gameObject.activeSelf && world.Root.activeSelf && !world.CanWalk && world.RpgClears == 5,
                     "A loss did not stage its dialogue in the locked field.");
                 Press(storyRoot, "Scene/DialogueTools/Skip/Button");
-                Require(world.Root.activeSelf && world.CanStartRpgEpisode(5) && !world.EnterRpgRegion(RpgPrison),
+                var retry = storyRoot.Find("Scene/Choices/Choice_0/Button").GetComponent<Button>();
+                Require(retry.GetComponentInChildren<Text>().text == "바로 재도전" && retry.interactable &&
+                    storyRoot.Find("Scene/Choices/Choice_2/Button").GetComponentInChildren<Text>().text == "덱 편집",
+                    "A loss did not offer immediate retry, dialogue replay and deck editing.");
+                Press(storyRoot, "Scene/Choices/Choice_2/Button");
+                app.CloseDeckEditor();
+                Require(retry.gameObject.activeInHierarchy && retry.interactable,
+                    "Returning from deck editing lost the retry choices.");
+                retry.onClick.Invoke();
+                Require(storyRoot.Find("Scene/Choices/Choice_0/Button").GetComponentInChildren<Text>().text == "가위",
+                    "Retry replayed the earlier dialogue instead of opening turn selection.");
+                story.Back();
+                Press(storyRoot, "Scene/Choices/Choice_3/Button");
+                Require(world.Root.activeSelf && WorldInputRestored() && world.CanStartRpgEpisode(5) && !world.EnterRpgRegion(RpgPrison),
                     "A loss changed the active NPC or unlocked the next region.");
 
                 OpenEpisode6();
@@ -200,7 +221,7 @@ namespace YGOPortable.Editor
                 Require(storyRoot.gameObject.activeSelf && world.RpgClears == 5 && CollectionProgress.Balance == balance,
                     "The win was settled before the post-win dialogue.");
                 Press(storyRoot, "Scene/DialogueTools/Skip/Button");
-                Require(world.Root.activeSelf && world.RpgClears == 6 && CollectionProgress.Balance > balance &&
+                Require(world.Root.activeSelf && WorldInputRestored() && world.RpgClears == 6 && CollectionProgress.Balance > balance &&
                     panel.Find("RegionUnlockToast/Label").GetComponent<Text>().text.Contains("시큐리티 수용소"),
                     "Winning did not save the clear, pay DP and announce the new region.");
                 CollectionProgress.Load(save);
@@ -256,6 +277,7 @@ namespace YGOPortable.Editor
                     gxDecks.Count == 37 && gxMap?.spots.Length == 12 && gxMap.roster.Length == 26,
                     "GX campaign inputs are incomplete.");
                 Require(gxScript.protagonist == "윤", "The GX protagonist name did not load.");
+                VerifyDialogueBounds(gxScript, "GX");
                 var dialogue = typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
                 var dialogueType = typeof(StoryModeUI.StoryDialogueView);
                 Require(File.Exists(Path.Combine(streaming, gxMap.assetConfig.worldMapPath)), "Missing GX world map.");
@@ -300,8 +322,15 @@ namespace YGOPortable.Editor
                             Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
                                 .text == "오토 켜짐", $"Automatic playback is off for {episode.id}.");
                             VerifyDialogueStart(episode.preDialogues, episode.id);
+                            if (index == 0)
+                            {
+                                VerifyGxPrologue(episode);
+                                Press(storyRoot, "Scene/DialogueTools/Auto/Button");
+                                Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
+                                    .text == "오토 2배", "The cutscene did not switch to double speed.");
+                            }
                             ReadDialogue(episode);
-                            Require(world.RpgClears == index + 1 && Get("_session") == null,
+                            Require(world.RpgClears == index + 1 && WorldInputRestored() && Get("_session") == null,
                                 $"A cutscene did not advance directly at {episode.id}.");
                             scenes++;
                             continue;
@@ -317,6 +346,11 @@ namespace YGOPortable.Editor
                             Require(panel.Find("RegionPreview/RegionName/Label").GetComponent<Text>().text == world.CampaignRegion(location).Name,
                                 "The GX field guide did not preselect the objective region on the map.");
                             world.Back();
+                            PressRpgNavigation("Map");
+                            Press(panel, "TravelToGoal");
+                            for (int tick = 0; tick < 10 && !world.CanStartRpgEpisode(index); tick++) world.Update(.18f);
+                            Require(world.CanStartRpgEpisode(index) && WorldInputRestored(),
+                                "The one-click map objective did not arrive or left field input locked.");
                         }
                         Require(world.EnterRpgRegion(location) && world.CanStartRpgEpisode(index) &&
                             FieldScene().Find("Scenery").GetComponent<Image>().sprite != null &&
@@ -354,7 +388,8 @@ namespace YGOPortable.Editor
                             VerifyDialogueStart(episode.postLoseDialogues, episode.id);
                             VerifySpeaker(episode.postLoseDialogues, "윤", player: true);
                             Press(storyRoot, "Scene/DialogueTools/Skip/Button");
-                            Require(world.RpgClears == index && world.CanStartRpgEpisode(index),
+                            Press(storyRoot, "Scene/Choices/Choice_3/Button");
+                            Require(world.RpgClears == index && WorldInputRestored() && world.CanStartRpgEpisode(index),
                                 "A GX loss advanced the story or prevented retrying.");
                             app.OpenRpgFieldEpisode(index);
                         }
@@ -425,6 +460,32 @@ namespace YGOPortable.Editor
                     if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
                     else PlayerPrefs.DeleteKey(gxPreference);
                     PlayerPrefs.Save();
+                }
+
+                void VerifyGxPrologue(StoryEpisodeData episode)
+                {
+                    var lines = episode.preDialogues;
+                    var bind = dialogueType.GetMethod("BindLine", flags);
+                    var scenery = FieldScene().Find("Scenery").GetComponent<Image>();
+                    var tournament = scenery.sprite;
+                    int backstageIndex = Array.FindIndex(lines, line => line.sceneMap == "spot_pro_backstage");
+                    int harborIndex = Array.FindIndex(lines, line => line.sceneMap == null);
+                    Require(tournament != null && lines[0].sceneMap == "spot_pro_tournament" &&
+                        backstageIndex > 0 && harborIndex > backstageIndex, "The GX opening maps were in the wrong order.");
+                    bind.Invoke(dialogue, new object[] { backstageIndex, false });
+                    var backstage = scenery.sprite;
+                    bind.Invoke(dialogue, new object[] { harborIndex, false });
+                    var harbor = scenery.sprite;
+                    Require(backstage != null && harbor != null && backstage != tournament &&
+                        harbor != backstage && harbor != tournament, "The GX opening did not switch all three stage backgrounds.");
+                    int castEntrance = Array.FindIndex(lines, harborIndex, line => line.stage?.Length > 1 &&
+                        line.stage.Any(action => action.actor == 119));
+                    bind.Invoke(dialogue, new object[] { castEntrance, false });
+                    foreach (var actor in FieldScene().Find("DialogueCast").Cast<RectTransform>().Where(actor => actor.gameObject.activeSelf))
+                        Require(actor.anchorMin.x >= .22f && actor.anchorMin.x <= .525f &&
+                            actor.anchorMin.y >= .185f && actor.anchorMin.y <= .35f, "An actor stood off of dry ground in the GX harbor.");
+                    bind.Invoke(dialogue, new object[] { 0, false });
+                    Require(scenery.sprite == tournament, "Rewinding the opening did not restore the tournament map.");
                 }
 
                 void VerifyGxWalkerSizes()
@@ -623,6 +684,91 @@ namespace YGOPortable.Editor
             }
 
             Transform FieldScene() => panel.Find("FieldViewport/Camera");
+
+            Vector2 ViewportSize()
+            {
+                Canvas.ForceUpdateCanvases();
+                return ((RectTransform)panel.Find("FieldViewport")).rect.size;
+            }
+
+            bool WorldInputRestored()
+            {
+                var group = (CanvasGroup)typeof(TagForceWorldUI).GetField("_worldInput", flags).GetValue(world);
+                return group.interactable && group.blocksRaycasts;
+            }
+
+            void VerifyDialogueBounds(StoryScriptRoot campaign, string assetFolder)
+            {
+                var host = DuelUiKit.FillRect("DialogueAspectVerification", canvas.transform);
+                host.anchorMin = host.anchorMax = Vector2.one * .5f;
+                var view = new StoryModeUI.StoryDialogueView(host);
+                var longest = campaign.episodes.SelectMany(entry => entry.preDialogues
+                    .Concat(entry.postWinDialogues).Concat(entry.postLoseDialogues))
+                    .OrderByDescending(line => line.text.Length).First();
+                var dialogueType = typeof(StoryModeUI.StoryDialogueView);
+                var panelImage = (Image)dialogueType.GetField("_dialoguePanel", flags).GetValue(view);
+                var label = (Text)dialogueType.GetField("_text", flags).GetValue(view);
+                var controls = host.Find("StoryDialogue/Scene/DialogueTools");
+                Vector2[] displays = { new(1920, 1080), new(1920, 1200), new(2560, 1080),
+                    new(1280, 960), new(2340, 1080) };
+                try
+                {
+                    foreach (var display in displays)
+                    {
+                        float canvasScale = Mathf.Sqrt(display.x / 1600f * (display.y / 900f));
+                        host.sizeDelta = display / canvasScale;
+                        bool mobile = display.x == 2340;
+                        if (mobile) host.sizeDelta -= new Vector2(160f, 44f) / canvasScale;
+                        view.Open("Layout verification", campaign.protagonist, (OpponentCharacter)null, new[] { longest },
+                            null, rpg: true, backdropBelow: true, rpgAssetFolder: assetFolder);
+                        Canvas.ForceUpdateCanvases();
+                        var characters = (int[])dialogueType.GetField("_characters", flags).GetValue(view);
+                        dialogueType.GetMethod("Reveal", flags).Invoke(view, new object[] { characters.Length });
+                        Require(panelImage.rectTransform.rect.height >= host.rect.height * .32f &&
+                            label.resizeTextMinSize >= 23 && label.text == longest.text,
+                            $"RPG dialogue was too small or incomplete on {assetFolder}, {display}.");
+                        var settings = label.GetGenerationSettings(label.rectTransform.rect.size);
+                        settings.resizeTextForBestFit = false;
+                        settings.fontSize = label.resizeTextMinSize;
+                        settings.verticalOverflow = VerticalWrapMode.Overflow;
+                        float height = new TextGenerator().GetPreferredHeight(label.text, settings) / label.pixelsPerUnit;
+                        Require(height > 0f && height <= label.rectTransform.rect.height + 1f,
+                            $"RPG dialogue overflow on {assetFolder}, {display}: {height} vs {label.rectTransform.rect.height}.");
+                        var buttons = controls.Cast<RectTransform>().Select(Bounds).ToArray();
+                        var box = Bounds(panelImage.rectTransform);
+                        Require(host.rect.Contains(box.min) && host.rect.Contains(box.max),
+                            $"RPG dialogue escaped the content area on {assetFolder}, {display}.");
+                        for (int i = 0; i < buttons.Length; ++i)
+                        {
+                            Require(host.rect.Contains(buttons[i].min) && host.rect.Contains(buttons[i].max) &&
+                                buttons.Skip(i + 1).All(button => !buttons[i].Overlaps(button)),
+                                $"Dialogue controls escaped or overlapped on {assetFolder}, {display}.");
+                        }
+
+                        var open = dialogueType.GetMethod("OpenLog", flags);
+                        var advance = dialogueType.GetMethod("Advance", flags);
+                        open.Invoke(view, null);
+                        advance.Invoke(view, null);
+                        Require(view.ClosePopup() && !view.ClosePopup(),
+                            $"The RPG dialogue popup did not release input on {assetFolder}, {display}.");
+                        view.Close();
+                    }
+                }
+                finally
+                {
+                    view.Close();
+                    UnityEngine.Object.DestroyImmediate(host.gameObject);
+                }
+
+                Rect Bounds(RectTransform item)
+                {
+                    var corners = new Vector3[4];
+                    item.GetWorldCorners(corners);
+                    return Rect.MinMaxRect(host.InverseTransformPoint(corners[0]).x,
+                        host.InverseTransformPoint(corners[0]).y, host.InverseTransformPoint(corners[2]).x,
+                        host.InverseTransformPoint(corners[2]).y);
+                }
+            }
 
             void PressRpgNavigation(string option)
             {
@@ -1697,7 +1843,9 @@ namespace YGOPortable.Editor
                 Require(ReferenceEquals(launched, Get("_session")), "The VS animation launched twice.");
                 AwardDuel(win: false);
                 Press(storyRoot, "Scene/DialogueTools/Skip/Button");
-                Require(world.CanWalk && world.RpgClears == 35, "The VS match did not return to the field on defeat.");
+                Press(storyRoot, "Scene/Choices/Choice_3/Button");
+                Require(world.CanWalk && WorldInputRestored() && world.RpgClears == 35,
+                    "The VS match did not return to the field on defeat.");
                 Debug.Log("[VERIFY 5DS POLISH] Master settings, four regional themes, dialogue controls, timed faceoff and saved partner rewards passed.");
             }
 
@@ -1900,7 +2048,7 @@ namespace YGOPortable.Editor
                 var firstEpisode = loaded.episodes[0];
                 Press(FieldScene(), "MainQuestNpc/SD");
                 world.Update(4f);
-                story.ShowFieldDuelResult(firstEpisode, true, false, () => "");
+                story.ShowFieldDuelResult(firstEpisode, true, false, () => "", default);
                 var opponent = (RectTransform)FieldScene().Find("MainQuestNpc");
                 Vector2 before = opponent.anchorMin;
                 int exit = Array.FindIndex(firstEpisode.postWinDialogues,

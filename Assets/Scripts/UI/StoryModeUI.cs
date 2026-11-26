@@ -15,10 +15,14 @@ namespace YGOPortable.UI
         public string speaker;
         public string text;
         public string cutscene;
+        public string sceneMap;
         public string memoryTitle;
         public string emotion;
         public string fx;
         public StoryStageAction[] stage;
+
+        internal string SceneMapPath => !string.IsNullOrEmpty(sceneMap) &&
+            sceneMap.All(c => char.IsLetterOrDigit(c) || c is '_' or '-') ? $"Maps/{sceneMap}.png" : null;
     }
 
     [Serializable]
@@ -235,17 +239,44 @@ namespace YGOPortable.UI
                 OpenEpisode(index);
         }
 
-        internal void ShowFieldDuelResult(StoryEpisodeData episode, bool won, bool draw, Func<string> settle)
+        internal void ShowFieldDuelResult(StoryEpisodeData episode, bool won, bool draw, Func<string> settle,
+            StoryBattlePlan plan)
         {
             string result = won ? "승리" : draw ? "무승부" : "패배";
-            _finishFieldResult = () =>
+            int index = IndexOf(episode);
+            if (index >= 0) SelectEpisode(index);
+            string reward = null;
+            _finishFieldResult = ReturnToField;
+            PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues,
+                $"{TitleOf(episode)} · {result}", () =>
+                {
+                    if (won)
+                    {
+                        ReturnToField();
+                    }
+                    else
+                    {
+                        reward = settle() ?? string.Empty;
+                        _finishFieldResult = null;
+                        _stance = plan.Stance;
+                        _supports = RaidSupport.None;
+                        _opponentOpening = plan.OpponentOpening;
+                        ShowRetryChoices();
+                    }
+                });
+
+            void ReturnToField()
             {
                 _finishFieldResult = null;
                 if (won && Application.isPlaying) DuelAudio.PlayWin();
-                _app.ReturnToRpgField(settle());
-            };
-            PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues,
-                $"{TitleOf(episode)} · {result}", () => _finishFieldResult?.Invoke());
+                _app.ReturnToRpgField(reward ?? settle());
+            }
+
+            void ShowRetryChoices() => _dialogue.ShowChoices(() => string.IsNullOrEmpty(reward) ? result : $"{result} · {reward}",
+                new("바로 재도전", () => ChooseTurnOrder(episode, ShowRetryChoices), () => HasEpisodeDeck(episode)),
+                new("대화부터 다시", () => OpenEpisode(index), () => index >= 0),
+                new("덱 편집", _app.OpenStoryDeckEditor, () => episode.forcedPlayerDeckId == 0),
+                new("필드로 돌아가기", ReturnToField));
         }
 
         private void LayoutEpisodeRows(int count)

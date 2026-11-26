@@ -77,12 +77,12 @@ namespace YGOPortable.UI
             _rpgResidents.TryGetValue(opponentId, out _rpgDialogueOpponent);
             if (_rpgDialogueOpponent == null || !IsGxCampaign && FieldOutfit(opponentId) != RpgWardrobe.ForStory(opponentId, _rpgSceneEpisode))
             {
-                var mark = _rpgDialogueOpponent != null ? _rpgDialogueOpponent.anchorMin : RpgNpcSlots[0];
+                var mark = _rpgDialogueOpponent != null ? _rpgDialogueOpponent.anchorMin : RpgNpcPoint(0);
                 _rpgDialogueOpponent = Anchor(_rpgDialogueCast, "Opponent", mark, new Vector2(91f, 100f));
                 CreateStageWalker(_rpgDialogueOpponent, opponentId, episode.opponentName);
             }
             var opponentMark = _rpgDialogueOpponent.anchorMin;
-            var heroMark = _position;
+            var heroMark = IsGxHarbor(_rpgLocation) && episode.isCutsceneOnly ? new Vector2(.355f, .245f) : _position;
             if (IsGxCampaign && !episode.isCutsceneOnly && Mathf.Abs(heroMark.x - opponentMark.x) < .085f &&
                 Mathf.Abs(heroMark.y - opponentMark.y) < .15f)
             {
@@ -91,7 +91,8 @@ namespace YGOPortable.UI
                 float x = opponentMark.x + side;
                 heroMark.x = x is < .06f or > .94f ? opponentMark.x - side : x;
             }
-            PoseRpgWalker(_player, _playerSprite, heroMark, Vector2.zero, false, RpgNpcSlots[0] - heroMark);
+            heroMark = RpgGroundPoint(_rpgLocation, heroMark);
+            PoseRpgWalker(_player, _playerSprite, heroMark, Vector2.zero, false, RpgNpcPoint(0) - heroMark);
             RegisterRpgActor(_rpgSceneHeroId, _player, _playerSprite, heroMark, true, false);
             var opponentArt = (_rpgDialogueOpponent.Find("SD") ?? _rpgDialogueOpponent.Find("Sprite")) as RectTransform;
             var opponent = RegisterRpgActor(opponentId, _rpgDialogueOpponent, opponentArt,
@@ -154,6 +155,11 @@ namespace YGOPortable.UI
             float row = .49f + (slot / 2) * .12f;
             var mark = new Vector2(left ? .32f : .66f, row);
             var entry = new Vector2(left ? .052f : .948f, row);
+            if (IsGxHarbor(_rpgLocation))
+            {
+                mark = new Vector2(left ? .25f : .435f, Mathf.Min(.35f, .335f + (slot / 2) * .015f));
+                entry = new Vector2(left ? .22f : .525f, mark.y);
+            }
             RectTransform actor, sprite;
             bool resident = false;
             if (!enters && id == RpgPartnerId && _rpgCompanion != null)
@@ -209,6 +215,16 @@ namespace YGOPortable.UI
 
         internal void SetRpgDialogueLine(StoryDialogueLine[] lines, int index, bool playMotion)
         {
+            string sceneMap = lines[index].SceneMapPath;
+            var scenery = GetRpgDialogueScenery(sceneMap);
+            _rpgAtmosphereLayer.gameObject.SetActive(sceneMap == null);
+            if (scenery != null && scenery != _rpgFieldScenery.sprite)
+            {
+                _rpgFieldScenery.sprite = scenery;
+                _rpgFieldScenery.color = Color.white;
+                _rpgBackdropAspect = scenery.rect.width / scenery.rect.height;
+                FrameRpgCamera(_player.anchorMin);
+            }
             bool playingNext = playMotion && index == _rpgLastLine + 1;
             _rpgSpeakingActor = RpgSpeaker(lines[index].speaker);
             _rpgPreviousSpeaker = null;
@@ -290,10 +306,11 @@ namespace YGOPortable.UI
                             continue;
                         if (action.action == "enter") target = new RpgStagePose(actor.Mark, true, target.LookAt);
                         else if (action.action == "move")
-                            target = new RpgStagePose(new Vector2(Mathf.Clamp(action.x, .05f, .95f),
-                                Mathf.Clamp(action.y, .12f, .64f)), true, target.LookAt);
+                            target = new RpgStagePose(RpgGroundPoint(_rpgLocation, new Vector2(Mathf.Clamp(action.x, .05f, .95f),
+                                Mathf.Clamp(action.y, .12f, .64f))), true, target.LookAt);
                         else if (action.action == "exit")
-                            target = new RpgStagePose(new Vector2(target.Position.x < .5f ? .04f : .96f, target.Position.y), false);
+                            target = new RpgStagePose(RpgGroundPoint(_rpgLocation,
+                                new Vector2(target.Position.x < .5f ? .04f : .96f, target.Position.y)), false);
                         else if (action.action == "face" && _rpgStageIds.TryGetValue(action.target, out var facing) && facing != actor)
                             target = new RpgStagePose(target.Position, target.Visible, action.target);
                         else continue;

@@ -357,7 +357,7 @@ namespace YGOPortable.UI
                 align: TextAnchor.MiddleRight, heading: true);
             foreach (var (slot, destination, _) in _rpgExits)
             {
-                var icon = Mark($"Exit_{destination}", RpgUiStyle.Symbol.Arrow, ExitGreen, 16f, RpgExitPoints[slot]);
+                var icon = Mark($"Exit_{destination}", RpgUiStyle.Symbol.Arrow, ExitGreen, 16f, RpgExitPoint(_rpgLocation, slot));
                 icon.localRotation = Quaternion.Euler(0f, 0f, slot == 0 ? 90f : slot == 1 ? -90f : 0f);
             }
             if (!gx && _rpgFieldObjects != null && _rpgFieldObjects.Find("HiddenCache") is RectTransform treasure)

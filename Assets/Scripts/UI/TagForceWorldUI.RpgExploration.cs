@@ -16,6 +16,14 @@ namespace YGOPortable.UI
             new(.075f, .20f), new(.925f, .20f), new(.12f, .455f), new(.88f, .455f),
         };
 
+        private static readonly Vector2[] GxHarborExitPoints =
+        {
+            new(.22f, .252f), new(.525f, .23f), new(.33f, .35f), new(.465f, .35f),
+        };
+
+        private Vector2 RpgExitPoint(int region, int slot) =>
+            (IsGxHarbor(region) ? GxHarborExitPoints : RpgExitPoints)[slot];
+
         private static readonly (int Region, int Exit, int Other, int Entrance)[] RpgPaths =
         {
             (RpgAcademia, 1, RpgGarage, 0), (RpgGarage, 1, RpgHideout, 0), (RpgGarage, 2, RpgPoppo, 0),
@@ -76,17 +84,18 @@ namespace YGOPortable.UI
             void AddExit(int slot, int destination, int entry)
             {
                 bool open = CampaignRegions[destination].IsOpen(cleared);
+                var exitPoint = RpgExitPoint(_rpgLocation, slot);
                 var gate = Anchor(_rpgFieldObjects, $"Exit_{destination}",
-                    RpgExitPoints[slot] + new Vector2(0f, .047f), new Vector2(196f, 32f));
+                    exitPoint + new Vector2(0f, .047f), new Vector2(196f, 32f));
                 _rpgExitSigns.Add(gate);
                 string arrow = slot switch { 0 => "‹", 1 => "›", _ => "↑" };
-                void Go() => MoveTo(RpgExitPoints[slot], () => FollowRpgExit(destination, entry));
+                void Go() => MoveTo(exitPoint, () => FollowRpgExit(destination, entry));
                 var button = RpgButton(gate, open ? $"{arrow}  {CampaignRegions[destination].Name}" :
                     $"{CampaignRegions[destination].Name} · 이야기 진행 시 개방", Go, 15);
                 button.interactable = open;
                 if (!open) return;
                 _rpgExits.Add((slot, destination, entry));
-                var target = Anchor(_rpgFieldObjects, $"ExitTarget_{destination}", RpgExitPoints[slot], Vector2.zero);
+                var target = Anchor(_rpgFieldObjects, $"ExitTarget_{destination}", exitPoint, Vector2.zero);
                 RegisterRpgInteraction(target, $"{CampaignRegions[destination].Name} · 이동", Go, RpgActionPriority.Exit);
             }
         }
@@ -109,7 +118,7 @@ namespace YGOPortable.UI
         private void FollowRpgExit(int destination, int entry)
         {
             if (!CanWalk) return;
-            var arrival = RpgExitPoints[entry] - RpgExitDirection(entry) * .105f;
+            var arrival = RpgExitPoint(destination, entry) - RpgExitDirection(entry) * .105f;
             BeginRpgTravel(destination, arrival);
         }
 
@@ -119,7 +128,7 @@ namespace YGOPortable.UI
             foreach (var (slot, destination, entry) in _rpgExits)
             {
                 if (Vector2.Dot(step, RpgExitDirection(slot)) <= 0f) continue;
-                var exit = RpgExitPoints[slot];
+                var exit = RpgExitPoint(_rpgLocation, slot);
                 bool reached = slot switch
                 {
                     0 => _position.x <= exit.x && Mathf.Abs(_position.y - exit.y) <= .043f,

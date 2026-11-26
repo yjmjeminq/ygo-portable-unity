@@ -43,6 +43,7 @@ namespace YGOPortable.Editor
                 VerifyArcVScenarioEffects();
                 VerifyVrainsScenarioEffects();
                 Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
+                VerifyMutedMusicRouting();
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
                 VerifyRpgField(starter, save);
@@ -59,6 +60,40 @@ namespace YGOPortable.Editor
                 CardArtLoader.Shutdown();
                 YgoNativeBridge.Shutdown();
                 if (Application.isBatchMode) EditorApplication.Exit(exit);
+            }
+        }
+
+        private static void VerifyMutedMusicRouting()
+        {
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
+            var sourceField = typeof(DuelAudio).GetField("_bgmSource", flags);
+            var pausedField = typeof(DuelAudio).GetField("_bgmPaused", flags);
+            var oldSource = sourceField.GetValue(null);
+            var oldPaused = pausedField.GetValue(null);
+            float oldVolume = DuelAudio.BgmVolume;
+            var audio = new GameObject("BGM switch verification", typeof(AudioSource));
+            try
+            {
+                var source = audio.GetComponent<AudioSource>();
+                source.playOnAwake = false;
+                sourceField.SetValue(null, source);
+                pausedField.SetValue(null, false);
+                DuelAudio.BgmVolume = 0f;
+                DuelAudio.PlayRpgFieldMusic(RpgFieldMusic.Home);
+                var fieldMusic = source.clip;
+                DuelAudio.PlayDuelBgm();
+                var duelMusic = source.clip;
+                Require(fieldMusic != null && duelMusic != null && duelMusic != fieldMusic && !source.isPlaying,
+                    "A muted scene switch did not select the duel soundtrack.");
+                DuelAudio.PlayRpgFieldMusic(RpgFieldMusic.Home);
+                Require(source.clip == fieldMusic && !source.isPlaying, "Returning to a muted field lost its soundtrack.");
+            }
+            finally
+            {
+                DuelAudio.BgmVolume = oldVolume;
+                sourceField.SetValue(null, oldSource);
+                pausedField.SetValue(null, oldPaused);
+                UnityEngine.Object.DestroyImmediate(audio);
             }
         }
 

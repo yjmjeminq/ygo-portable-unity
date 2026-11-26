@@ -75,16 +75,7 @@ namespace YGOPortable.UI
 
         internal static void PlayRpgFieldMusic(RpgFieldMusic music)
         {
-            if (_bgmSource == null) return;
-            var clip = GetRpgFieldMusic(music);
-            if (_bgmSource.clip != clip)
-            {
-                _bgmSource.Stop();
-                _bgmSource.clip = clip;
-            }
-            _bgmSource.loop = true;
-            _bgmSource.volume = BgmVolume;
-            if (BgmVolume >= 0.01f && !_bgmSource.isPlaying) _bgmSource.Play();
+            if (_bgmSource != null) PlayBgmClip(GetRpgFieldMusic(music));
         }
 
         private static AudioClip MakeRewardJingle()

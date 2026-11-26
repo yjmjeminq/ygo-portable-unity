@@ -926,6 +926,7 @@ namespace YGOPortable.UI
     {
         private static AudioSource _sfxSource;
         private static AudioSource _bgmSource;
+        private static bool _bgmPaused;
         private static AudioClip _clipClick, _clipDraw, _clipSummon, _clipAttack, _clipDamage, _clipChain, _clipWin, _clipPhase, _clipDirectAttack, _clipTick, _clipCoin, _clipDice;
         private static AudioClip _clipSpecialSummon, _clipActivate, _clipSet, _clipShuffle;
         private static AudioClip _clipDuelBgm, _clipMenuBgm;
@@ -989,37 +990,45 @@ namespace YGOPortable.UI
 
         public static void PlayDuelBgm()
         {
-            if (_bgmSource == null || BgmVolume < 0.01f) return;
+            if (_bgmSource == null) return;
             _clipDuelBgm ??= DuelVisualAssets.LoadSound("DuelMusic") ?? MakeDuelBgm(22050);
-            if (_bgmSource.clip == _clipDuelBgm && _bgmSource.isPlaying) return;
-            _bgmSource.clip = _clipDuelBgm;
-            _bgmSource.loop = true;
-            _bgmSource.volume = BgmVolume;
-            _bgmSource.Play();
+            PlayBgmClip(_clipDuelBgm);
         }
 
-        public static void PlayMenuBgm()
+        public static void PlayMenuBgm() => PlayBgmClip(_clipMenuBgm);
+
+        private static void PlayBgmClip(AudioClip clip)
         {
-            if (_bgmSource == null || _clipMenuBgm == null || BgmVolume < 0.01f) return;
-            if (_bgmSource.clip == _clipMenuBgm && _bgmSource.isPlaying) return;
-            _bgmSource.clip = _clipMenuBgm;
+            if (_bgmSource == null || clip == null) return;
+            if (_bgmSource.clip != clip)
+            {
+                StopBgm();
+                _bgmSource.clip = clip;
+            }
             _bgmSource.loop = true;
-            _bgmSource.volume = BgmVolume;
-            _bgmSource.Play();
+            UpdateBgmVolume();
         }
 
         public static void StopBgm()
         {
+            _bgmPaused = false;
             if (_bgmSource != null) _bgmSource.Stop();
         }
 
         public static void UpdateBgmVolume()
         {
-            if (_bgmSource != null)
+            if (_bgmSource == null) return;
+            _bgmSource.volume = BgmVolume;
+            if (BgmVolume < 0.01f && _bgmSource.isPlaying)
             {
-                _bgmSource.volume = BgmVolume;
-                if (BgmVolume < 0.01f && _bgmSource.isPlaying) _bgmSource.Pause();
-                else if (BgmVolume >= 0.01f && !_bgmSource.isPlaying && _bgmSource.clip != null) _bgmSource.Play();
+                _bgmSource.Pause();
+                _bgmPaused = true;
+            }
+            else if (BgmVolume >= 0.01f && !_bgmSource.isPlaying && _bgmSource.clip != null)
+            {
+                if (_bgmPaused) _bgmSource.UnPause();
+                else _bgmSource.Play();
+                _bgmPaused = false;
             }
         }
 

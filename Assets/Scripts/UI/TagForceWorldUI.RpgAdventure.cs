@@ -142,8 +142,8 @@ namespace YGOPortable.UI
                 RegisterRpgInteraction(actor, $"{RpgPartnerName} · 대화", () => OpenRpgService(RpgPartnerId), radius: .055f);
                 return;
             }
-            _rpgCompanionPoint = new Vector2(Mathf.Clamp(_position.x - .074f, .06f, .94f),
-                Mathf.Max(.105f, _position.y - .026f));
+            _rpgCompanionPoint = RpgGroundPoint(_rpgLocation, new Vector2(Mathf.Clamp(_position.x - .074f, .06f, .94f),
+                Mathf.Max(.105f, _position.y - .026f)));
             _rpgCompanion = Anchor(_rpgSceneSpace, "RpgCompanion", _rpgCompanionPoint, RpgFieldActorSize);
             int id = RpgPartnerId;
             string outfit = FieldOutfit(id);

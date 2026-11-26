@@ -115,7 +115,7 @@ namespace YGOPortable.UI
                     continue;
                 }
 
-                var toStop = resident.Home + resident.Patrol[resident.Stop] - position;
+                var toStop = RpgGroundPoint(_rpgLocation, resident.Home + resident.Patrol[resident.Stop]) - position;
                 float distance = RpgArtDirection(toStop).magnitude;
                 float travel = resident.Speed * delta;
                 bool arrived = travel >= distance;

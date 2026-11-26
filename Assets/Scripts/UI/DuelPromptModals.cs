@@ -30,6 +30,7 @@ namespace YGOPortable.UI
         private RectTransform _modalBody;
         private RectTransform _modalFooter;
         private CanvasGroup _promptInput;
+        private bool _cardDetailsOpen;
         private DuelPromptBackdrop _promptShade;
         private RectTransform _fieldViewTab;
         private Button _fieldViewButton;
@@ -254,6 +255,11 @@ namespace YGOPortable.UI
         {
             CloseZoneViewer();
             HidePrompt();
+            _cardDetailsOpen = false;
+            _curSession = null;
+            _curPrompt = null;
+            _lastMaterial = null;
+            RefreshPromptInput();
         }
 
         internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
@@ -307,7 +313,13 @@ namespace YGOPortable.UI
             return true;
         }
 
-        internal void SetCardDetailsOpen(bool open) => _promptInput.interactable = !open && !IsZoneViewerOpen;
+        internal void SetCardDetailsOpen(bool open)
+        {
+            _cardDetailsOpen = open;
+            RefreshPromptInput();
+        }
+
+        private void RefreshPromptInput() => _promptInput.interactable = !_cardDetailsOpen && !IsZoneViewerOpen;
 
         internal void SetZoneBrowserActions(Action<bool, uint> browsePile, Action<uint, LiveCardState> openDetails,
             Action<LiveCardState> inspect)
@@ -2282,8 +2294,8 @@ namespace YGOPortable.UI
             if (!IsZoneViewerOpen) return;
             bool restoreFocus = FocusIsInside(ZoneViewRoot);
             ZoneViewRoot.SetActive(false);
-            _promptInput.interactable = true;
-            if (restoreFocus) SetFocus(IsShowingField ? _fieldViewButton.gameObject : _focusBeforeZone);
+            RefreshPromptInput();
+            if (!_cardDetailsOpen && restoreFocus) SetFocus(IsShowingField ? _fieldViewButton.gameObject : _focusBeforeZone);
             _focusBeforeZone = null;
             ClearZoneCards();
         }
@@ -2398,8 +2410,8 @@ namespace YGOPortable.UI
             {
                 CloseZoneViewer();
                 _focusBeforeZone = EventSystem.current?.currentSelectedGameObject;
-                _promptInput.interactable = false;
                 ZoneViewRoot.SetActive(true);
+                RefreshPromptInput();
             }
             _zoneTabs.gameObject.SetActive(browsePiles);
             _zoneBody.offsetMax = new Vector2(-10f, browsePiles ? -151f : -62f);

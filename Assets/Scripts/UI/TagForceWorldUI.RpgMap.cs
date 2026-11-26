@@ -30,7 +30,7 @@ namespace YGOPortable.UI
             DuelUiKit.AddImage(sky.gameObject, RpgSoftLight, new Color(.34f, .36f, .67f, .28f), false, false);
             RpgUiStyle.Display(HudLabel(Area(_body, "MapTitle", .013f, 1.018f, .108f, 1.127f), "월드맵", 35,
                 new Color(.93f, .97f, 1f)));
-            RpgUiStyle.Reading(HudLabel(Area(_body, "MapArea", .113f, 1.022f, .61f, 1.115f),
+            RpgUiStyle.Reading(HudLabel(Area(_body, "MapArea", .113f, 1.022f, .575f, 1.115f),
                 IsGxCampaign ? "듀얼 아카데미아 화산섬" : "새틀라이트 · 네오 도미노 시티", 23, new Color(.76f, .83f, .94f)));
             _rpgMapTime = 0f;
             _rpgMapPulses.Clear();
@@ -38,6 +38,9 @@ namespace YGOPortable.UI
             var episodes = _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>();
             int target = cleared < episodes.Length ? CampaignRegionForEpisode(cleared + 1) : -1;
             BuildRpgMapLegend();
+            if (target >= 0 && target != _rpgLocation && CampaignRegions[target].IsOpen(cleared))
+                RpgButton(Area(_body, "TravelToGoal", .59f, 1.025f, .80f, 1.114f), "목표로 이동",
+                    () => { if (_rpgPendingRegion < 0) BeginRpgTravel(target, RpgArrival); }, 19, primary: true);
             var mapWell = Area(_body, "Atlas", .006f, .019f, .730f, .989f);
             RpgUiStyle.Glass(mapWell);
             var crop = Area(mapWell, "MapInset", .014f, .041f, .987f, .957f);

@@ -18,6 +18,12 @@ namespace YGOPortable.UI
         private string RpgArt => "TagForce/" + RpgAssetFolder + "/";
         private string RpgRegionPreference => $"ygo.{RpgCampaignId}-rpg.last-region";
         private RpgRegion[] CampaignRegions => _campaignRegions;
+        private bool IsGxHarbor(int region) => IsGxCampaign && CampaignRegions[region].Id == "spot_harbor_beach";
+
+        private Vector2 RpgGroundPoint(int region, Vector2 position) => IsGxHarbor(region)
+            ? new Vector2(Mathf.Clamp(position.x, .22f, .525f), Mathf.Clamp(position.y, .185f, .35f))
+            : position;
+
         private string CampaignFieldTheme => _rpgConfiguration?.spots[_rpgLocation].fieldTheme;
         private (int From, int Exit, int To, int Entry)[] CampaignRoutes => _campaignRoutes ?? RpgPaths;
         private StoryEpisodeData CurrentRpgEpisode => _rpgCampaign?.episodes != null && RpgClears < _rpgCampaign.episodes.Length
@@ -89,7 +95,7 @@ namespace YGOPortable.UI
         {
             if (!IsGxCampaign) return RpgLandmarks[index];
             var spot = _rpgConfiguration.spots[index];
-            return ("지역 안내", new Vector2(.67f, .30f), spot.subtitle);
+            return ("지역 안내", IsGxHarbor(index) ? new Vector2(.43f, .285f) : new Vector2(.67f, .30f), spot.subtitle);
         }
 
         private bool AdvanceAutomaticRpgScene()
@@ -140,7 +146,8 @@ namespace YGOPortable.UI
                     "dp_small" => "150 DP",
                     _ => item,
                 };
-                var position = new Vector2(index % 2 == 0 ? .21f : .75f, .30f + .08f * (index / 2));
+                var position = RpgGroundPoint(_rpgLocation,
+                    new Vector2(index % 2 == 0 ? .21f : .75f, .30f + .08f * (index / 2)));
                 var marker = Anchor(_rpgFieldObjects, $"Pickup_{item}", position, new Vector2(89f, 35f));
                 RpgButton(marker, "✦ 줍기", Approach, 17, primary: true);
                 _questMarkers.Add(marker);

@@ -23,6 +23,7 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
+            VerifyLayeredPromptInput();
             VerifyMobileDuelSafeArea();
             int opens = 0;
             foreach (bool humanFirst in new[] { true, false })
@@ -36,6 +37,28 @@ namespace YGOPortable.Editor
             VerifyNativeBanishedTrigger();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
             Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile counts and visible tops, tabs, card details, filtered action shortcuts, privacy and effect prompt field view ({hitTest}) verified.");
+        }
+
+        private static void VerifyLayeredPromptInput()
+        {
+            var canvas = new GameObject("Layered duel prompt input", typeof(Canvas));
+            try
+            {
+                var modals = new DuelPromptModals(canvas.transform, null, null);
+                var promptInput = modals.ModalRoot.GetComponent<CanvasGroup>();
+                modals.ZoneViewRoot.SetActive(true);
+                modals.SetCardDetailsOpen(true);
+                modals.CloseZoneViewer();
+                Require(!promptInput.interactable, "Closing the zone browser leaked input through card details.");
+                modals.SetCardDetailsOpen(false);
+                Require(promptInput.interactable, "Closing card details left the duel prompt locked.");
+                modals.ZoneViewRoot.SetActive(true);
+                modals.SetCardDetailsOpen(true);
+                modals.HideAll();
+                Require(!modals.IsZoneViewerOpen && !modals.IsPromptOpen && promptInput.interactable,
+                    "Leaving the duel did not release its nested modal locks.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(canvas); }
         }
 
         private static void VerifyMobileDuelSafeArea()

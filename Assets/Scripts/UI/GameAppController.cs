@@ -901,7 +901,7 @@ namespace YGOPortable.UI
                         }
                         string storyReward = fromField ? null : Settle();
                         ShowScreen(AppScreen.StoryMode);
-                        if (fromField) _storyMode.ShowFieldDuelResult(episode, won, draw, Settle);
+                        if (fromField) _storyMode.ShowFieldDuelResult(episode, won, draw, Settle, plan);
                         else _storyMode.ShowDuelResult(episode, won, draw, storyReward, plan);
                         SyncFrontMenuFocus();
                         return;

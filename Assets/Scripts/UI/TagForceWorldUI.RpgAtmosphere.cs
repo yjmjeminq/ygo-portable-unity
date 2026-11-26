@@ -57,6 +57,7 @@ namespace YGOPortable.UI
 
         private readonly List<RpgAtmosphereParticle> _rpgAtmosphereParticles = new();
         private static Sprite _rpgSoftLight, _rpgMote;
+        private RectTransform _rpgAtmosphereLayer;
         private Image _rpgAtmosphereLight, _rpgAtmosphereHaze;
         private RpgAtmosphereStyle _rpgAtmosphereStyle;
         private float _rpgAtmosphereTime;
@@ -90,7 +91,7 @@ namespace YGOPortable.UI
                 _ => RpgAcademia,
             } : _rpgLocation];
             var style = _rpgAtmosphereStyle;
-            var layer = DuelUiKit.FillRect("FieldAtmosphere", _rpgSceneSpace);
+            var layer = _rpgAtmosphereLayer = DuelUiKit.FillRect("FieldAtmosphere", _rpgSceneSpace);
             var input = layer.gameObject.AddComponent<CanvasGroup>();
             input.blocksRaycasts = input.interactable = false;
             var lower = style.LightPosition - style.LightSize * .5f;
@@ -164,6 +165,7 @@ namespace YGOPortable.UI
 
         private void ClearRpgAtmosphere()
         {
+            _rpgAtmosphereLayer = null;
             _rpgAtmosphereLight = _rpgAtmosphereHaze = null;
             _rpgAtmosphereParticles.Clear();
         }
