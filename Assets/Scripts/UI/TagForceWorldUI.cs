@@ -468,8 +468,8 @@ namespace YGOPortable.UI
         {
             if (!CanWalk || (_rpgField && _fieldMenu)) return;
             _manualWalk = false;
-            _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
-            if (_rpgField) _destination = RpgGroundPoint(_rpgLocation, _destination);
+            _destination = _rpgField && IsGxCampaign ? RpgGroundPoint(_rpgLocation, point) :
+                new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
             _moving = true;
             _onArrival = arrive;
             _rpgApproachActor = approachActor;
@@ -602,7 +602,7 @@ namespace YGOPortable.UI
                 return true;
             }
             if (_fieldMenu) return false;
-            if (_rpgField && frame.Alternate && (_rpgCompanion != null || _rpgResidents.ContainsKey(RpgPartnerId)))
+            if (_rpgField && !IsGxCampaign && frame.Alternate && (_rpgCompanion != null || _rpgResidents.ContainsKey(RpgPartnerId)))
             {
                 OpenRpgService(RpgPartnerId);
                 return true;

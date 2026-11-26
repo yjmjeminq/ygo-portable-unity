@@ -9,11 +9,11 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private int RpgPartnerId => IsGxCampaign ? RpgPlayerId == 107 ? 119 : 107 : CollectionProgress.ActiveRpgPartner.Id;
+        private int RpgPartnerId => CollectionProgress.ActiveRpgPartner.Id;
         private const int RpgShopkeeperId = -1;
         private const string RpgShopkeeperName = "카드 매점 직원";
         private static string RpgArtKey(int id) => id == RpgShopkeeperId ? "shopkeeper" : id.ToString();
-        private string RpgPartnerName => IsGxCampaign ? DeckRepository.GetCharacter(RpgPartnerId)?.name ?? "동료" : CollectionProgress.ActiveRpgPartner.Name;
+        private string RpgPartnerName => CollectionProgress.ActiveRpgPartner.Name;
         private static readonly string[] RpgPartnerLines =
         {
             "아카데미아 실습장부터 둘러보자. 교정에 오늘의 대진표가 있어.",
@@ -58,7 +58,7 @@ namespace YGOPortable.UI
         private bool _rpgIntroOnOpen, _rpgAnnounceArrival, _rpgWorkbenchServices, _rpgChoosingCompanion;
         private int? _rpgServiceSpeaker;
 
-        private string RpgPartnerComment => IsGxCampaign ? CampaignLandmark(_rpgLocation).Description : RpgPartnerAreaLines.GetValueOrDefault(RpgPartnerId, RpgPartnerLines)[_rpgLocation];
+        private string RpgPartnerComment => RpgPartnerAreaLines.GetValueOrDefault(RpgPartnerId, RpgPartnerLines)[_rpgLocation];
 
         internal Sprite RpgStandingPortrait(int id, int episode = 0)
         {
@@ -170,7 +170,8 @@ namespace YGOPortable.UI
         private void AddRpgShopkeeper()
         {
             if (!HasRpgMerchant(_rpgLocation, RpgClears)) return;
-            AddRpgResident(RpgShopkeeperId, RpgShopkeeperName, "RpgCardMerchant", new Vector2(.82f, .38f),
+            var point = IsGxCampaign ? new Vector2(.71f, .42f) : new Vector2(.82f, .38f);
+            AddRpgResident(RpgShopkeeperId, RpgShopkeeperName, "RpgCardMerchant", RpgGroundMark(_rpgLocation, point),
                 RpgResidentRole.Shop, () => OpenRpgService(RpgShopkeeperId));
         }
 

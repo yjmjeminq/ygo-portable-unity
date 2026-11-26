@@ -16,13 +16,13 @@ namespace YGOPortable.UI
             new(.075f, .20f), new(.925f, .20f), new(.12f, .455f), new(.88f, .455f),
         };
 
-        private static readonly Vector2[] GxHarborExitPoints =
+        private static readonly Vector2[] GxExitApproaches =
         {
-            new(.22f, .252f), new(.525f, .23f), new(.33f, .35f), new(.465f, .35f),
+            new(.075f, .23f), new(.925f, .22f), new(.37f, .90f), new(.63f, .90f),
         };
 
         private Vector2 RpgExitPoint(int region, int slot) =>
-            (IsGxHarbor(region) ? GxHarborExitPoints : RpgExitPoints)[slot];
+            IsGxCampaign ? RpgGroundPoint(region, GxExitApproaches[slot]) : RpgExitPoints[slot];
 
         private static readonly (int Region, int Exit, int Other, int Entrance)[] RpgPaths =
         {
@@ -118,7 +118,9 @@ namespace YGOPortable.UI
         private void FollowRpgExit(int destination, int entry)
         {
             if (!CanWalk) return;
-            var arrival = RpgExitPoint(destination, entry) - RpgExitDirection(entry) * .105f;
+            var exit = RpgExitPoint(destination, entry);
+            var arrival = IsGxCampaign ? Vector2.MoveTowards(exit, RpgFieldArrival(destination), .105f) :
+                exit - RpgExitDirection(entry) * .105f;
             BeginRpgTravel(destination, arrival);
         }
 
@@ -127,8 +129,15 @@ namespace YGOPortable.UI
             var step = _position - previous;
             foreach (var (slot, destination, entry) in _rpgExits)
             {
-                if (Vector2.Dot(step, RpgExitDirection(slot)) <= 0f) continue;
                 var exit = RpgExitPoint(_rpgLocation, slot);
+                if (IsGxCampaign)
+                {
+                    var outward = GxExitApproaches[slot] - exit;
+                    if (Vector2.Dot(step, outward) <= 0f || (_position - exit).sqrMagnitude > .018f * .018f) continue;
+                    FollowRpgExit(destination, entry);
+                    return true;
+                }
+                if (Vector2.Dot(step, RpgExitDirection(slot)) <= 0f) continue;
                 bool reached = slot switch
                 {
                     0 => _position.x <= exit.x && Mathf.Abs(_position.y - exit.y) <= .043f,

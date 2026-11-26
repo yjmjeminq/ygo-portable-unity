@@ -271,23 +271,18 @@ namespace YGOPortable.UI
             float progress = Mathf.Clamp01(CollectionProgress.RpgRankProgress);
             if (progress > 0f) Tint(Area(experience, "Fill", 0f, 0f, progress, 1f), RpgUiStyle.Cyan);
 
-            _gxFieldDetails = Area(_rpgFieldHud, "FieldDetails", .741f, .426f, .974f, .699f);
+            _gxFieldDetails = Area(_rpgFieldHud, "FieldDetails", .741f, .486f, .974f, .699f);
             RpgUiStyle.Glass(_gxFieldDetails);
             var deck = episode?.forcedPlayerDeckId is > 0 && _rpgWorldDecks.TryGetValue(episode.forcedPlayerDeckId, out var povDeck)
                 ? povDeck.title : RpgFieldDeckName();
-            Detail("Deck", .69f, "출전 덱", deck.TrimStart(' ', '/'));
-            Detail("Partner", .40f, "동료", $"{RpgPartnerName}  ·  호감도 {CollectionProgress.RpgAffinityFor(RpgPartnerId)} / 100");
+            Detail("Deck", .57f, "출전 덱", deck.TrimStart(' ', '/'));
             PresetDeckInfo rival = null;
             if (episode != null) _rpgWorldDecks.TryGetValue(episode.deckId, out rival);
             Detail("GxOpponentTier", .11f, rival == null ? "상대 덱" : $"상대 덱 · ★{rival.difficultyTier}",
                 rival?.title ?? "예정된 듀얼 없음");
             _gxFieldDetails.gameObject.SetActive(false);
 
-            if (_page == Page.Field)
-            {
-                AddGxIdentity(_player, $"나 · {RpgPlayerName}", RpgUiStyle.Cyan);
-                if (_rpgCompanion != null) AddGxIdentity(_rpgCompanion, $"동료 · {RpgPartnerName}", Color.white);
-            }
+            if (_page == Page.Field) AddGxIdentity(_player, $"나 · {RpgPlayerName}", RpgUiStyle.Cyan);
             var controls = Area(_rpgFieldHud, "Controls", .025f, .035f, .263f, .085f);
             RpgUiStyle.Glass(controls);
             HudLabel(Area(controls, "Move", .074f, 0f, .94f, 1f), Application.isMobilePlatform ? "바닥을 터치해 이동" : "방향키 또는 스틱으로 이동",

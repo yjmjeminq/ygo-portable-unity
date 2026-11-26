@@ -67,7 +67,18 @@ namespace YGOPortable.UI
 
         private static readonly Vector2[] RpgNpcSlots = { new(.48f, .40f), new(.23f, .33f), new(.74f, .36f) };
         private static readonly Vector2[] GxHarborNpcSlots = { new(.50f, .30f), new(.24f, .32f), new(.43f, .345f) };
-        private Vector2 RpgNpcPoint(int index) => (IsGxHarbor(_rpgLocation) ? GxHarborNpcSlots : RpgNpcSlots)[index];
+        private static readonly Vector2[] GxLibraryNpcSlots = { new(.50f, .62f), new(.49f, .42f), new(.515f, .51f) };
+
+        private Vector2 RpgNpcPoint(int index)
+        {
+            var slots = IsGxCampaign ? CampaignRegions[_rpgLocation].Id switch
+            {
+                "spot_harbor_beach" => GxHarborNpcSlots,
+                "spot_library" => GxLibraryNpcSlots,
+                _ => RpgNpcSlots,
+            } : RpgNpcSlots;
+            return RpgGroundMark(_rpgLocation, slots[index]);
+        }
         private readonly List<RectTransform> _questMarkers = new();
         private readonly Dictionary<int, RectTransform> _rpgResidents = new();
         private RectTransform _rpgNavigation;
@@ -129,7 +140,7 @@ namespace YGOPortable.UI
                 _rpgLocation = CampaignRegionForEpisode(_observedRpgClears + 1);
             if (_rpgIntroOnOpen) _rpgLocation = RpgGarage;
             _rpgAnnounceArrival = openIntro;
-            _position = RpgGroundPoint(_rpgLocation, RpgArrival);
+            _position = RpgFieldArrival(_rpgLocation);
             _resident = null;
             _rpgQuestResident = null;
             _rpgLastPlayedSceneId = null;
@@ -281,7 +292,7 @@ namespace YGOPortable.UI
                 return false;
             if (index != _rpgLocation)
             {
-                _position = RpgGroundPoint(index, arrival);
+                _position = arrival == RpgArrival ? RpgFieldArrival(index) : RpgGroundPoint(index, arrival);
                 _rpgAnnounceArrival = true;
             }
             _rpgLocation = index;
@@ -336,7 +347,7 @@ namespace YGOPortable.UI
             }
             var sideObjective = sideQuest != null ? AddRpgSideQuest(sideQuest) : null;
             AddRpgShopkeeper();
-            BuildRpgCompanion();
+            if (!IsGxCampaign) BuildRpgCompanion();
             _player = Anchor(_rpgSceneSpace, "Player", _position, RpgFieldActorSize);
             _playerSprite = WalkerSprite(_player, CampaignSdPath(RpgPlayerId), RpgPlayerName);
             PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false);

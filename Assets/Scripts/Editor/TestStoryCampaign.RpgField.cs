@@ -329,6 +329,7 @@ namespace YGOPortable.Editor
                             VerifyDialogueStart(episode.preDialogues, episode.id);
                             if (index == 0)
                             {
+                                Require(FieldScene().Find("RpgCompanion") == null, "The GX prologue spawned a partner.");
                                 VerifyGxPrologue(episode);
                                 Press(storyRoot, "Scene/DialogueTools/Auto/Button");
                                 Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
@@ -343,6 +344,7 @@ namespace YGOPortable.Editor
 
                         if (episode.id == "gx_ep_01")
                         {
+                            VerifyGxHarborWalk();
                             PressRpgNavigation("Quests");
                             Require(panel.Find("GxStoryJournal/Memories").GetComponentsInChildren<Button>().Length == 0,
                                 "GX memories were visible before their episodes were cleared.");
@@ -368,6 +370,9 @@ namespace YGOPortable.Editor
                         if (episode.id == "gx_ep_01")
                         {
                             var fieldHud = panel.Find("FieldHud");
+                            Require(fieldHud.Find("FieldDetails/Partner") == null && FieldScene().Find("RpgCompanion") == null &&
+                                FieldScene().Find("Resident_107") != null && FieldScene().Find("Resident_119") != null,
+                                "Asuka and Jaden should appear as academy residents after the harbor introduction.");
                             Require(!fieldHud.Find("FieldDetails").gameObject.activeSelf &&
                                 !fieldHud.Find("ContextAction").gameObject.activeSelf &&
                                 panel.Find("RegionBanner") == null && panel.Find("PartnerGreeting") == null &&
@@ -450,21 +455,92 @@ namespace YGOPortable.Editor
                         !CollectionProgress.IsStoryEpisodeCleared("gx_ep_17") && CollectionProgress.RpgAffinity == 0,
                         "GX progress did not survive reloading or overwrote classic GX progress.");
                     foreach (int location in Enumerable.Range(0, gxMap.spots.Length))
+                    {
+                        string map = gxMap.spots[location].spotId;
                         Require(world.EnterRpgRegion(location) && FieldScene().Find("Scenery").GetComponent<Image>().sprite != null,
-                            $"Unable to enter GX map {gxMap.spots[location].spotId}.");
+                            $"Unable to enter GX map {map}.");
+                        VerifyGxGrounded(location);
+                        var exitPoints = FieldScene().Find("Exploration").Cast<RectTransform>()
+                            .Where(anchor => anchor.name.StartsWith("ExitTarget_", StringComparison.Ordinal))
+                            .Select(anchor => anchor.anchorMin).ToArray();
+                        for (int i = 0; i < exitPoints.Length; i++)
+                            Require(!exitPoints.Skip(i + 1).Any(point => Vector2.Distance(point, exitPoints[i]) < .055f),
+                                $"Two exits lead to the same point on {map}.");
+                        if (map == "spot_library")
+                        {
+                            WalkOnGxMap(new Vector2(.89f, .66f));
+                            var feet = ((RectTransform)FieldScene().Find("Player")).anchorMin;
+                            Require(feet.x is > .455f and < .546f && feet.y > .455f,
+                                "The player left the library aisle or could not use its back half.");
+                        }
+                        if (map == "spot_volcano_arena")
+                        {
+                            WalkOnGxMap(new Vector2(.89f, .30f));
+                            var feet = ((RectTransform)FieldScene().Find("Player")).anchorMin;
+                            Require(feet.x < .70f && feet.y > .36f, "The player walked off the platform into the lava.");
+                        }
+                    }
                     PressRpgNavigation("Map");
                     Require(panel.Find(MapNodes)?.childCount == 12, "The GX world map lost pin buttons.");
                     world.Back();
                     VerifyGxArtwork(gxMap, expectedCg);
                     VerifyGxMemories();
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
-                    Debug.Log("[VERIFY GX FIELD] 53 consecutive sequences, 34 Master duels, 19 automatic lockouts, all 12 maps and three temporary POV decks passed.");
+                    Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master duels, 19 lockouts, 12 grounded fields, solo travel and three POV decks passed.");
                 }
                 finally
                 {
                     if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
                     else PlayerPrefs.DeleteKey(gxPreference);
                     PlayerPrefs.Save();
+                }
+
+                void VerifyGxHarborWalk()
+                {
+                    int harbor = world.CampaignRegionForEpisode(1);
+                    Require(world.EnterRpgRegion(harbor), "Unable to return to the GX harbor after the opening.");
+                    VerifyGxGrounded(harbor);
+                    var field = FieldScene();
+                    var player = (RectTransform)field.Find("Player");
+                    WalkOnGxMap(new Vector2(.82f, .70f));
+                    Require(player.anchorMin.x < .54f && player.anchorMin.y < .40f,
+                        "Touch movement crossed from the GX harbor onto the water.");
+                    for (int i = 0; i < 5; i++) world.Update(.1f, new Vector2(1f, 1f));
+                    Require(FieldScene() == field && player.anchorMin.x < .54f && player.anchorMin.y < .40f,
+                        "Stick movement crossed from the GX harbor onto the water.");
+                    world.Update(0f);
+                    int academy = world.CampaignRegionForEpisode(2);
+                    Press(field, $"Exploration/Exit_{academy}");
+                    for (int i = 0; i < 20 && FieldScene() == field; i++) world.Update(.20f);
+                    world.Update(.4f);
+                    Require(FieldScene() != field && world.CanStartRpgEpisode(1),
+                        "The grounded harbor exit did not reach the academy.");
+                    VerifyGxGrounded(academy);
+                    Require(world.EnterRpgRegion(harbor), "Unable to return to the harbor for the map guide.");
+                }
+
+                void WalkOnGxMap(Vector2 point)
+                {
+                    FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(point);
+                    world.Update(4f);
+                }
+
+                void VerifyGxGrounded(int location)
+                {
+                    var project = typeof(TagForceWorldUI).GetMethod("RpgGroundPoint", flags);
+                    var field = FieldScene();
+                    Require(field.Find("RpgCompanion") == null, "A GX companion followed the player.");
+                    foreach (var anchor in field.GetComponentsInChildren<RectTransform>())
+                    {
+                        string id = anchor.name;
+                        if (id != "Player" && id != "MainQuestNpc" && id != "RpgCardMerchant" && id != "Landmark" &&
+                            !id.StartsWith("Resident_", StringComparison.Ordinal) &&
+                            !id.StartsWith("Pickup_", StringComparison.Ordinal) &&
+                            !id.StartsWith("ExitTarget_", StringComparison.Ordinal)) continue;
+                        var point = anchor.anchorMin;
+                        var grounded = (Vector2)project.Invoke(world, new object[] { location, point });
+                        Require(Vector2.Distance(grounded, point) < .0001f, $"{id} was outside the GX walking area.");
+                    }
                 }
 
                 void VerifyGxPrologue(StoryEpisodeData episode)
@@ -485,10 +561,17 @@ namespace YGOPortable.Editor
                         harbor != backstage && harbor != tournament, "The GX opening did not switch all three stage backgrounds.");
                     int castEntrance = Array.FindIndex(lines, harborIndex, line => line.stage?.Length > 1 &&
                         line.stage.Any(action => action.actor == 119));
+                    bind.Invoke(dialogue, new object[] { harborIndex, false });
+                    Require(!FieldScene().Find("DialogueCast/Guest_107").gameObject.activeSelf &&
+                        !FieldScene().Find("DialogueCast/Guest_119").gameObject.activeSelf,
+                        "Asuka or Jaden appeared before the scripted meeting.");
                     bind.Invoke(dialogue, new object[] { castEntrance, false });
-                    foreach (var actor in FieldScene().Find("DialogueCast").Cast<RectTransform>().Where(actor => actor.gameObject.activeSelf))
-                        Require(actor.anchorMin.x >= .22f && actor.anchorMin.x <= .525f &&
-                            actor.anchorMin.y >= .185f && actor.anchorMin.y <= .35f, "An actor stood off of dry ground in the GX harbor.");
+                    var stage = FieldScene().Find("DialogueCast");
+                    Require(stage.Find("Guest_107").gameObject.activeSelf && stage.Find("Guest_119").gameObject.activeSelf,
+                        "Asuka or Jaden was missing at the scripted meeting.");
+                    foreach (var actor in stage.Cast<RectTransform>().Where(actor => actor.gameObject.activeSelf))
+                        Require(actor.anchorMin.x is > .14f and < .53f &&
+                            actor.anchorMin.y is > .195f and < .395f, "An actor stood off of dry ground in the GX harbor.");
                     bind.Invoke(dialogue, new object[] { 0, false });
                     Require(scenery.sprite == tournament, "Rewinding the opening did not restore the tournament map.");
                 }

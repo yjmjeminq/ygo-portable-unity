@@ -90,6 +90,9 @@ namespace YGOPortable.UI
                 float side = heroMark.x <= opponentMark.x ? -.09f : .09f;
                 float x = opponentMark.x + side;
                 heroMark.x = x is < .06f or > .94f ? opponentMark.x - side : x;
+                heroMark = RpgGroundPoint(_rpgLocation, heroMark);
+                if (Mathf.Abs(heroMark.x - opponentMark.x) < .065f)
+                    heroMark.y = opponentMark.y - .13f;
             }
             heroMark = RpgGroundPoint(_rpgLocation, heroMark);
             PoseRpgWalker(_player, _playerSprite, heroMark, Vector2.zero, false, RpgNpcPoint(0) - heroMark);
@@ -103,7 +106,6 @@ namespace YGOPortable.UI
             foreach (var resident in _rpgResidentMotion)
                 resident.Marker.gameObject.SetActive(false);
             _player.Find("GxIdentity")?.gameObject.SetActive(false);
-            _rpgCompanion?.Find("GxIdentity")?.gameObject.SetActive(false);
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldObjects?.gameObject.SetActive(false);
             _rpgGreeting?.gameObject.SetActive(false);
@@ -156,9 +158,12 @@ namespace YGOPortable.UI
             var entry = new Vector2(left ? .052f : .948f, row);
             if (IsGxHarbor(_rpgLocation))
             {
-                mark = new Vector2(left ? .25f : .435f, Mathf.Min(.35f, .335f + (slot / 2) * .015f));
-                entry = new Vector2(left ? .22f : .525f, mark.y);
+                float rowOffset = (slot / 2) * .035f;
+                mark = new Vector2(left ? .245f + rowOffset : .465f - rowOffset, .321f + rowOffset * .7f);
+                entry = new Vector2(left ? .14f : .525f, mark.y);
             }
+            mark = RpgGroundMark(_rpgLocation, mark);
+            entry = RpgGroundPoint(_rpgLocation, entry);
             RectTransform actor, sprite;
             bool resident = false;
             if (!enters && id == RpgPartnerId && _rpgCompanion != null)
