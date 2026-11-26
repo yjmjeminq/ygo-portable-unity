@@ -255,6 +255,9 @@ namespace YGOPortable.Editor
                 Require(gxScript?.episodes.Length == 53 && gxScript.episodes.Count(episode => episode.isCutsceneOnly) == 19 &&
                     gxDecks.Count == 37 && gxMap?.spots.Length == 12 && gxMap.roster.Length == 26,
                     "GX campaign inputs are incomplete.");
+                Require(gxScript.protagonist == "윤", "The GX protagonist name did not load.");
+                var dialogue = typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
+                var dialogueType = typeof(StoryModeUI.StoryDialogueView);
                 Require(File.Exists(Path.Combine(streaming, gxMap.assetConfig.worldMapPath)), "Missing GX world map.");
                 Require(gxMap.roster.All(actor => DeckRepository.GetCharacter(actor.charId) != null), "GX resident has no character entry.");
                 int forbiddenTypes = (int)(YgoConstants.TYPE_SYNCHRO | YgoConstants.TYPE_XYZ |
@@ -295,6 +298,7 @@ namespace YGOPortable.Editor
                                 $"Automatic cutscene did not lock controls at {episode.id}.");
                             Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
                                 .text == "오토 켜짐", $"Automatic playback is off for {episode.id}.");
+                            VerifyDialogueStart(episode.preDialogues, episode.id);
                             ReadDialogue(episode.preDialogues.Length);
                             Require(world.RpgClears == index + 1 && Get("_session") == null,
                                 $"A cutscene did not advance directly at {episode.id}.");
@@ -311,6 +315,33 @@ namespace YGOPortable.Editor
                         app.OpenRpgFieldEpisode(index);
                         Require(story.IsGxRpg && story.GetOpponentMatch(episode).Deck?.id == episode.deckId &&
                             FieldScene().Find("DialogueCast") != null, $"GX episode used the wrong deck or stage at {episode.id}.");
+                        VerifyDialogueStart(episode.preDialogues, episode.id);
+                        if (episode.id == "gx_ep_01")
+                        {
+                            VerifySpeaker(episode.preDialogues, "윤", player: true);
+                            app.StartStoryDuel(episode, startingDeck, true);
+                            AwardDuel(win: false);
+                            VerifyDialogueStart(episode.postLoseDialogues, episode.id);
+                            VerifySpeaker(episode.postLoseDialogues, "윤", player: true);
+                            Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                            Require(world.RpgClears == index && world.CanStartRpgEpisode(index),
+                                "A GX loss advanced the story or prevented retrying.");
+                            app.OpenRpgFieldEpisode(index);
+                        }
+                        if (isPov)
+                        {
+                            VerifySpeaker(episode.preDialogues, "텐죠인 아스카", player: true);
+                            if (episode.id == "gx_ep_27")
+                                VerifySpeaker(episode.preDialogues, "유벨 (윤에게 빙의)", player: false);
+                            else
+                            {
+                                VerifySpeaker(episode.preDialogues, "윤", player: false);
+                                var actors = typeof(TagForceWorldUI).GetField("_rpgStageIds", flags).GetValue(world)
+                                    as System.Collections.IDictionary;
+                                Require(actors != null && actors.Contains(0) && actors.Contains(episode.playAsCharacterId),
+                                    $"The field actors for Yun and Asuka were not separate at {episode.id}.");
+                            }
+                        }
                         app.StartStoryDuel(episode, startingDeck, true);
                         Require(Get("_ai") is TacticalAI { Difficulty: AIDifficulty.Master } &&
                             Get("_activeOppDeck") is PresetDeckInfo rival && rival.id == episode.deckId,
@@ -321,13 +352,16 @@ namespace YGOPortable.Editor
                                 forced.main.SequenceEqual(gxDecks[episode.forcedPlayerDeckId].main) &&
                                 forced.extra.SequenceEqual(gxDecks[episode.forcedPlayerDeckId].extra),
                                 $"Forced deck was not equipped at {episode.id}.");
-                            var fieldUi = Get("_duelField") as DuelFieldUI;
-                            var name = typeof(DuelFieldUI).GetField("_myNameText", flags).GetValue(fieldUi) as Text;
-                            Require(name?.text.Contains("아스카") == true, $"The duel HUD lost the POV name at {episode.id}.");
                             pov++;
                         }
                         else Require(ReferenceEquals(Get("_activeMyDeck"), startingDeck), "GX POV deck was not restored.");
+                        var fieldUi = Get("_duelField") as DuelFieldUI;
+                        var name = typeof(DuelFieldUI).GetField("_myNameText", flags).GetValue(fieldUi) as Text;
+                        Require(name?.text.Contains(isPov ? "아스카" : "윤") == true,
+                            $"The duel HUD lost the current player name at {episode.id}.");
                         AwardDuel(win: true);
+                        VerifyDialogueStart(episode.postWinDialogues, episode.id);
+                        if (episode.id == "gx_ep_27") VerifySpeaker(episode.postWinDialogues, "윤", player: false);
                         Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                         Require(world.RpgClears == index + 1 && CollectionProgress.LastDuelDeckId == startingDeck.id,
                             $"Duel result or previous deck was lost after {episode.id}.");
@@ -345,6 +379,7 @@ namespace YGOPortable.Editor
                     Require(panel.Find(MapNodes)?.childCount == 12, "The GX world map lost pin buttons.");
                     world.Back();
                     VerifyGxArtwork(gxMap, expectedCg);
+                    Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
                     Debug.Log("[VERIFY GX FIELD] 53 consecutive sequences, 34 Master duels, 19 automatic lockouts, all 12 maps and three temporary POV decks passed.");
                 }
                 finally
@@ -352,6 +387,34 @@ namespace YGOPortable.Editor
                     if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
                     else PlayerPrefs.DeleteKey(gxPreference);
                     PlayerPrefs.Save();
+                }
+
+                void VerifyDialogueStart(StoryDialogueLine[] lines, string episodeId)
+                {
+                    Require(storyRoot.gameObject.activeInHierarchy && CurrentLine() == 0 &&
+                        ReferenceEquals(dialogueType.GetField("_dialogue", flags).GetValue(dialogue), lines),
+                        $"The wrong dialogue branch opened at {episodeId}.");
+                    VerifyDisplayedText(lines[0]);
+                }
+
+                void VerifySpeaker(StoryDialogueLine[] lines, string speaker, bool player)
+                {
+                    int index = Array.FindIndex(lines, line => line.speaker == speaker);
+                    Require(index >= 0, $"Missing GX speaker {speaker}.");
+                    dialogueType.GetMethod("BindLine", flags).Invoke(dialogue, new object[] { index, false });
+                    VerifyDisplayedText(lines[index]);
+                    var name = (Text)dialogueType.GetField("_speaker", flags).GetValue(dialogue);
+                    string speaking = player ? "_heroSpeaking" : "_opponentSpeaking";
+                    Require(name.text == speaker && (bool)dialogueType.GetField(speaking, flags).GetValue(dialogue),
+                        $"The dialogue assigned the wrong portrait slot to {speaker}.");
+                }
+
+                void VerifyDisplayedText(StoryDialogueLine line)
+                {
+                    var characters = (int[])dialogueType.GetField("_characters", flags).GetValue(dialogue);
+                    dialogueType.GetMethod("Reveal", flags).Invoke(dialogue, new object[] { characters.Length });
+                    var text = (Text)dialogueType.GetField("_text", flags).GetValue(dialogue);
+                    Require(text.text == line.text, "The GX dialogue did not render the scripted text.");
                 }
 
                 void ReadDialogue(int lines)

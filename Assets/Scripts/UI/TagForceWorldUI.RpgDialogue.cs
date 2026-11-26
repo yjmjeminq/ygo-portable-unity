@@ -86,7 +86,7 @@ namespace YGOPortable.UI
             var opponent = RegisterRpgActor(opponentId, _rpgDialogueOpponent, opponentArt,
                 _rpgDialogueOpponent.anchorMin, !IsGxCampaign || !entrances.Contains(opponentId), false);
             _rpgStageSpeakers[episode.opponentName] = opponent;
-            if (opponentId == 0) _rpgStageSpeakers["주인공"] = opponent;
+            if (opponentId == 0) _rpgStageSpeakers[RpgHeroName] = opponent;
 
             foreach (var resident in _rpgResidentMotion)
                 resident.Marker.gameObject.SetActive(false);
@@ -380,7 +380,8 @@ namespace YGOPortable.UI
         private bool IsRpgHero(string name) => name == _rpgHeroName || (_rpgSceneHeroId > 0
             ? name is "아스카" or "텐죠인 아스카" : IsOriginalRpgHero(name));
 
-        private static bool IsOriginalRpgHero(string name) => name?.StartsWith("주인공", StringComparison.Ordinal) == true ||
+        private bool IsOriginalRpgHero(string name) => name == RpgHeroName ||
+            name?.StartsWith("주인공", StringComparison.Ordinal) == true ||
             name?.StartsWith("여주인공", StringComparison.Ordinal) == true;
 
         private void ClearRpgDialogue()

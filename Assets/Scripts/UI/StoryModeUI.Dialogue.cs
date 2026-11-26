@@ -112,7 +112,9 @@ namespace YGOPortable.UI
             private TagForceWorldUI _field;
             private bool _stageCaption;
             private OpponentCharacter _sceneOpponent;
+            private string _sceneOpponentName;
             private string _protagonist;
+            private string _originalProtagonist;
             private string _emotion;
             private float _poseTime;
             private Selectable _popupReturn;
@@ -257,7 +259,8 @@ namespace YGOPortable.UI
                 Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
                 string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
                 string preferredRpgBackdrop = null, int rpgEpisode = 0, bool compactRpgDialogue = false,
-                int playAsCharacterId = 0, bool autoPlay = false, string rpgAssetFolder = null)
+                int playAsCharacterId = 0, bool autoPlay = false, string rpgAssetFolder = null,
+                string originalProtagonist = null, string opponentName = null)
             {
                 Close();
                 _field = field;
@@ -271,7 +274,9 @@ namespace YGOPortable.UI
                 if (rpg && compactRpgDialogue) dialogueTop = .236f;
                 _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, dialogueTop);
                 _protagonist = protagonist;
+                _originalProtagonist = originalProtagonist;
                 _sceneOpponent = opponent;
+                _sceneOpponentName = opponentName;
                 _rpg = rpg;
                 _rpgEpisode = rpgEpisode;
                 _rpgAssetFolder = rpgAssetFolder ?? field?.RpgAssetFolder ?? "5DS";
@@ -479,7 +484,8 @@ namespace YGOPortable.UI
                 _speaker.text = narration ? "" : line.speaker;
                 bool heroPreviouslySpeaking = _heroSpeaking;
                 bool opponentPreviouslySpeaking = _opponentSpeaking;
-                bool originalHero = !narration && (line.speaker.StartsWith("주인공", StringComparison.Ordinal) ||
+                bool originalHero = !narration && (line.speaker == _originalProtagonist ||
+                    line.speaker.StartsWith("주인공", StringComparison.Ordinal) ||
                     line.speaker.StartsWith("여주인공", StringComparison.Ordinal));
                 bool previousHeroSpeaking = _playAsCharacterId > 0 && originalHero;
                 _heroSpeaking = !narration && (line.speaker == _protagonist ||
@@ -840,7 +846,8 @@ namespace YGOPortable.UI
 
             private OpponentCharacter FindSpeaker(string name)
             {
-                if (_sceneOpponent?.name == name) return _sceneOpponent;
+                if (_sceneOpponent != null && (name == _sceneOpponentName || name == _sceneOpponent.name))
+                    return _sceneOpponent;
                 return DeckRepository.Characters.FirstOrDefault(character => character.name == name) ??
                     DeckRepository.Characters.FirstOrDefault(character => character.aliases?.Contains(name) == true);
             }

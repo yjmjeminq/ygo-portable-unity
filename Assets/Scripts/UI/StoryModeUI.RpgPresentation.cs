@@ -34,7 +34,8 @@ namespace YGOPortable.UI
                 DeckRepository.GetCharacter(episode.charId), lines, ReturnToEpisodes, rpg: true,
                 rpgBackdrop: region.StoryBackdrop,
                 preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1), rpgEpisode: index + 1,
-                playAsCharacterId: episode.playAsCharacterId, rpgAssetFolder: world.RpgAssetFolder);
+                playAsCharacterId: episode.playAsCharacterId, rpgAssetFolder: world.RpgAssetFolder,
+                originalProtagonist: Script.protagonist, opponentName: episode.opponentName);
         }
 
         private void PlayRpgFaceoff(StoryEpisodeData episode, string deckTitle, Action finish)

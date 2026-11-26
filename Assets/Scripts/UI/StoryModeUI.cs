@@ -864,7 +864,7 @@ namespace YGOPortable.UI
             }
             _dialogue.Open(heading, hero, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field,
                 rpgEpisode: RpgWardrobe.EpisodeNumber(episode), playAsCharacterId: episode.playAsCharacterId,
-                autoPlay: episode.isCutsceneOnly);
+                autoPlay: episode.isCutsceneOnly, originalProtagonist: Script.protagonist, opponentName: episode.opponentName);
         }
 
         private void ReturnToEpisodes()
