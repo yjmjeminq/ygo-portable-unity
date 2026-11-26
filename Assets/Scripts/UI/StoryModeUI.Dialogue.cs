@@ -104,6 +104,7 @@ namespace YGOPortable.UI
             private int _rpgEpisode;
             private bool _showCutscene;
             private bool _akiBlush;
+            private bool _blushOverlay;
             private readonly Image _heroPrevious, _opponentPrevious;
             private readonly Text _heroReaction, _opponentReaction;
             private float _heroFade, _opponentFade, _heroSlide, _opponentSlide;
@@ -476,14 +477,18 @@ namespace YGOPortable.UI
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
                 _akiBlush = _rpg && speaker?.id == 1 && _emotion == "blush";
+                _blushOverlay = false;
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
                 if (_rpg)
                 {
                     if (_heroSpeaking || _hero.sprite == null)
                         ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
                     if ((speaker ?? (_opponent.sprite == null ? _sceneOpponent : null)) is { } actor)
-                        ShowBust(_opponent, _opponentPrevious, LoadActorBust(actor.id, speaker != null ? _emotion : null)
-                            ?? DuelProfileArt.Opponent(actor), ref _opponentFade, ref _opponentSlide);
+                    {
+                        var bust = LoadActorBust(actor.id, speaker != null ? _emotion : null, out bool authoredExpression);
+                        _blushOverlay = _akiBlush && !authoredExpression;
+                        ShowBust(_opponent, _opponentPrevious, bust ?? DuelProfileArt.Opponent(actor), ref _opponentFade, ref _opponentSlide);
+                    }
                     if (_heroSpeaking && !heroPreviouslySpeaking) _heroSlide = Mathf.Max(_heroSlide, .12f);
                     if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
                 }
@@ -786,16 +791,21 @@ namespace YGOPortable.UI
             private Sprite LoadHeroBust(string emotion) =>
                 LoadBust("Characters_Standing/full_protagonist", emotion) ?? DuelProfileArt.Player;
 
-            private Sprite LoadActorBust(int id, string emotion)
+            private Sprite LoadActorBust(int id, string emotion, out bool authoredExpression)
             {
                 string outfit = RpgWardrobe.ForStory(id, _rpgEpisode);
                 if (outfit != null)
                 {
-                    var pose = LoadExpression(RpgWardrobe.PortraitStem(id, outfit), emotion) ??
-                        LoadRpgSprite(RpgWardrobe.Preview(id, outfit));
-                    if (pose != null) return pose;
+                    var pose = LoadExpression(RpgWardrobe.PortraitStem(id, outfit), emotion);
+                    authoredExpression = pose != null;
+                    var bust = pose ?? LoadRpgSprite(RpgWardrobe.Preview(id, outfit));
+                    if (bust != null) return bust;
                 }
-                return LoadBust(RpgWardrobe.PortraitStem(id, null), emotion);
+                string stem = RpgWardrobe.PortraitStem(id, null);
+                // Aki's unsuffixed expression files belong to her everyday clothes.
+                var fallbackPose = id == 1 ? null : LoadExpression(stem, emotion);
+                authoredExpression = fallbackPose != null;
+                return fallbackPose ?? LoadRpgSprite(stem + ".png", waistUp: true);
             }
 
             private Sprite LoadBust(string stem, string emotion)
@@ -866,8 +876,8 @@ namespace YGOPortable.UI
 
             private void AnimateHearts()
             {
-                _blush.enabled = _akiBlush;
-                if (_akiBlush && _blush.sprite == null)
+                _blush.enabled = _blushOverlay;
+                if (_blushOverlay && _blush.sprite == null)
                 {
                     if (_cheekGlow == null)
                     {

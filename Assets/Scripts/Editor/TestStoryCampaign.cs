@@ -205,9 +205,9 @@ namespace YGOPortable.Editor
                             playerPortrait.enabled && speakerPortrait.enabled &&
                             caret.enabled && body.text == "<b>고마워.</b>" &&
                             badge.GetComponentInChildren<Text>().color == (Color)new Color32(0xFF, 0x40, 0x81, 255) &&
-                            portraits.transform.Find("Opponent/Blush").GetComponent<Image>().enabled &&
+                            !portraits.transform.Find("Opponent/Blush").GetComponent<Image>().enabled &&
                             portraits.transform.Find("Opponent/Heart_0/Label").GetComponent<Text>().enabled,
-                            "The portrait and blush did not return after fading out the CG.");
+                            "The authored blush did not return cleanly after fading out the CG.");
                         next.onClick.Invoke();
                         dialogue.Update(.4f);
                         Require(playerPortrait.enabled && speakerPortrait.enabled &&
