@@ -207,6 +207,7 @@ namespace YGOPortable.UI
         public Func<uint> CardCodeGetter;
         public Func<int> IndexGetter;
         public Func<object> DataGetter;
+        internal Func<bool> CanStartDrag;
         public Action OnLeftClick;
         public Action OnTouchClick;
         public Action OnTouchHold;
@@ -343,7 +344,7 @@ namespace YGOPortable.UI
             if (eventData.pointerId == _touchPressId) _touchPressId = -1;
             _parentScroll = null;
             if (eventData.pointerId >= 0 && eventData.pointerId == _consumedTouchId) return;
-            bool canDragCard = SourceType != DragSourceType.None && CardCodeGetter != null;
+            bool canDragCard = SourceType != DragSourceType.None && CardCodeGetter != null && CanStartDrag?.Invoke() != false;
             if (!canDragCard || eventData.pointerId >= 0)
             {
                 var scroll = GetComponentInParent<ScrollRect>();

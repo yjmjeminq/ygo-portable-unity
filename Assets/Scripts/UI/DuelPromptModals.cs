@@ -162,6 +162,7 @@ namespace YGOPortable.UI
             _materialConfirmRoot.gameObject.activeSelf ? _materialConfirm : _confirmBtn ?? _attackCancel;
 
         internal void SetFieldCardHitTest(Func<Vector2, Camera, bool> hitTest) => _promptShade.FieldCardHitTest = hitTest;
+        internal void SetFieldInspectionHitTest(Func<Vector2, Camera, bool> hitTest) => _promptShade.FieldInspectionHitTest = hitTest;
 
         internal bool FindFieldCard(DuelPrompt prompt, byte controller, uint location, uint sequence, out int index)
         {
@@ -3196,6 +3197,7 @@ namespace YGOPortable.UI
         internal bool ShowingField { get; set; }
         internal bool SelectingFieldCards { get; set; }
         internal Func<Vector2, Camera, bool> FieldCardHitTest { get; set; }
+        internal Func<Vector2, Camera, bool> FieldInspectionHitTest { get; set; }
         internal Button ChainConfirmationControl { get; set; }
         internal Button GraveActivationControl { get; set; }
         internal Button ExtraActivationControl { get; set; }
@@ -3229,7 +3231,8 @@ namespace YGOPortable.UI
                     ActivationHitTest?.Invoke(screenPoint, eventCamera) == true))
                 return false;
             if (SelectingFieldCards) return !FieldCardHitTest(screenPoint, eventCamera);
-            return !ShowingField || !IsPointOverPile(screenPoint, eventCamera);
+            return !ShowingField || !IsPointOverPile(screenPoint, eventCamera) &&
+                FieldInspectionHitTest?.Invoke(screenPoint, eventCamera) != true;
         }
 
         private static bool HitsControl(Button control, Vector2 point, Camera camera) =>

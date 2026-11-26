@@ -10,7 +10,7 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private enum PadScope { None, Board, Place, FieldCards, Piles, CardActions, Commands, Phase, Log, Zoom, StoryCrisis }
+        private enum PadScope { None, Board, Place, FieldCards, FieldView, CardActions, Commands, Phase, Log, Zoom, StoryCrisis }
 
         private readonly struct PadTarget
         {
@@ -127,7 +127,7 @@ namespace YGOPortable.UI
                     case PadScope.Log: CloseDuelLog(); break;
                     case PadScope.Zoom: CloseCardZoomModal(); break;
                     case PadScope.FieldCards:
-                    case PadScope.Piles: _modals.TryCancelOrPass(); break;
+                    case PadScope.FieldView: _modals.TryCancelOrPass(); break;
                     case PadScope.Place: TryCancelPlacement(); break;
                     case PadScope.StoryCrisis: SkipStoryCrisis(); break;
                     default: OnPauseClicked(); break;
@@ -146,7 +146,7 @@ namespace YGOPortable.UI
             if (frame.DescriptionScroll != 0f)
             {
                 var scroll = scope == PadScope.Log ? _logScroll : scope == PadScope.Zoom ? _zoomScroll :
-                    scope is PadScope.Board or PadScope.FieldCards ? _inspectScroll : null;
+                    scope is PadScope.Board or PadScope.FieldCards or PadScope.FieldView ? _inspectScroll : null;
                 if (scroll != null) ScrollDuelPadDescription(scroll, frame.DescriptionScroll);
             }
             if (frame.Direction == Vector2Int.zero && !frame.Submit && !frame.Alternate &&
@@ -155,10 +155,10 @@ namespace YGOPortable.UI
             BuildDuelPadTargets(scope);
             if (_duelPadTargets.Count == 0) return;
             int index = FindDuelPadFocus(scope);
-            if ((scope == PadScope.Board || scope == PadScope.Piles) && (frame.PreviousArea || frame.NextArea))
+            if ((scope == PadScope.Board || scope == PadScope.FieldView) && (frame.PreviousArea || frame.NextArea))
             {
                 RectTransform shortcut = frame.PreviousArea
-                    ? scope == PadScope.Piles ? _myExtraTile.root :
+                    ? scope == PadScope.FieldView ? _myExtraTile.root :
                         _myHandViews.FirstOrDefault(view => view.Rect.gameObject.activeInHierarchy)?.Rect
                     : _myGyTile.root;
                 int shortcutIndex = FindDuelPadTarget(shortcut);
@@ -175,7 +175,10 @@ namespace YGOPortable.UI
             SetDuelPadFocus(target, scope);
             if (frame.Submit) target.Submit?.Invoke();
             else if (frame.Alternate && scope != PadScope.FieldCards && target.PreviewCode != 0)
-                ShowCardZoomModal(target.PreviewCode, _inspectedFieldCard);
+            {
+                if (scope == PadScope.FieldView) OpenInspectedCardDetails();
+                else ShowCardZoomModal(target.PreviewCode, _inspectedFieldCard);
+            }
             RefreshDuelPadCursor();
         }
 
@@ -185,7 +188,7 @@ namespace YGOPortable.UI
             if (_modals.ZoneViewRoot.activeSelf || _modals.ResultRoot.activeSelf) return PadScope.None;
             if (_modals.IsFieldCardSelection)
                 return CanAcceptPlayerAction ? PadScope.FieldCards : PadScope.None;
-            if (_modals.IsShowingField) return PadScope.Piles;
+            if (_modals.IsShowingField) return PadScope.FieldView;
             if (_modals.IsPromptOpen) return PadScope.None;
             if (_logWindow.activeSelf) return PadScope.Log;
             if (_actionPopup.activeSelf) return PadScope.Commands;
@@ -234,12 +237,12 @@ namespace YGOPortable.UI
                     AddDuelPadButton(_storyCrisisButton);
                     AddDuelPadButton(_storyDrawButton);
                     return;
-                case PadScope.Piles:
+                case PadScope.FieldView:
                     AddDuelPadButton(_modals.FieldViewControl as Button);
                     AddDuelPadButton(_graveEffectButton);
                     AddDuelPadButton(_extraEffectButton);
                     AddDuelPadPiles();
-                    return;
+                    break;
             }
 
 
@@ -311,6 +314,12 @@ namespace YGOPortable.UI
                 }
                 var card = slot.liveCard;
                 if (card == null || !slot.cardView.gameObject.activeInHierarchy) continue;
+                if (scope == PadScope.FieldView)
+                {
+                    if (CanOpenTouchCardDetails && IsInspectableFieldSlot(slot))
+                        _duelPadTargets.Add(new PadTarget(slot.root, slot.dragTrigger.OnTouchClick, card.code, slot.focusArt));
+                    continue;
+                }
                 if (scope == PadScope.FieldCards &&
                     !FindFieldCardChoice(slot.mappedCon, slot.mappedLoc, slot.mappedSeq, out _)) continue;
                 bool publicCard = card.IsFaceUp || card.isPublic || slot.mappedCon == _session.HumanPlayerIndex;

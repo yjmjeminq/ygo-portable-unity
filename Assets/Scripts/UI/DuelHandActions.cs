@@ -52,7 +52,8 @@ namespace YGOPortable.UI
 
         private bool CanOpenTouchCardDetails =>
             _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
-            !IsStagingPlacement && !_modals.IsPromptOpen && !IsBrowsingZone && !_modals.ResultRoot.activeSelf &&
+            !IsStagingPlacement && (!_modals.IsPromptOpen || _modals.IsShowingField) &&
+            !IsBrowsingZone && !_modals.ResultRoot.activeSelf &&
             !_actionPopup.activeSelf && !_phasePicker.activeSelf && !_cardZoomModal.activeSelf &&
             CardDragManager.Instance?.IsDragging != true;
 

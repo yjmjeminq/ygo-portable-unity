@@ -293,6 +293,7 @@ namespace YGOPortable.UI
             _mobileLayout = mobileLayout;
             BuildUI(canvasParent);
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
+            _modals.SetFieldInspectionHitTest(IsPointOverInspectableFieldCard);
             _modals.SetActivationHitTest(IsPointOverEffectSource);
             _modals.SetInspectorControls(_inspectorArtworkButton, _duelPadInspectButton, (RectTransform)_inspectScroll.transform);
             _modals.SetCandidateInspector(InspectCandidate);
@@ -1178,6 +1179,7 @@ namespace YGOPortable.UI
                 dragTrigger = cell.gameObject.AddComponent<CardDragTrigger>(),
             };
             slot.activationGlow = DuelStyle.AddActivationGlow(slot.focusArt);
+            slot.dragTrigger.CanStartDrag = () => !_modals.IsShowingField;
             _fieldSlotsByRect.Add(cell, slot);
             return slot;
         }
@@ -4005,9 +4007,30 @@ namespace YGOPortable.UI
             return false;
         }
 
+        private bool IsInspectableFieldSlot(FieldSlotView slot) =>
+            slot != null && slot.cardView.gameObject.activeInHierarchy && CanInspectCardActionSource(slot.liveCard);
+
+        private bool IsPointOverInspectableFieldCard(Vector2 point, Camera camera)
+        {
+            if (!CanOpenTouchCardDetails) return false;
+            foreach (var slot in _fieldSlotsByRect.Values)
+                if (IsInspectableFieldSlot(slot) && slot.bgImg.IsRaycastLocationValid(point, camera))
+                    return true;
+            return false;
+        }
+
         private void OnSlotClicked(byte con, uint loc, uint seq, bool touch = false)
         {
             if (_session == null || IsPresenting || IsPaused || IsBrowsingZone) return;
+
+            if (_modals.IsShowingField)
+            {
+                var fieldSlot = GetSlot(con, loc, seq);
+                if (!CanOpenTouchCardDetails || !IsInspectableFieldSlot(fieldSlot)) return;
+                InspectCard(fieldSlot.liveCard.code, fieldSlot);
+                if (touch) OpenInspectedCardDetails();
+                return;
+            }
 
             if (CanAcceptPlayerAction && !IsReadingCardDetails && con == _session.HumanPlayerIndex &&
                 _modals.FocusChainActivationAt(_session, loc, seq)) return;

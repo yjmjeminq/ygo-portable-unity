@@ -832,6 +832,37 @@ namespace YGOPortable.Editor
                 Require(ShowingField() && !Modals.TryConfirm(),
                     "Field view did not hide and lock the current chooser.");
 
+                var monster = mine.mzone.First(card => card != null && card.IsFaceUp && card.code != 0);
+                var monsterSlot = CardSlot(new SelectableCardItem
+                {
+                    controller = monster.controller, location = monster.location, sequence = monster.sequence,
+                });
+                var zoom = Private<GameObject>(Field, "_cardZoomModal");
+                var effect = CardDatabase.Get(monster.code).desc;
+                ClickAt(monsterSlot);
+                Require(ShowingField() && Private<uint>(Field, "_inspectedCode") == monster.code &&
+                    monsterSlot.GetComponent<CardDragTrigger>().CanStartDrag?.Invoke() == false,
+                    "A mouse click did not inspect the monster in the field or allowed it to be dragged.");
+                VerifyInspectorArtwork(monster.code, prompt, pointerId: -1);
+
+                ClickAt(monsterSlot, pointerId: 0);
+                Require(ShowingField() && zoom.activeInHierarchy && Private<Text>(Field, "_zoomDesc").text == effect &&
+                    ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Touching a monster in field view did not open its effect.");
+                ClickAt((RectTransform)Private<Button>(Field, "_zoomCloseButton").transform, pointerId: 0);
+
+                SetPrivate(Field, "_usingDuelPad", true);
+                SetPrivate(Field, "_duelPadFocus", monsterSlot);
+                Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Alternate));
+                Require(ShowingField() && zoom.activeInHierarchy && Private<Text>(Field, "_zoomDesc").text == effect,
+                    "The controller could not read a monster's effect in field view.");
+                Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Cancel));
+                Require(ShowingField() && !zoom.activeSelf && ReferenceEquals(_duel.ActivePrompt, prompt) &&
+                    Private<int>(Modals, "_chainSelection") == chainIndex &&
+                    Private<HashSet<int>>(Modals, "_selectedIndices").SetEquals(selected),
+                    "Inspecting a field monster changed the pending prompt or its selection.");
+                SetPrivate(Field, "_usingDuelPad", false);
+
                 var deck = StackRoot("_myDeckTile");
                 var phase = Field.Root.transform.Find("Turn/Dial") as RectTransform;
                 foreach (var target in new[] { deck, phase })
