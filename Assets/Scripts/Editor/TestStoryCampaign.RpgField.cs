@@ -268,7 +268,7 @@ namespace YGOPortable.Editor
                 var expectedCg = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
                     .Concat(episode.postLoseDialogues)).Select(line => line.cutscene)
                     .Where(id => !string.IsNullOrEmpty(id)).Distinct().ToArray();
-                Require(expectedCg.Length == 19 && expectedCg.All(id =>
+                Require(expectedCg.Length == 24 && expectedCg.All(id =>
                     File.Exists(Path.Combine(streaming, "TagForce/GX/Cutscenes", id + ".png"))), "Missing GX event CG.");
 
                 try
@@ -368,6 +368,7 @@ namespace YGOPortable.Editor
                                     $"The field actors for Yun and Asuka were not separate at {episode.id}.");
                             }
                         }
+                        VerifyGxDuelDialogueArt(episode);
                         app.StartStoryDuel(episode, startingDeck, true);
                         Require(Get("_ai") is TacticalAI { Difficulty: AIDifficulty.Master } &&
                             Get("_activeOppDeck") is PresetDeckInfo rival && rival.id == episode.deckId,
@@ -455,21 +456,32 @@ namespace YGOPortable.Editor
                 {
                     var lines = episode.preDialogues;
                     var checkedScenes = new HashSet<string>();
-                    var image = (Image)dialogueType.GetField("_cutsceneImage", flags).GetValue(dialogue);
-                    var sprites = (Dictionary<string, Sprite>)dialogueType.GetField("_rpgSprites", flags).GetValue(dialogue);
                     for (int tick = 0; tick < lines.Length * 5 + 5 && storyRoot.gameObject.activeInHierarchy; ++tick)
                     {
                         string scene = lines[CurrentLine()].cutscene;
                         if (!string.IsNullOrEmpty(scene) && checkedScenes.Add(scene))
-                        {
-                            string path = Path.Combine(streaming, "TagForce/GX", $"Cutscenes/{scene}.png");
-                            Require(sprites.TryGetValue(path, out var sprite) && sprite != null && image.sprite == sprite,
-                                $"The scripted CG did not load for {episode.id}: {scene}.");
-                        }
+                            VerifyGxDialogueArt(episode, scene);
                         story.Update(4f);
                     }
                     Require(lines.All(line => string.IsNullOrEmpty(line.cutscene) || checkedScenes.Contains(line.cutscene)),
                         $"Automatic playback skipped a CG in {episode.id}.");
+                }
+
+                void VerifyGxDuelDialogueArt(StoryEpisodeData episode)
+                {
+                    int index = Array.FindIndex(episode.preDialogues, line => !string.IsNullOrEmpty(line.cutscene));
+                    if (index < 0) return;
+                    dialogueType.GetMethod("BindLine", flags).Invoke(dialogue, new object[] { index, false });
+                    VerifyGxDialogueArt(episode, episode.preDialogues[index].cutscene);
+                }
+
+                void VerifyGxDialogueArt(StoryEpisodeData episode, string scene)
+                {
+                    var image = (Image)dialogueType.GetField("_cutsceneImage", flags).GetValue(dialogue);
+                    var sprites = (Dictionary<string, Sprite>)dialogueType.GetField("_rpgSprites", flags).GetValue(dialogue);
+                    string path = Path.Combine(streaming, "TagForce/GX", $"Cutscenes/{scene}.png");
+                    Require(sprites.TryGetValue(path, out var sprite) && sprite != null && image.sprite == sprite,
+                        $"The scripted CG did not load for {episode.id}: {scene}.");
                 }
 
                 void VerifyGxArtwork(TagForceData configuration, string[] cutscenes)

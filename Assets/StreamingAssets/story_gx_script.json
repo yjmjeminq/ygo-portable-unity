@@ -365,32 +365,38 @@
         },
         {
           "speaker": "",
-          "text": "양쪽 필드의 홀로그램 시스템이 가동되며 아레나 전체에 푸른 에너지 라인이 번쩍였다."
+          "text": "양쪽 필드의 홀로그램 시스템이 가동되며 아레나 전체에 푸른 에너지 라인이 번쩍였다.",
+          "cutscene": "cg_gx_kaiser_exhibition"
         },
         {
           "speaker": "",
-          "text": "필드 양끝에 선 나와 카이저 료 사이로 팽팽한 정적이 내려앉았다. 관중석에서 누군가 숨을 삼키는 소리마저 들릴 듯했다."
+          "text": "필드 양끝에 선 나와 카이저 료 사이로 팽팽한 정적이 내려앉았다. 관중석에서 누군가 숨을 삼키는 소리마저 들릴 듯했다.",
+          "cutscene": "cg_gx_kaiser_exhibition"
         },
         {
           "speaker": "마루후지 료",
           "text": "프로의 정점에 선 자가 아카데미아에서 무엇을 찾는지는 모르겠다. 하지만 이 필드 위에서만큼은 나도 물러설 생각이 없다.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_kaiser_exhibition"
         },
         {
           "speaker": "윤",
           "text": "그 눈빛은 마음에 드는군. 적어도 시시한 시범 경기로 끝나진 않겠어.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_kaiser_exhibition"
         },
         {
           "speaker": "마루후지 료",
           "text": "듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "cutscene": "cg_gx_kaiser_exhibition"
         },
         {
           "speaker": "윤",
           "text": "듀얼.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_kaiser_exhibition"
         }
       ],
       "postWinDialogues": [
@@ -989,42 +995,50 @@
         },
         {
           "speaker": "",
-          "text": "오시리스 레드 앞마당의 낡은 벤치에 앉아 있던 나는, 끝없이 말을 걸어오는 쥬다이의 천진난만한 에너지에 살짝 압도당했다."
+          "text": "오시리스 레드 앞마당의 낡은 벤치에 앉아 있던 나는, 끝없이 말을 걸어오는 쥬다이의 천진난만한 에너지에 살짝 압도당했다.",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "유우키 쥬다이",
           "text": "있잖아 형, 난 프로 리그 같은 건 잘 모르지만, 카드를 뽑을 때 다음엔 어떤 녀석이 나와줄까 상상하는 것만으로 엄청 신나거든!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "윤",
           "text": "……상상이라. 프로의 세계에선 덱 40장의 확률 분포를 외우고 드로우하지. 상상 따윈 변수가 될 뿐이야.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "유우키 쥬다이",
           "text": "에이, 그렇게 다 계산해 버리면 재미없잖아! 계산 밖에서 기적이 터질 때가 진짜 듀얼의 묘미라고!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "윤",
           "text": "기적은 실력이 부족한 자들이 바라는 요행일 뿐이다. ……하지만 네가 말하는 그 '기적'이 뭔지, 한 번쯤 직접 눈으로 확인해 보는 것도 나쁘진 않겠군.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "유우키 쥬다이",
           "text": "프로 형은 어떤 카드가 제일 좋아? 난 역시 엘리멘틀 히어로들이 최고거든! 같이 싸우면 힘이 막 솟아나!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "윤",
           "text": "제일 좋아하는 카드라…… 승률이 가장 높은 카드가 좋은 카드지. 감정은 판단을 흐릴 뿐이야.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "유우키 쥬다이",
           "text": "에이~ 말은 그렇게 해도, 형 덱에서 되게 따뜻한 기운이 느껴지는데? 일단 한 판 붙어보면 알겠지!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_judai_red_dorm_talk"
         },
         {
           "speaker": "",
@@ -3675,12 +3689,14 @@
         {
           "speaker": "윤",
           "text": "에드 피닉스. ……네가 아카데미아엔 무슨 일이지?",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_edo_spring_arrival"
         },
         {
           "speaker": "에드 피닉스",
           "text": "흥, 스폰서들이 애타게 찾고 있더군. 네 날이 얼마나 무뎌졌는지 직접 확인하러 왔다. 그리고—혼자 온 건 아니야.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_edo_spring_arrival"
         },
         {
           "speaker": "",
@@ -6280,12 +6296,14 @@
         {
           "speaker": "유우키 쥬다이",
           "text": "오오! 요한, 너도 덱에서 정령 목소리가 들린다며? 이따가 레드 기숙사 가서 꼭 붙어보자!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_johan_judai_exchange"
         },
         {
           "speaker": "요한 안데르센",
           "text": "좋아! 보옥수 애들도 쥬다이의 히어로들이랑 빨리 인사하고 싶대!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_johan_judai_exchange"
         },
         {
           "speaker": "오스틴 오브라이언",
@@ -9048,22 +9066,26 @@
         },
         {
           "speaker": "",
-          "text": "평화로운 졸업 준비가 한창이던 섬 위로, 소리 없이 검은 안개가 밀려들며 학생들의 웃음소리가 하나둘 끊어져 갔다."
+          "text": "평화로운 졸업 준비가 한창이던 섬 위로, 소리 없이 검은 안개가 밀려들며 학생들의 웃음소리가 하나둘 끊어져 갔다.",
+          "cutscene": "cg_gx_fubuki_fujiwara_warning"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "준코랑 모모에가… 방금 눈앞에서 사라졌어!!",
-          "emotion": "shock"
+          "emotion": "shock",
+          "cutscene": "cg_gx_fubuki_fujiwara_warning"
         },
         {
           "speaker": "후지와라 유스케",
           "text": "슬퍼할 필요 없어. 미래의 불안도, 이별의 아픔도 없는 완벽한 어둠 속으로 돌아간 것뿐이니까.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_fubuki_fujiwara_warning"
         },
         {
           "speaker": "윤",
           "text": "웃기지 마, 후지와라. 불안을 이겨내고 앞으로 나아가기 때문에 미래가 가치 있는 거야.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_fubuki_fujiwara_warning"
         },
         {
           "speaker": "",
