@@ -4,100 +4,115 @@
     {
       "id": "111",
       "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_111.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/SD/sd_111.png",
       "sha256": "8236168e75c8c8281e05d4bab8af956b5e1b619bcdec99501a05b9eea88f62ad",
       "source_sha256": "fc0f360cef279ec337c5af6ec2d370cb6e7c4106d7fbccabadc3ce4e00256671"
     },
     {
       "id": "111",
       "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_111.png",
-      "sha256": "878a18ba63d5a6ab7d54790a6a491ec08ad5f69f24ac2312a40666e383629415",
-      "source_sha256": "c10b40d4c76deb2e72bd938e2a44913ea78d08b05aa6ed3f68c6f392beb94059"
+      "file": "Assets/StreamingAssets/TagForce/GX/Standing/full_111.png",
+      "sha256": "0e10a679026ff6996288f4da3cc0cbfbbbbcead809025ff3135ff8cc3f4e03c9",
+      "size": [
+        887,
+        1774
+      ]
     },
     {
       "id": "117",
       "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_117.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/SD/sd_117.png",
       "sha256": "ddcb0956da67bb5409371d4f0dd7eae31d85572898bcb094413dd60d82011fe5",
       "source_sha256": "79293a9c17cb215a0aa1a5c5e7e85ea909159f72d7ae6041b7dfe6c6d8b22e85"
     },
     {
       "id": "117",
       "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_117.png",
-      "sha256": "d41eea681df813ce400657cdcaac3f913393198de3c5d04c2f5a2bd0b0701a76",
-      "source_sha256": "2a1c038878a376164b5b23d21ef9342fd300db104a3dad18759fb45fca6c09e1"
+      "file": "Assets/StreamingAssets/TagForce/GX/Standing/full_117.png",
+      "sha256": "859af93b9a1715941ce7dc6045979322d53cf057cbe85c7a1c258cfa7447192a",
+      "size": [
+        887,
+        1774
+      ]
     },
     {
       "id": "119",
       "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_119.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/SD/sd_119.png",
       "sha256": "cfd0cbdd7b4f1943cd2758d06b57633d7cf54fad3939a2dc7d9169d2ca08983b",
       "source_sha256": "c0276ad7cbfe55d664c9fb9734701f164e322f7b73c855d68c385905a17c9234"
     },
     {
       "id": "119",
       "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_119.png",
-      "sha256": "42c7eea82b235af501b89f3eb2d1bbb7f371772cc6f2c9c59a9f8f9cc6dc3ccd",
-      "source_sha256": "4ec14d5d5958e2f8fd3b0654e61a9f92dfb94b0a5b0641923cdd6b045006f317"
+      "file": "Assets/StreamingAssets/TagForce/GX/Standing/full_119.png",
+      "sha256": "caa27d9ff21b4bf149f254de107a17511e359feb54d90022003a5025e41c5668",
+      "size": [
+        887,
+        1774
+      ]
     },
     {
       "id": "120",
       "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_120.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/SD/sd_120.png",
       "sha256": "648dfda0ecc611d265a22a442bf3203bd0d6002d3520749e8ed32e6f61bd1d4e",
       "source_sha256": "6467aa2332bed3e0a1dbb7335a15415c304367827fd598eefb11d85559423650"
     },
     {
       "id": "120",
       "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_120.png",
-      "sha256": "cfbb2e222c8663503546eaf2bb6796748046273fa41b318a02497ea0df856d4f",
-      "source_sha256": "b6d0beb754d65eed7118d95578540d72cd274683d28c3ea1e9fc5dcc261e5972"
+      "file": "Assets/StreamingAssets/TagForce/GX/Standing/full_120.png",
+      "sha256": "963e220d5275b51284493f8d3149c9340d043bd74b9e3c1913f9937eb504611f",
+      "size": [
+        887,
+        1774
+      ]
     },
     {
       "id": "128",
       "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_128.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/SD/sd_128.png",
       "sha256": "1f07aebd573e6305e19793b7d9ffff497f3a6b451a25c0a7ec0c7562ba1d3654",
       "source_sha256": "9d575ec5913044fb9538513fa4489351f34060e835fa42e41732ee9bdea54119"
     },
     {
       "id": "128",
       "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_128.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/Standing/full_128.png",
       "sha256": "a2aea19c71bbebad2cca9b6cdc80f92f138b6061e549b111668fb42da4571cff",
       "source_sha256": "d7969afb90e3b52ade8a9f52821635244334cc61a787ce5f2edec2304e0d1b2e"
     },
     {
       "id": "209",
       "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_209.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/SD/sd_209.png",
       "sha256": "c95b9912549a27da04680e8e05c1b156fe769601072136141b5b3d9d91b0daee",
       "source_sha256": "831ff79fcddfbcd29f33cbba457894c5f96d1d7d6ea487dd9491a22669fdba20"
     },
     {
       "id": "209",
       "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_209.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/Standing/full_209.png",
       "sha256": "8c19df62b8ea505efe6fd45aebdd1763a82e5551be97775df1a86e1cba10738b",
       "source_sha256": "326f39ed370e0a21748d405862f92f189a73a492c770a7a9a3f568d3ad4b6aa1"
     },
     {
       "id": "3100",
       "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_3100.png",
+      "file": "Assets/StreamingAssets/TagForce/GX/SD/sd_3100.png",
       "sha256": "9e5d19753e3d2bfc59cdc587762e78890f602699b8295f4450cf66e7a0dd4708",
       "source_sha256": "347d224a06c0fbbbf31d118e13677b885968c7c776e1803e106bc87ecb8526f4"
     },
     {
       "id": "3100",
       "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_3100.png",
-      "sha256": "86190bacc6edf24cf8e27b07383b4d0077e83206492d7c1c366c4ee5d03aaebe",
-      "source_sha256": "2c178bea1c41a7c0e4c1def6f5ce9651b44936132a061746118a8999c16de550"
+      "file": "Assets/StreamingAssets/TagForce/GX/Standing/full_3100.png",
+      "sha256": "9e3835f88e79827e3b04e3ad9cef636408482e01c9d02bf9dc539566c2293bc1",
+      "size": [
+        887,
+        1774
+      ]
     }
   ],
   "canon_audit_note": "Removed hash-denied incorrect art. Remaining entries have file-format provenance only and are not certified as completely canon-correct."

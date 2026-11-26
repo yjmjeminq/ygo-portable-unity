@@ -59,8 +59,8 @@ CHAR_SPECS = [('119', '유우키 쥬다이'),
  ('206', '하마구치 모모에')]
 
 KINDS = {
-    "sd": ("Characters_SD", "SD", "sd_", (512, 512)),
-    "standing": ("Characters_Standing", "Standing", "full_", (1024, 1536)),
+    "sd": ("SD", "sd_", (512, 512)),
+    "standing": ("Standing", "full_", (1024, 1536)),
 }
 REMOVED_CHARACTER_IDS = {"player_heroine"}
 
@@ -69,11 +69,9 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def paths(cid, kind):
-    output, runtime, prefix, _ = KINDS[kind]
-    runtime_id = cid
-    return (BASE_DIR / output / f"{prefix}{cid}.png",
-            BASE_DIR / runtime / f"{prefix}{runtime_id}.png")
+def sprite_path(cid, kind):
+    folder, prefix, _ = KINDS[kind]
+    return BASE_DIR / folder / f"{prefix}{cid}.png"
 
 
 def unity_meta(path):
@@ -153,9 +151,9 @@ def main():
             source_hash = reject_retired_asset(source, blocked)
             if entries.get((cid, kind), {}).get("source_sha256") == source_hash:
                 continue
-            prepared.append((cid, kind, source_hash, normalize(source, KINDS[kind][3])))
+            prepared.append((cid, kind, source_hash, normalize(source, KINDS[kind][2])))
         for cid, kind, source_hash, image in prepared:
-            output, _ = paths(cid, kind)
+            output = sprite_path(cid, kind)
             output.parent.mkdir(parents=True, exist_ok=True)
             image.save(output, "PNG")
             entries[cid, kind] = {"id": cid, "kind": kind,
@@ -173,16 +171,12 @@ def main():
     if set(entries) - expected:
         raise ValueError("Unexpected character IDs in installed artwork manifest")
     for (cid, kind), entry in entries.items():
-        output, runtime = paths(cid, kind)
-        check_image(output, KINDS[kind][3], entry["sha256"])
+        output = sprite_path(cid, kind)
+        check_image(output, tuple(entry.get("size", KINDS[kind][2])), entry["sha256"])
         if not args.verify_only:
-            runtime.parent.mkdir(parents=True, exist_ok=True)
-            if not runtime.exists() or digest(runtime) != entry["sha256"]:
-                runtime.write_bytes(output.read_bytes())
-            for path in (output.parent, runtime.parent, output, runtime):
-                unity_meta(path)
-        check_image(runtime, KINDS[kind][3], entry["sha256"])
-    print(f"Sprite format and runtime copies validated: {len(entries)}/{len(expected)}; "
+            unity_meta(output.parent)
+            unity_meta(output)
+    print(f"Sprite format and runtime paths validated: {len(entries)}/{len(expected)}; "
           f"pending: {len(pending)}. This does not certify canonical appearance.")
 
 

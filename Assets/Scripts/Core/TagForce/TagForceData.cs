@@ -65,7 +65,7 @@ namespace YGOPortable.Core
                 if (selected.drawBreadCatalog?.breads?.Length is not > 0)
                     selected.drawBreadCatalog = gx?.drawBreadCatalog;
                 selected.assetConfig ??= new TagForcePaths();
-                if (selected.roster?.Length > 0) selected.BuildRoster(series);
+                if (selected.roster?.Length > 0) selected.BuildRoster(directory, series);
                 if (!selected.IsUsable()) continue;
                 var staffed = new HashSet<string>(selected.personas.SelectMany(persona => persona.forms)
                     .SelectMany(form => form.spots));
@@ -130,7 +130,7 @@ namespace YGOPortable.Core
             personas.Select(persona => persona.personaId).Distinct().Count() == personas.Length &&
             (drawBreadCatalog == null || drawBreadCatalog.breads?.Length > 0);
 
-        private void BuildRoster(TagForceSeries series)
+        private void BuildRoster(string directory, TagForceSeries series)
         {
             var people = new List<TagForcePersona>();
             foreach (var visitor in roster)
@@ -138,6 +138,10 @@ namespace YGOPortable.Core
                 if (visitor == null || Spot(visitor.spotId) is not { } spot ||
                     DeckRepository.GetCharacter(visitor.charId) is not { } character) continue;
                 string art = $"TagForce/{series.AssetFolder}";
+                string sd = $"{art}/Characters_SD/sd_{character.id}.png";
+                string standingFolder = series.Id == GxId ? "Standing" : "Characters_Standing";
+                if (series.Id == GxId && !File.Exists(Path.Combine(directory, sd)))
+                    sd = $"{art}/SD/sd_{character.id}.png";
                 people.Add(new TagForcePersona
                 {
                     personaId = $"{series.Id}_{character.id}",
@@ -165,8 +169,8 @@ namespace YGOPortable.Core
                         new TagForceForm
                         {
                             formCharId = character.id, formName = character.name, formTitle = spot.name,
-                            sdSpritePath = $"{art}/Characters_SD/sd_{character.id}.png",
-                            standingSpritePath = $"{art}/Characters_Standing/full_{character.id}.png",
+                            sdSpritePath = sd,
+                            standingSpritePath = $"{art}/{standingFolder}/full_{character.id}.png",
                             activeTimes = TimeKeys, spots = new[] { spot.spotId },
                             greetingLines = new TagForceGreetings
                             {

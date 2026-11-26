@@ -141,7 +141,7 @@ class CanonSourceContractTests(unittest.TestCase):
 
     def test_updating_visuals_removes_retired_fields_and_preserves_dialogue_and_player(self):
         records = canon.build(self.catalogue, self.manifest, allow_pending=True)
-        original = canon.read_json(canon.ROOT / "Assets/StreamingAssets/tagforce_gx_script.json")
+        original = canon.read_json(canon.GX_LEGACY_SCRIPT)
         original["personas"][0]["forms"][0]["visualSpec"]["inventedAura"] = "discard me"
         expected = copy.deepcopy(original)
         with tempfile.TemporaryDirectory() as directory:

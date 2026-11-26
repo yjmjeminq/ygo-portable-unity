@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
+GX_LEGACY_SCRIPT = ROOT / "Assets/StreamingAssets/TagForce/tagforce_gx_script.json"
 SERIES = {"dm": "DM", "gx": "GX", "5ds": "5DS", "zexal": "ZEXAL", "arcv": "ARCV", "vrains": "VRAINS"}
 FACTS = ("hair_color", "hair_style", "facial_hair", "outfit", "duel_disk")
 VERIFIED_STATES = {"observed", "not_visible_in_selected_pose", "not_applicable"}
@@ -289,8 +290,8 @@ def gx_prompt_jobs(records, catalogue, allow_non_anime=False):
         raise ValueError("GX prompt export requires the 43 roster forms and two explicit supplemental forms")
     jobs = []
     for record in sorted(gx_records, key=lambda item: item["id"]):
-        for kind, folder, prefix, field in (("sd", "Characters_SD", "sd_", "comfyPromptSd"),
-                                             ("standing", "Characters_Standing", "full_", "comfyPromptStanding")):
+        for kind, folder, prefix, field in (("sd", "SD", "sd_", "comfyPromptSd"),
+                                             ("standing", "Standing", "full_", "comfyPromptStanding")):
             jobs.append({"id": str(record["id"]), "name": record["name"], "kind": kind,
                          "canonicalMedium": record["canonicalMedium"], "renderMode": record["renderMode"],
                          "generationAllowed": record["generationAllowed"],
@@ -338,7 +339,7 @@ def main():
     parser.add_argument("--catalogue", type=Path, default=ROOT / "Tools/all_series_canon_specs.json")
     parser.add_argument("--manifest", type=Path, default=ROOT / "Tools/all_series_character_manifest.json")
     parser.add_argument("--output", type=Path, default=ROOT / "Tools/all_series_asset_prompts.json")
-    parser.add_argument("--gx-script", type=Path, default=ROOT / "Assets/StreamingAssets/tagforce_gx_script.json")
+    parser.add_argument("--gx-script", type=Path, default=GX_LEGACY_SCRIPT)
     parser.add_argument("--gx-prompts", type=Path, default=ROOT / "Tools/tagforce_gx_asset_prompts.json")
     parser.add_argument("--report", type=Path, default=ROOT / "Tools/canon_review_status.json")
     parser.add_argument("--allow-pending", action="store_true", help="Publish disabled records with null prompts for incomplete reviews")
