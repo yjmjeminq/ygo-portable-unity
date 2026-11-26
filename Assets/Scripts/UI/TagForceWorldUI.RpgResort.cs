@@ -124,6 +124,45 @@ namespace YGOPortable.UI
             _rpgIntroDialogue.Open("네오 도미노의 여름", "카이", DeckRepository.GetCharacter(1), lines,
                 ReturnToWorkbench, rpg: true, onSkip: ReturnToWorkbench, rpgEpisode: 50,
                 rpgBackdrop: "Maps/spot_poppo_time.png");
+            _rpgIntroDialogue.SetBranch(lines.Length - 1, () => _rpgIntroDialogue.ShowChoices(
+                () => "몇 해 뒤, 누구와 다시 바다를 찾을까?",
+                new StoryModeUI.StoryChoice("이자요이 아키", () => OpenRpgSummerRomance(withAki: true)),
+                new StoryModeUI.StoryChoice("셰리 르블랑", () => OpenRpgSummerRomance(withAki: false)),
+                new StoryModeUI.StoryChoice("정비소로 돌아가기", ReturnToWorkbench)));
+        }
+
+        private void OpenRpgSummerRomance(bool withAki)
+        {
+            int id = withAki ? 1 : 32;
+            string speaker = withAki ? "이자요이 아키" : "셰리 르블랑";
+            string title = withAki ? "아키 · 파도가 잦아들 때" : "셰리 · 여름의 마지막 불빛";
+            string nightScene = withAki ? "cg_summer_romance_aki" : "cg_summer_romance_sherry";
+            var lines = new[]
+            {
+                new StoryDialogueLine { speaker = "내레이션", text = "몇 해 뒤. 성인이 된 두 사람은 다시 이 바다를 찾았다." },
+                new StoryDialogueLine { speaker = speaker, emotion = "smile", text = withAki
+                    ? "그날 우리 사진, 아직 정비소 책상 위에 있어."
+                    : "그날 사진을 액자에 넣었어요. 볼 때마다 여기가 생각났죠." },
+                new StoryDialogueLine { speaker = "카이", text = withAki
+                    ? "아키, 오늘 밤도 네 곁에 있고 싶어. 그래도 될까?"
+                    : "셰리, 오늘 밤은 좀 더 함께 있어도 될까요?" },
+                new StoryDialogueLine { speaker = speaker, emotion = withAki ? "blush" : "smile", text = withAki
+                    ? "응. 오늘은 나도 네가 곁에 있었으면 해."
+                    : "좋아요. 저도 당신과 더 있고 싶었어요." },
+                new StoryDialogueLine { speaker = "내레이션", cutscene = nightScene, text = withAki
+                    ? "아키가 카이의 손을 잡고 어깨에 살며시 기댔다."
+                    : "셰리가 카이의 손을 잡았다. 눈이 마주치자 둘 다 웃었다." },
+                new StoryDialogueLine { speaker = speaker, cutscene = nightScene, text = withAki
+                    ? "파도 소리가 좋다. 이 밤은 오래 기억할 것 같아."
+                    : "내일도 같이 바다를 볼까요? 이번엔 아침 일찍요." },
+                new StoryDialogueLine { speaker = speaker, cutscene = "cg_summer_sea_morning", text = withAki
+                    ? "다음엔 사진보다 먼저 우리 둘이 갈 곳부터 정하자."
+                    : "다음 여름 계획은 같이 세워요. 이번엔 당신이 먼저 골라요." },
+            };
+            void ReturnToWorkbench() => Show(Page.Talk);
+            _rpgIntroDialogue.Open(title, "카이", DeckRepository.GetCharacter(id), lines, ReturnToWorkbench,
+                rpg: true, onSkip: ReturnToWorkbench, rpgEpisode: 50, compactRpgDialogue: true,
+                rpgBackdrop: "Cutscenes/cg_summer_guest_room_night.jpg");
         }
     }
 }

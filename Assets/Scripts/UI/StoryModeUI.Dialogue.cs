@@ -252,7 +252,7 @@ namespace YGOPortable.UI
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
                 Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
                 string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
-                string preferredRpgBackdrop = null, int rpgEpisode = 0)
+                string preferredRpgBackdrop = null, int rpgEpisode = 0, bool compactRpgDialogue = false)
             {
                 Close();
                 _field = field;
@@ -262,7 +262,9 @@ namespace YGOPortable.UI
                 _heroIdentity.gameObject.SetActive(!rpg && !onField);
                 _portraitGroup.gameObject.SetActive(rpg || !onField);
                 _shade.color = new Color(.014f, .026f, .058f, onField ? .14f : .95f);
-                _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, onField ? rpg ? .281f : .32f : rpg ? .322f : .406f);
+                float dialogueTop = onField ? rpg ? .281f : .32f : rpg ? .322f : .406f;
+                if (rpg && compactRpgDialogue) dialogueTop = .236f;
+                _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, dialogueTop);
                 _protagonist = protagonist;
                 _sceneOpponent = opponent;
                 _rpg = rpg;
@@ -875,13 +877,14 @@ namespace YGOPortable.UI
 
             private void BindCutscene(string id)
             {
+                bool continuing = _showCutscene;
                 _showCutscene = false;
                 if (string.IsNullOrEmpty(id) || id.Any(c => !char.IsLetterOrDigit(c) && c != '_' && c != '-')) return;
                 var picture = LoadRpgSprite($"Cutscenes/{id}.jpg");
                 if (picture == null) return;
                 if (_cutsceneImage.sprite != picture)
                 {
-                    _cutsceneOverlay.alpha = 0f;
+                    if (!continuing) _cutsceneOverlay.alpha = 0f;
                     SetSprite(_cutsceneImage, picture);
                     _cutsceneAspect.aspectRatio = picture.rect.width / picture.rect.height;
                 }

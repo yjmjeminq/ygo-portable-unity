@@ -1495,6 +1495,61 @@ namespace YGOPortable.Editor
                     "Skipping the summer story did not return to the workbench.");
                 Debug.Log("[VERIFY 5DS RESORT] 22 expression portraits, 45 walk frames, early shop purchase, save persistence, live wardrobe and 3 epilogue CGs passed.");
 
+                foreach (var (index, name, sceneId) in new[] { (0, "아키", "aki"), (1, "셰리", "sherry") })
+                {
+                    var romance = OpenSummerChoices();
+                    Press(romance, $"Choices/Choice_{index}/Button");
+                    Require(!romance.Find("Choices").gameObject.activeSelf &&
+                        romance.Find("Episode/Label").GetComponent<Text>().text.StartsWith(name, StringComparison.Ordinal) &&
+                        romance.Find("RpgStage").GetComponent<Image>().sprite is { } room &&
+                        Mathf.Approximately(room.rect.width / room.rect.height, 16f / 9f),
+                        $"The {name} choice did not open its room scene.");
+                    for (int line = 0; line < 4; line++) Advance(romance);
+                    var overlay = romance.Find("CutsceneOverlay");
+                    var fade = overlay.GetComponent<CanvasGroup>();
+                    var cgImage = overlay.Find("CG").GetComponent<Image>();
+                    world.Update(.5f);
+                    var routeView = (StoryModeUI.StoryDialogueView)typeof(TagForceWorldUI).GetField("_rpgIntroDialogue", flags).GetValue(world);
+                    var routeArt = (Dictionary<string, Sprite>)typeof(StoryModeUI.StoryDialogueView).GetField("_rpgSprites", flags).GetValue(routeView);
+                    string nightKey = Path.Combine(streaming, art.TrimEnd('/'), $"Cutscenes/cg_summer_romance_{sceneId}.jpg");
+                    Require(routeArt.TryGetValue(nightKey, out var night) && night != null && cgImage.sprite == night &&
+                        cgImage.enabled && fade.alpha == 1f, $"The {name} route did not show its night illustration.");
+                    Advance(romance);
+                    Require(cgImage.sprite == night && fade.alpha == 1f, $"The {name} scene disappeared during the conversation.");
+                    Advance(romance);
+                    string morningKey = Path.Combine(streaming, art.TrimEnd('/'), "Cutscenes/cg_summer_sea_morning.jpg");
+                    Require(routeArt.TryGetValue(morningKey, out var morning) && morning != null && cgImage.sprite == morning &&
+                        cgImage.enabled && fade.alpha == 1f && Mathf.Approximately(morning.rect.width / morning.rect.height, 16f / 9f),
+                        $"The {name} route did not cut directly to the morning illustration.");
+                    Advance(romance);
+                    Require(AtWorkbench(), $"The {name} ending did not return to the workbench.");
+                }
+                var leave = OpenSummerChoices();
+                Press(leave, "Choices/Choice_2/Button");
+                Require(AtWorkbench(), "Leaving from the choice screen did not return to the workbench.");
+                Debug.Log("[VERIFY 5DS SUMMER ROMANCE] Both character choices, distinct night CGs, direct morning transition and replay passed.");
+
+                bool AtWorkbench() => world.Root.transform.Find("SummerEpilogue") == null &&
+                    panel.Find("ResidentChoices/SummerEpilogue") != null;
+
+                Transform OpenSummerChoices()
+                {
+                    Press(panel, "ResidentChoices/SummerEpilogue");
+                    var opening = world.Root.transform.Find("SummerEpilogue/StoryDialogue/Scene");
+                    for (int line = 0; line < 6; line++) Advance(opening);
+                    Require(opening.Find("Choices").gameObject.activeSelf &&
+                        opening.Find("Choices/Choice_0/Button").GetComponentInChildren<Text>().text == "이자요이 아키" &&
+                        opening.Find("Choices/Choice_1/Button").GetComponentInChildren<Text>().text == "셰리 르블랑",
+                        "Finishing the summer story did not offer the two character choices.");
+                    return opening;
+                }
+
+                void Advance(Transform dialogue)
+                {
+                    world.Update(2f);
+                    Press(dialogue, "DialogueBox/Next/Button");
+                }
+
                 void ClearUntil(int count)
                 {
                     for (int index = world.RpgClears; index < count; index++)
