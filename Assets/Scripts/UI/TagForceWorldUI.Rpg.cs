@@ -496,13 +496,21 @@ namespace YGOPortable.UI
                     _images.GetBust(CampaignBustPath(id));
                 if (bust == null && id != RpgShopkeeperId)
                     bust = DuelProfileArt.Opponent(DeckRepository.GetCharacter(id));
-                if (bust != null && bust != DuelProfileArt.MissingOpponent)
+                bool hasPortrait = bust != null && bust != DuelProfileArt.MissingOpponent;
+                if (IsGxCampaign)
+                {
+                    if (_player != null) _player.gameObject.SetActive(false);
+                    foreach (var resident in _rpgResidents.Values)
+                        if (hasPortrait || resident != speaker) resident.gameObject.SetActive(false);
+                }
+                if (hasPortrait)
                 {
                     bool showOnLeft = speaker != null && speaker.anchorMin.x > .62f;
                     var fieldArt = speaker?.Find("SD") ?? speaker?.Find("Sprite");
                     if (fieldArt != null) fieldArt.gameObject.SetActive(false);
-                    var portrait = Area(_body, "ConversationPortrait", showOnLeft ? .045f : .404f, .262f,
-                        showOnLeft ? .305f : .685f, .957f);
+                    float left = IsGxCampaign ? .355f : showOnLeft ? .045f : .404f;
+                    float right = IsGxCampaign ? .645f : showOnLeft ? .305f : .685f;
+                    var portrait = Area(_body, "ConversationPortrait", left, .262f, right, .957f);
                     DuelUiKit.AddImage(portrait.gameObject, bust, Color.white, true, false);
                     UiEntranceMotion.Play(portrait.gameObject, .65f, .20f);
                 }

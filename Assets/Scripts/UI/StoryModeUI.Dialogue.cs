@@ -103,6 +103,7 @@ namespace YGOPortable.UI
             private bool _finished;
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
+            private string _gxPortraitSpeaker;
             private bool _rpg;
             private int _rpgEpisode, _playAsCharacterId;
             private string _rpgAssetFolder;
@@ -349,6 +350,7 @@ namespace YGOPortable.UI
                 SetSprite(_opponentPrevious, null);
                 _heroReaction.enabled = _opponentReaction.enabled = false;
                 _heroFade = _opponentFade = _heroSlide = _opponentSlide = 0f;
+                _gxPortraitSpeaker = null;
                 _hero.rectTransform.localScale = _opponent.rectTransform.localScale = Vector3.one;
                 _hero.rectTransform.anchoredPosition = _opponent.rectTransform.anchoredPosition = Vector2.zero;
                 foreach (var sprite in _rpgSprites.Values)
@@ -531,7 +533,15 @@ namespace YGOPortable.UI
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
                 if (_rpg && _field == null && _defaultRpgStage != null)
                     SetSprite(_stage, (line.SceneMapPath is string map ? LoadRpgSprite(map) : null) ?? _defaultRpgStage);
-                if (_rpg)
+                bool internalMonologue = IsGxDialogue && !narration && line.IsInternalMonologue;
+                bool soloPortrait = IsGxDialogue && !narration && (internalMonologue ||
+                    (string.IsNullOrEmpty(line.cutscene) && line.stage?.Length is not > 0 && _field?.RpgHasSingleSpeaker == true));
+                if (IsGxDialogue)
+                {
+                    BindGxSpeakerPortraits(line.speaker, speaker, previousHeroSpeaking, soloPortrait);
+                    _field?.SetRpgSoloPortrait(soloPortrait && (_hero.enabled || _opponent.enabled));
+                }
+                else if (_rpg)
                 {
                     if (_heroSpeaking || _hero.sprite == null)
                         ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
@@ -546,7 +556,16 @@ namespace YGOPortable.UI
                     if (_heroSpeaking && !heroPreviouslySpeaking) _heroSlide = Mathf.Max(_heroSlide, .12f);
                     if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
                 }
-                BindCutscene(_rpg ? line.cutscene : null);
+                BindCutscene(_rpg && !internalMonologue ? line.cutscene : null);
+                if (soloPortrait)
+                {
+                    // Cut to the speaker's solo shot without leaving the previous CG behind the portrait.
+                    _cutsceneOverlay.alpha = 0f;
+                    _cutsceneBlend = 1f;
+                    _cutsceneImage.color = Color.white;
+                    SetSprite(_cutscenePrevious, null);
+                    _portraitGroup.alpha = 1f;
+                }
                 _fx.Play(_rpg ? line.fx : null);
                 _formatting = _rpg ? DialogueTag.Matches(line.text).Cast<Match>().ToArray() : Array.Empty<Match>();
                 _characters = StringInfo.ParseCombiningCharacters(line.text);
@@ -560,6 +579,37 @@ namespace YGOPortable.UI
                 _visible = 0;
                 _previous.interactable = index > 0;
                 RefreshStageCaption();
+            }
+
+            private void BindGxSpeakerPortraits(string name, OpponentCharacter speaker, bool originalHero, bool solo)
+            {
+                Sprite hero = _heroSpeaking ? LoadHeroBust(_emotion) : null;
+                Sprite other = !_opponentSpeaking ? null : originalHero ? LoadOriginalHeroBust(_emotion) :
+                    speaker != null ? LoadActorBust(speaker.id, _emotion) ?? DuelProfileArt.Opponent(speaker) : null;
+                bool sameSpeaker = name == _gxPortraitSpeaker;
+                SetPortrait(_hero, _heroPrevious, _heroReaction, hero, .066f, .314f, ref _heroFade, ref _heroSlide);
+                SetPortrait(_opponent, _opponentPrevious, _opponentReaction, other, .686f, .934f, ref _opponentFade, ref _opponentSlide);
+                _gxPortraitSpeaker = hero != null || other != null ? name : null;
+
+                void SetPortrait(Image image, Image previous, Text reaction, Sprite bust, float left, float right,
+                    ref float fade, ref float slide)
+                {
+                    var rect = image.rectTransform;
+                    rect.anchorMin = new Vector2(solo ? .355f : left, rect.anchorMin.y);
+                    rect.anchorMax = new Vector2(solo ? .645f : right, rect.anchorMax.y);
+                    if (bust != null && sameSpeaker)
+                    {
+                        ShowBust(image, previous, bust, ref fade, ref slide);
+                        return;
+                    }
+
+                    SetSprite(previous, null);
+                    SetSprite(image, bust);
+                    image.color = Color.white;
+                    rect.anchoredPosition = Vector2.zero;
+                    reaction.enabled = false;
+                    fade = slide = 0f;
+                }
             }
 
             private void Reveal(int count)

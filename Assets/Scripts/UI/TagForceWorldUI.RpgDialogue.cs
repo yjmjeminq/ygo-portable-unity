@@ -24,7 +24,10 @@ namespace YGOPortable.UI
         private int _rpgLastLine;
         private int _rpgGuestSlots;
         private int _rpgSceneEpisode, _rpgSceneHeroId;
+        private bool _rpgSoloPortrait;
         internal bool RpgStageRunning => _rpgBeatRemaining > 0f;
+        internal bool RpgHasSingleSpeaker => _rpgSpeakingActor?.Target.Visible == true &&
+            !_rpgStageActors.Any(actor => actor != _rpgSpeakingActor && actor.Target.Visible);
 
         private readonly struct RpgStagePose
         {
@@ -375,6 +378,21 @@ namespace YGOPortable.UI
             }
             TrackRpgCamera(delta, RpgDialogueCameraFocus());
             OrderRpgFieldActors();
+            RefreshRpgCastVisibility();
+        }
+
+        internal void SetRpgSoloPortrait(bool enabled)
+        {
+            _rpgSoloPortrait = enabled;
+            RefreshRpgCastVisibility();
+        }
+
+        private void RefreshRpgCastVisibility()
+        {
+            if (_rpgDialogueCast == null) return;
+            bool visible = !_rpgSoloPortrait || RpgStageRunning;
+            if (_rpgDialogueCast.gameObject.activeSelf != visible)
+                _rpgDialogueCast.gameObject.SetActive(visible);
         }
 
         private Vector2 RpgDialogueCameraFocus()
@@ -476,6 +494,7 @@ namespace YGOPortable.UI
             }
             _rpgFieldHud = null;
             _rpgDialogueCast = _rpgDialogueOpponent = null;
+            _rpgSoloPortrait = false;
             _rpgSpeakingActor = _rpgPreviousSpeaker = null;
             _rpgBeatLines = null;
             _rpgCameraFocus = null;

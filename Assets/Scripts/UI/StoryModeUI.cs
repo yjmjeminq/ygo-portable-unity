@@ -21,6 +21,9 @@ namespace YGOPortable.UI
         public string fx;
         public StoryStageAction[] stage;
 
+        internal bool IsInternalMonologue => text?.Trim() is { Length: > 2 } line &&
+            ((line[0] == '(' && line[^1] == ')') || (line[0] == '（' && line[^1] == '）'));
+
         internal string SceneMapPath => !string.IsNullOrEmpty(sceneMap) &&
             sceneMap.All(c => char.IsLetterOrDigit(c) || c is '_' or '-') ? $"Maps/{sceneMap}.png" : null;
     }
