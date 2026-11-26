@@ -1226,17 +1226,20 @@
         },
         {
           "speaker": "",
-          "text": "달빛 아래로 걸어 나온 아스카의 손에는 덱 케이스가 꽉 쥐어져 있었다. 그녀의 눈빛은 낮보다 훨씬 더 진지했다."
+          "text": "달빛 아래로 걸어 나온 아스카의 손에는 덱 케이스가 꽉 쥐어져 있었다. 그녀의 눈빛은 낮보다 훨씬 더 진지했다.",
+          "cutscene": "cg_gx_forest_first_spar"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "매일 밤 여기서 혼자 덱을 정리한다는 걸 알아냈어. 부탁이야, 나랑 다시 한 번만 싸워줘. 당신을 이길 때까지 몇 번이고 도전할 거야.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_forest_first_spar"
         },
         {
           "speaker": "윤",
           "text": "호오… 오벨리스크 블루의 여왕이 밤중에 숲속까지 찾아올 줄이야. 좋아. 하지만 낮처럼 봐주는 건 없다.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_forest_first_spar"
         },
         {
           "speaker": "",
@@ -2664,46 +2667,55 @@
         {
           "speaker": "",
           "text": "아스카가 투명한 비닐우산을 펼쳐 내 쪽으로 슬쩍 기울였다. 작은 우산 하나 아래 두 사람의 어깨가 자연스럽게 가까워졌다.",
-          "fx": "heartbeat"
+          "fx": "heartbeat",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "윤",
           "text": "……네 쪽 어깨가 젖잖아. 우산 좀 더 네 쪽으로 가져가.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "괜찮아, 나보다 당신이 감기 걸리면 밤 스파링 못 하니까. ……후훗, 왠지 빗소리 들으니까 기분이 차분해지네.",
-          "emotion": "blush"
+          "emotion": "blush",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "",
-          "text": "우산 위로 후두둑 떨어지는 빗방울 소리와, 곁에서 풍겨오는 은은한 샴푸 향기. 프로 리그 시절엔 단 한 번도 경험해 본 적 없는 평범하고 따뜻한 시간이었다."
+          "text": "우산 위로 후두둑 떨어지는 빗방울 소리와, 곁에서 풍겨오는 은은한 샴푸 향기. 프로 리그 시절엔 단 한 번도 경험해 본 적 없는 평범하고 따뜻한 시간이었다.",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "있잖아… 지난번 폐기숙사에서 날 구해줬을 때 말이야. 나 사실 그날 밤에 잠이 안 와서 계속 생각했어.",
-          "emotion": "blush"
+          "emotion": "blush",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "윤",
           "text": "무슨 생각을?",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "당신이 생각보다 훨씬 무모하고, 훨씬 다정한 사람이라는 생각. ……고마워, 정말로.",
           "emotion": "blush",
-          "fx": "heartbeat"
+          "fx": "heartbeat",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "윤",
           "text": "……비가 많이 오네. 발밑 미끄러우니까 조심해서 걸어.",
-          "emotion": "blush"
+          "emotion": "blush",
+          "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "",
-          "text": "시선을 피하며 대답하는 내 옆얼굴을 보며, 아스카가 장난스럽게 웃으며 우산 손잡이를 꼭 쥐었다."
+          "text": "시선을 피하며 대답하는 내 옆얼굴을 보며, 아스카가 장난스럽게 웃으며 우산 손잡이를 꼭 쥐었다.",
+          "cutscene": "cg_gx_rainy_umbrella"
         }
       ],
       "postWinDialogues": [],
@@ -3575,32 +3587,38 @@
         {
           "speaker": "텐죠인 아스카",
           "text": "겨울 방학 동안 프로 리그 초청전 때문에 본토에 잠깐 다녀온다며? ……언제 돌아와?",
-          "emotion": "sad"
+          "emotion": "sad",
+          "cutscene": "cg_gx_winter_harbor_promise"
         },
         {
           "speaker": "윤",
           "text": "일주일이면 끝나. 스폰서 행사만 치르고 바로 돌아올 거다.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_winter_harbor_promise"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "그렇구나… 다행이야. 혹시 그대로 프로 무대로 영영 돌아가 버릴까 봐 조금 걱정했거든.",
           "emotion": "blush",
-          "fx": "heartbeat"
+          "fx": "heartbeat",
+          "cutscene": "cg_gx_winter_harbor_promise"
         },
         {
           "speaker": "윤",
           "text": "아직 네 완성된 덱을 못 봤는데 어디로 가겠어. 방학 동안 릴리스 연계 더 다듬어 둬.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_winter_harbor_promise"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "응! 2학년 새 학기엔 깜짝 놀랄 만큼 강해져서 기다리고 있을게. 조심히 다녀와!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_winter_harbor_promise"
         },
         {
           "speaker": "",
-          "text": "손을 흔들어 주는 아스카의 미소를 눈에 담으며, 나는 처음으로 '돌아올 곳'이 생긴 듯한 묘한 따뜻함을 느꼈다."
+          "text": "손을 흔들어 주는 아스카의 미소를 눈에 담으며, 나는 처음으로 '돌아올 곳'이 생긴 듯한 묘한 따뜻함을 느꼈다.",
+          "cutscene": "cg_gx_winter_harbor_promise"
         }
       ],
       "postWinDialogues": [],
@@ -5178,41 +5196,49 @@
         {
           "speaker": "텐죠인 아스카",
           "text": "세뇌당했을 때 내가 당신한테 했던 심한 말들… 생각할수록 너무 미안해. 사실은 단 한 번도 진심이 아니었는데.",
-          "emotion": "sad"
+          "emotion": "sad",
+          "cutscene": "cg_gx_sunset_boardwalk"
         },
         {
           "speaker": "윤",
           "text": "잊어버려. 네가 진심으로 원했던 건 날 상처 입히는 게 아니라, 내 옆에 당당히 서는 거였잖아.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_sunset_boardwalk"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "……당신은 정말 치사해. 그렇게 다정하게 말해버리면 내가 또 울 것 같잖아.",
           "emotion": "blush",
-          "fx": "heartbeat"
+          "fx": "heartbeat",
+          "cutscene": "cg_gx_sunset_boardwalk"
         },
         {
           "speaker": "",
-          "text": "아스카가 바닷바람에 흩날리는 금발을 귀 뒤로 넘기며, 내 손가락 끝에 살짝 자신의 새끼손가락을 걸었다."
+          "text": "아스카가 바닷바람에 흩날리는 금발을 귀 뒤로 넘기며, 내 손가락 끝에 살짝 자신의 새끼손가락을 걸었다.",
+          "cutscene": "cg_gx_sunset_boardwalk"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "내일 세레나와의 리벤지 매치… 빛의 힘 같은 거 빌리지 않고, 오직 내 힘과 당신한테 배운 수 싸움으로 이겨서 보여줄게.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_sunset_boardwalk"
         },
         {
           "speaker": "윤",
           "text": "그래. 관중석 맨 앞줄에서 지켜보고 있을게. 보란 듯이 꺾어주고 와라.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_sunset_boardwalk"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "응! 내일 경기 끝나고 나면… 나한테 진심으로 잘했다고 칭찬해 줘야 해?",
-          "emotion": "blush"
+          "emotion": "blush",
+          "cutscene": "cg_gx_sunset_boardwalk"
         },
         {
           "speaker": "",
-          "text": "노을빛에 물든 그녀의 눈동자는 그 어떤 빛의 결사의 환상보다도 맑고 단단하게 빛나고 있었다."
+          "text": "노을빛에 물든 그녀의 눈동자는 그 어떤 빛의 결사의 환상보다도 맑고 단단하게 빛나고 있었다.",
+          "cutscene": "cg_gx_sunset_boardwalk"
         }
       ],
       "postWinDialogues": [],
@@ -5713,56 +5739,67 @@
         },
         {
           "speaker": "",
-          "text": "밤하늘에서 커다란 금빛 불꽃이 터지며 아스카의 환한 옆얼굴을 비추었다. 세뇌당했던 시절의 차가운 그림자는 이제 어디에도 남아 있지 않았다."
+          "text": "밤하늘에서 커다란 금빛 불꽃이 터지며 아스카의 환한 옆얼굴을 비추었다. 세뇌당했던 시절의 차가운 그림자는 이제 어디에도 남아 있지 않았다.",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "윤",
           "text": "정말 잘 싸웠어, 아스카. 솔직히 마지막 턴의 의식 연계는 프로 리그 결승전에서도 환호가 터질 만한 명장면이었어.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "……당신이 의무실에서 잡아준 손 덕분에 다시 일어설 수 있었어. 만약 그때 당신이 계산을 버리고 날 구해주지 않았으면, 난 영원히 하얀 가면 뒤에 갇혀 있었을 거야.",
-          "emotion": "sad"
+          "emotion": "sad",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "윤",
           "text": "이제 그 이야기는 끝이야. 넌 스스로 세레나를 꺾고 증명했잖아.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "응! 이제 프로 랭커도 이겼으니… 다음 목표는 오직 한 사람뿐이야. 각오해, 무패의 프로님.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "",
-          "text": "방파제에 부딪히는 파도 소리와 밤하늘의 불꽃 소리가 어우러지며, 두 사람만의 조용한 축제가 이어졌다."
+          "text": "방파제에 부딪히는 파도 소리와 밤하늘의 불꽃 소리가 어우러지며, 두 사람만의 조용한 축제가 이어졌다.",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "있잖아… 세레나 씨를 이긴 순간, 제일 먼저 떠오른 얼굴이 당신이었어.",
           "emotion": "blush",
-          "fx": "heartbeat"
+          "fx": "heartbeat",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "윤",
           "text": "영광이군. 다음엔 세계 무대 결승전에서도 제일 먼저 떠올려 줘.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "후훗, 당연하지!",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "윤",
           "text": "언제든 환영한다. 단—그 자리는 쉽게 내주지 않을 테니까.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
           "speaker": "",
-          "text": "불꽃놀이의 여운이 바다 위로 잔잔히 내려앉는 동안, 두 사람의 어깨가 아주 자연스럽게 맞닿아 있었다."
+          "text": "불꽃놀이의 여운이 바다 위로 잔잔히 내려앉는 동안, 두 사람의 어깨가 아주 자연스럽게 맞닿아 있었다.",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
         }
       ],
       "postWinDialogues": [],
@@ -6974,41 +7011,49 @@
         {
           "speaker": "윤",
           "text": "그건…… 1학년 때 도서관에서 보던 노트인가?",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "응. 이차원에 떨어질 때도 덱이랑 이 노트만큼은 꼭 챙겼어. 봐, 첫 페이지엔 1기 때 20연패 기록이 적혀 있고… 여긴 당신이 볼펜으로 써준 힌트야.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         },
         {
           "speaker": "",
-          "text": "노트 페이지를 넘길 때마다, 1학년의 분한 연패 기록과 2학년의 제넥스 우승 기록, 그리고 두 사람이 함께 써 내려간 수백 번의 밤이 고스란히 담겨 있었다."
+          "text": "노트 페이지를 넘길 때마다, 1학년의 분한 연패 기록과 2학년의 제넥스 우승 기록, 그리고 두 사람이 함께 써 내려간 수백 번의 밤이 고스란히 담겨 있었다.",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         },
         {
           "speaker": "윤",
           "text": "……이렇게까지 꼼꼼하게 적어뒀을 줄은 몰랐군. 진짜 프로 분석관보다 대단한데.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "당연하지. 내 목표는 단 하나였으니까. ……원래 세계로 돌아가면, 이 노트 마지막 페이지에 꼭 '첫 승리'라고 적을 거야.",
           "emotion": "blush",
-          "fx": "heartbeat"
+          "fx": "heartbeat",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         },
         {
           "speaker": "윤",
           "text": "호오… 그 마지막 페이지가 채워지는 날이 언제일지 기대되는군.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "기대해. 절대 오래 기다리게 안 할 테니까.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         },
         {
           "speaker": "",
-          "text": "삭막한 이차원의 황야 한가운데서도, 두 사람이 나란히 웃는 그 작은 모닥불 옆만큼은 세상에서 가장 따뜻한 장소였다."
+          "text": "삭막한 이차원의 황야 한가운데서도, 두 사람이 나란히 웃는 그 작은 모닥불 옆만큼은 세상에서 가장 따뜻한 장소였다.",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
         }
       ],
       "postWinDialogues": [],
@@ -9421,36 +9466,43 @@
         {
           "speaker": "텐죠인 아스카",
           "text": "안 자고 있었네? 내일이면 정말 졸업이야… 아직도 실감이 안 나.",
-          "emotion": "sad"
+          "emotion": "sad",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
           "speaker": "윤",
           "text": "들어와. 차라도 한 잔 내줄까.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "아니, 잠깐 얼굴만 보러 왔어. ……내일 저녁, 졸업식 끝나고 숲속 빈 듀얼장으로 나와줄 거지?",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
           "speaker": "윤",
           "text": "물론이지. 이차원에서 했던 약속, 잊을 리가 없잖아.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "단 1%도 봐주면 안 돼. 내일 밤만큼은, 네가 프로 리그 결승전에서 보여주던 100% 그대로의 전력으로 날 상대해 줘.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
           "speaker": "윤",
           "text": "약속하지. 내 진짜 에이스와 모든 수 싸움을 걸고 정면으로 맞서겠다.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
           "speaker": "",
-          "text": "아스카가 내 손을 한 번 꼭 쥐었다가 놓으며 수줍게 웃었다."
+          "text": "아스카가 내 손을 한 번 꼭 쥐었다가 놓으며 수줍게 웃었다.",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
           "speaker": "",
@@ -10057,21 +10109,25 @@
         },
         {
           "speaker": "",
-          "text": "저녁 바람이 숲속 나뭇잎을 스치며 지나갔다. 아스카가 듀얼 디스크를 들어 올리며 장난기 가득한 눈빛으로 미소 지었다."
+          "text": "저녁 바람이 숲속 나뭇잎을 스치며 지나갔다. 아스카가 듀얼 디스크를 들어 올리며 장난기 가득한 눈빛으로 미소 지었다.",
+          "cutscene": "cg_gx_epilogue_friendly_duel"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "자, 추억 이야기는 여기까지! 오늘 저녁 설거지 당번 걸고—무패의 챔피언님, 한 판 붙어줄래요?",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_epilogue_friendly_duel"
         },
         {
           "speaker": "윤",
           "text": "기꺼이. 이번엔 절대 안 져준다, 나의 여왕님.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_epilogue_friendly_duel"
         },
         {
           "speaker": "",
-          "text": "노을빛 아래 두 사람의 듀얼 디스크가 찬란하게 맞부딪쳤다. 고독했던 프로와 완벽함을 강요받던 여왕이 서로를 구원하고 나란히 선 이야기는, 앞으로도 끝없이 계속될 것이다. — FIN —"
+          "text": "노을빛 아래 두 사람의 듀얼 디스크가 찬란하게 맞부딪쳤다. 고독했던 프로와 완벽함을 강요받던 여왕이 서로를 구원하고 나란히 선 이야기는, 앞으로도 끝없이 계속될 것이다. — FIN —",
+          "cutscene": "cg_gx_epilogue_friendly_duel"
         }
       ],
       "postWinDialogues": [],

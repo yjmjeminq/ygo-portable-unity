@@ -268,7 +268,7 @@ namespace YGOPortable.Editor
                 var expectedCg = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
                     .Concat(episode.postLoseDialogues)).Select(line => line.cutscene)
                     .Where(id => !string.IsNullOrEmpty(id)).Distinct().ToArray();
-                Require(expectedCg.Length == 11 && expectedCg.All(id =>
+                Require(expectedCg.Length == 19 && expectedCg.All(id =>
                     File.Exists(Path.Combine(streaming, "TagForce/GX/Cutscenes", id + ".png"))), "Missing GX event CG.");
 
                 try
@@ -300,7 +300,7 @@ namespace YGOPortable.Editor
                             Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
                                 .text == "오토 켜짐", $"Automatic playback is off for {episode.id}.");
                             VerifyDialogueStart(episode.preDialogues, episode.id);
-                            ReadDialogue(episode.preDialogues.Length);
+                            ReadDialogue(episode);
                             Require(world.RpgClears == index + 1 && Get("_session") == null,
                                 $"A cutscene did not advance directly at {episode.id}.");
                             scenes++;
@@ -451,10 +451,25 @@ namespace YGOPortable.Editor
                     Require(text.text == line.text, "The GX dialogue did not render the scripted text.");
                 }
 
-                void ReadDialogue(int lines)
+                void ReadDialogue(StoryEpisodeData episode)
                 {
-                    for (int tick = 0; tick < lines * 5 + 5 && storyRoot.gameObject.activeInHierarchy; ++tick)
+                    var lines = episode.preDialogues;
+                    var checkedScenes = new HashSet<string>();
+                    var image = (Image)dialogueType.GetField("_cutsceneImage", flags).GetValue(dialogue);
+                    var sprites = (Dictionary<string, Sprite>)dialogueType.GetField("_rpgSprites", flags).GetValue(dialogue);
+                    for (int tick = 0; tick < lines.Length * 5 + 5 && storyRoot.gameObject.activeInHierarchy; ++tick)
+                    {
+                        string scene = lines[CurrentLine()].cutscene;
+                        if (!string.IsNullOrEmpty(scene) && checkedScenes.Add(scene))
+                        {
+                            string path = Path.Combine(streaming, "TagForce/GX", $"Cutscenes/{scene}.png");
+                            Require(sprites.TryGetValue(path, out var sprite) && sprite != null && image.sprite == sprite,
+                                $"The scripted CG did not load for {episode.id}: {scene}.");
+                        }
                         story.Update(4f);
+                    }
+                    Require(lines.All(line => string.IsNullOrEmpty(line.cutscene) || checkedScenes.Contains(line.cutscene)),
+                        $"Automatic playback skipped a CG in {episode.id}.");
                 }
 
                 void VerifyGxArtwork(TagForceData configuration, string[] cutscenes)
@@ -506,7 +521,7 @@ namespace YGOPortable.Editor
                     view.Update(.5f);
                     Require(alpha.alpha == 0f, "CG did not fade back to the field.");
                     view.Close();
-                    Debug.Log("[VERIFY GX ART] All 27 sets of standing and directional character assets and all 11 CG transition paths passed.");
+                    Debug.Log($"[VERIFY GX ART] All 27 sets of standing and directional character assets and all {cutscenes.Length} CG transition paths passed.");
                 }
             }
 
