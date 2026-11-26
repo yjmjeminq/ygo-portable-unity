@@ -81,10 +81,21 @@ namespace YGOPortable.UI
                 _rpgDialogueOpponent = Anchor(_rpgDialogueCast, "Opponent", mark, new Vector2(91f, 100f));
                 CreateStageWalker(_rpgDialogueOpponent, opponentId, episode.opponentName);
             }
-            RegisterRpgActor(_rpgSceneHeroId, _player, _playerSprite, _position, true, false);
+            var opponentMark = _rpgDialogueOpponent.anchorMin;
+            var heroMark = _position;
+            if (IsGxCampaign && !episode.isCutsceneOnly && Mathf.Abs(heroMark.x - opponentMark.x) < .085f &&
+                Mathf.Abs(heroMark.y - opponentMark.y) < .15f)
+            {
+                // Give the larger walkers separate silhouettes when the duel starts from a close approach.
+                float side = heroMark.x <= opponentMark.x ? -.09f : .09f;
+                float x = opponentMark.x + side;
+                heroMark.x = x is < .06f or > .94f ? opponentMark.x - side : x;
+            }
+            PoseRpgWalker(_player, _playerSprite, heroMark, Vector2.zero, false, RpgNpcSlots[0] - heroMark);
+            RegisterRpgActor(_rpgSceneHeroId, _player, _playerSprite, heroMark, true, false);
             var opponentArt = (_rpgDialogueOpponent.Find("SD") ?? _rpgDialogueOpponent.Find("Sprite")) as RectTransform;
             var opponent = RegisterRpgActor(opponentId, _rpgDialogueOpponent, opponentArt,
-                _rpgDialogueOpponent.anchorMin, !IsGxCampaign || !entrances.Contains(opponentId), false);
+                opponentMark, !IsGxCampaign || !entrances.Contains(opponentId), false);
             _rpgStageSpeakers[episode.opponentName] = opponent;
             if (opponentId == 0) _rpgStageSpeakers[RpgHeroName] = opponent;
 
@@ -119,9 +130,7 @@ namespace YGOPortable.UI
                 }
             }
 
-            PoseRpgWalker(_rpgDialogueOpponent, opponentArt, _rpgDialogueOpponent.anchorMin, Vector2.zero, false,
-                _position - _rpgDialogueOpponent.anchorMin);
-            PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, RpgNpcSlots[0] - _position);
+            PoseRpgWalker(_rpgDialogueOpponent, opponentArt, opponentMark, Vector2.zero, false, heroMark - opponentMark);
             _player.SetAsLastSibling();
             foreach (var resident in _rpgResidents.Values)
                 if (!_rpgStageActors.Any(actor => actor.Root == resident)) resident.gameObject.SetActive(false);

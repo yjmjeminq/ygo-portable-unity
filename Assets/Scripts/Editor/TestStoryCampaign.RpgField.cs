@@ -420,7 +420,7 @@ namespace YGOPortable.Editor
                 {
                     var walkers = FieldScene().GetComponentsInChildren<TagForceRpgWalkAnimator>(true);
                     Require(walkers.Length > 0 && walkers.All(walker => walker.transform.parent is RectTransform actor &&
-                        actor.sizeDelta.y >= 130f && actor.pivot.y < .5f),
+                        actor.sizeDelta.y >= 220f && actor.pivot.y < .35f),
                         "A GX field or staged walker is too small or grows downward from the ground point.");
                 }
 

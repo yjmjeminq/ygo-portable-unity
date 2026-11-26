@@ -319,7 +319,7 @@ namespace YGOPortable.UI
 
         private static void AddGxIdentity(RectTransform actor, string caption, Color color)
         {
-            var tag = Anchor(actor, "GxIdentity", new Vector2(.5f, .012f), new Vector2(144f, 27f));
+            var tag = Anchor(actor, "GxIdentity", new Vector2(.5f, .065f), new Vector2(144f, 27f));
             RpgUiStyle.Glass(tag);
             HudLabel(tag, caption, 16, color, align: TextAnchor.MiddleCenter, heading: true).raycastTarget = false;
         }

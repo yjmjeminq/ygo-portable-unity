@@ -52,7 +52,8 @@ namespace YGOPortable.UI
             };
             bool story = role == RpgResidentRole.Story;
             bool gxGoal = story && IsGxCampaign;
-            var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.06f),
+            float markerHeight = IsGxCampaign && art != null ? .99f : 1.06f;
+            var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, markerHeight),
                 gxGoal ? new Vector2(184f, 36f) : story ? new Vector2(36f, 29f) : new Vector2(31f, 25f));
             string icon = role switch
             {

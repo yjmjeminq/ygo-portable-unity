@@ -12,7 +12,7 @@ namespace YGOPortable.UI
         private const float RpgStrideDistanceScale = 1.46f;
         private const float RpgSceneryFocusY = .55f;
         private static readonly Vector2 RpgFieldActorSize = new(82f, 83f);
-        private static readonly Vector2 GxFieldActorSize = new(136f, 138f);
+        private static readonly Vector2 GxFieldActorSize = new(224f, 228f);
         private readonly List<RectTransform> _rpgDepthOrder = new();
         private RectTransform _rpgSceneSpace, _rpgViewport;
         private Vector2 _rpgCameraPan;
@@ -70,7 +70,7 @@ namespace YGOPortable.UI
                     center.x = leftCenter <= rightCenter ? Mathf.Clamp(center.x, leftCenter, rightCenter) :
                         (leftCenter + rightCenter) * .5f;
                     float lowerCenter = .425f + (position.y - min.y) * span.y;
-                    float upperCenter = (IsGxCampaign ? .82f : .875f) + (position.y - max.y) * span.y;
+                    float upperCenter = (IsGxCampaign ? .735f : .875f) + (position.y - max.y) * span.y;
                     center.y = Mathf.Clamp(center.y, lowerCenter, Mathf.Max(lowerCenter, upperCenter));
                 }
             }
@@ -169,7 +169,7 @@ namespace YGOPortable.UI
                 // Grow the sprite upward from its ground position and leave room for the icon above it.
                 var actor = (RectTransform)art.parent;
                 actor.sizeDelta = GxFieldActorSize;
-                actor.pivot = new Vector2(.5f, .36f);
+                actor.pivot = new Vector2(.5f, .277f);
             }
 
             if (directions != null || sides != null || profile != null)
@@ -181,6 +181,8 @@ namespace YGOPortable.UI
             var depth = sides == null ? null : _images.GetSlices(cycle + "_vertical.png", 3, 2);
             AddRpgGroundShadow(art, field != null ? .06f : 0f);
             var image = DuelUiKit.AddImage(art.gameObject, idle, Color.white, true, false);
+            // Keep the transparent sides of the larger atlas cells from intercepting floor taps.
+            if (IsGxCampaign) image.raycastPadding = new Vector4(44f, 0f, 44f, 0f);
             art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions, field != null);
             return art;
         }
