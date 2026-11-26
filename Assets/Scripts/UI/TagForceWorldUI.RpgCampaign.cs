@@ -173,15 +173,33 @@ namespace YGOPortable.UI
             int total = _rpgCampaign.episodes.Length;
             var paper = Area(_body, "GxStoryJournal", .13f, .12f, .87f, .91f);
             RpgUiStyle.Dialogue(paper);
-            HudLabel(Area(paper, "Title", .08f, .77f, .92f, .92f),
+            HudLabel(Area(paper, "Title", .08f, .815f, .92f, .945f),
                 $"여왕의 대관식  ·  {clears}/{total}", 30, Color.white, heading: true);
             var episode = CurrentRpgEpisode;
             string objective = episode == null ? "모든 이야기를 마쳤습니다. 아카데미아를 자유롭게 둘러보세요." :
                 $"{episode.chapterTitle}\n{episode.title}\n{CampaignRegions[CampaignRegionForEpisode(clears + 1)].Name}";
-            HudLabel(Area(paper, "Objective", .08f, .35f, .92f, .74f), objective, 24, RpgUiStyle.Cyan);
+            HudLabel(Area(paper, "Objective", .08f, .619f, .92f, .81f), objective, 23, RpgUiStyle.Cyan);
+            HudLabel(Area(paper, "MemoryTitle", .08f, .493f, .92f, .600f),
+                "아스카와 함께한 이야기", 24, Color.white, heading: true);
+            var memoryList = Area(paper, "Memories", .08f, .215f, .92f, .484f);
+            var memories = _rpgCampaign.episodes.Take(clears).SelectMany((entry, i) => entry.preDialogues
+                .Concat(entry.postWinDialogues ?? Array.Empty<StoryDialogueLine>())
+                .Where(line => !string.IsNullOrWhiteSpace(line.memoryTitle) && !string.IsNullOrWhiteSpace(line.cutscene))
+                .Select(line => (Index: i, Cg: line.cutscene, Title: line.memoryTitle))).ToArray();
+            if (memories.Length == 0)
+                HudLabel(memoryList, "이야기를 진행하면 함께한 장면을 다시 볼 수 있습니다.", 20, RpgUiStyle.Cyan);
+            float rowHeight = 1f / Mathf.Max(2, (memories.Length + 1) / 2);
+            for (int i = 0; i < memories.Length; i++)
+            {
+                var memory = memories[i];
+                float left = i % 2 * .52f;
+                float top = 1f - i / 2 * rowHeight;
+                RpgButton(Area(memoryList, memory.Cg, left, top - rowHeight * .85f, left + .48f, top), memory.Title,
+                    () => _app.OpenRpgRecap(memory.Index, memory.Cg), 20);
+            }
             if (clears > 0)
-                RpgButton(Area(paper, "Recap", .08f, .13f, .47f, .29f), "지난 이야기", _app.OpenRpgRecap);
-            RpgButton(Area(paper, "BackToField", .53f, .13f, .92f, .29f), "필드로 돌아가기", () => Show(Page.Field));
+                RpgButton(Area(paper, "Recap", .08f, .06f, .47f, .179f), "지난 이야기", _app.OpenRpgRecap);
+            RpgButton(Area(paper, "BackToField", .53f, .06f, .92f, .179f), "필드로 돌아가기", () => Show(Page.Field));
         }
 
         internal static int StageOpponentId(StoryEpisodeData episode) =>

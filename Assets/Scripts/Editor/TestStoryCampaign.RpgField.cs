@@ -268,7 +268,7 @@ namespace YGOPortable.Editor
                 var expectedCg = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
                     .Concat(episode.postLoseDialogues)).Select(line => line.cutscene)
                     .Where(id => !string.IsNullOrEmpty(id)).Distinct().ToArray();
-                Require(expectedCg.Length == 24 && expectedCg.All(id =>
+                Require(expectedCg.Length == 28 && expectedCg.All(id =>
                     File.Exists(Path.Combine(streaming, "TagForce/GX/Cutscenes", id + ".png"))), "Missing GX event CG.");
 
                 try
@@ -309,6 +309,10 @@ namespace YGOPortable.Editor
 
                         if (episode.id == "gx_ep_01")
                         {
+                            PressRpgNavigation("Quests");
+                            Require(panel.Find("GxStoryJournal/Memories").GetComponentsInChildren<Button>().Length == 0,
+                                "GX memories were visible before their episodes were cleared.");
+                            world.Back();
                             Press(panel, "FieldHud/QuestTrack/Guide");
                             Require(panel.Find("RegionPreview/RegionName/Label").GetComponent<Text>().text == world.CampaignRegion(location).Name,
                                 "The GX field guide did not preselect the objective region on the map.");
@@ -388,6 +392,12 @@ namespace YGOPortable.Editor
                             $"The duel HUD lost the current player name at {episode.id}.");
                         AwardDuel(win: true);
                         VerifyDialogueStart(episode.postWinDialogues, episode.id);
+                        int memoryIndex = Array.FindIndex(episode.postWinDialogues, line => !string.IsNullOrEmpty(line.memoryTitle));
+                        if (memoryIndex >= 0)
+                        {
+                            dialogueType.GetMethod("BindLine", flags).Invoke(dialogue, new object[] { memoryIndex, false });
+                            VerifyGxDialogueArt(episode, episode.postWinDialogues[memoryIndex].cutscene);
+                        }
                         if (episode.id == "gx_ep_27") VerifySpeaker(episode.postWinDialogues, "윤", player: false);
                         Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                         Require(world.RpgClears == index + 1 && CollectionProgress.LastDuelDeckId == startingDeck.id,
@@ -406,6 +416,7 @@ namespace YGOPortable.Editor
                     Require(panel.Find(MapNodes)?.childCount == 12, "The GX world map lost pin buttons.");
                     world.Back();
                     VerifyGxArtwork(gxMap, expectedCg);
+                    VerifyGxMemories();
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
                     Debug.Log("[VERIFY GX FIELD] 53 consecutive sequences, 34 Master duels, 19 automatic lockouts, all 12 maps and three temporary POV decks passed.");
                 }
@@ -482,6 +493,26 @@ namespace YGOPortable.Editor
                     string path = Path.Combine(streaming, "TagForce/GX", $"Cutscenes/{scene}.png");
                     Require(sprites.TryGetValue(path, out var sprite) && sprite != null && image.sprite == sprite,
                         $"The scripted CG did not load for {episode.id}: {scene}.");
+                }
+
+                void VerifyGxMemories()
+                {
+                    var memories = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
+                        .Where(line => !string.IsNullOrEmpty(line.memoryTitle)).Select(line => (episode, line))).ToArray();
+                    Require(memories.Length == 4, "Wrong number of GX Asuka memories.");
+                    int balance = CollectionProgress.Balance;
+                    foreach (var (episode, memory) in memories)
+                    {
+                        PressRpgNavigation("Quests");
+                        Press(panel, $"GxStoryJournal/Memories/{memory.cutscene}");
+                        var lines = (StoryDialogueLine[])dialogueType.GetField("_dialogue", flags).GetValue(dialogue);
+                        Require(storyRoot.gameObject.activeInHierarchy && ReferenceEquals(lines[0], memory) && lines.Length > 1 &&
+                            lines.All(line => line.cutscene == memory.cutscene), "The journal did not open only the selected GX memory.");
+                        VerifyGxDialogueArt(episode, memory.cutscene);
+                        Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                        Require(world.Root.activeSelf && world.RpgClears == 53 && CollectionProgress.Balance == balance,
+                            "GX memory replay changed the save or awarded duel rewards again.");
+                    }
                 }
 
                 void VerifyGxArtwork(TagForceData configuration, string[] cutscenes)

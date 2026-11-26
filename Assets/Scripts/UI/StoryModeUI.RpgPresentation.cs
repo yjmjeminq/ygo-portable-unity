@@ -16,13 +16,13 @@ namespace YGOPortable.UI
         private float _rpgFaceoffTime;
         internal const float RpgFaceoffDuration = 1.12f;
 
-        internal void OpenFieldRecap(int index)
+        internal void OpenFieldRecap(int index, string cutscene = null)
         {
             if (!FromRpgField || Script?.episodes == null || (uint)index >= Script.episodes.Length) return;
             var episode = Script.episodes[index];
             var lines = (episode.preDialogues ?? Array.Empty<StoryDialogueLine>())
                 .Concat(episode.postWinDialogues ?? Array.Empty<StoryDialogueLine>())
-                .Where(line => line != null).ToArray();
+                .Where(line => line != null && (cutscene == null || line.cutscene == cutscene)).ToArray();
             if (lines.Length == 0)
                 lines = new[] { new StoryDialogueLine { speaker = "내레이션", text = TitleOf(episode) } };
             _browser.interactable = _browser.blocksRaycasts = false;
@@ -30,7 +30,8 @@ namespace YGOPortable.UI
             _app.RpgField.Root.SetActive(false);
             var world = _app.RpgField;
             var region = world.CampaignRegion(world.CampaignRegionForEpisode(index + 1));
-            _dialogue.Open("지난 이야기 · " + TitleOf(episode), episode.playAsCharacterId > 0 ? DeckRepository.GetCharacter(episode.playAsCharacterId)?.name ?? "아스카" : Script.protagonist,
+            string heading = cutscene == null ? "지난 이야기 · " + TitleOf(episode) : lines[0].memoryTitle ?? TitleOf(episode);
+            _dialogue.Open(heading, episode.playAsCharacterId > 0 ? DeckRepository.GetCharacter(episode.playAsCharacterId)?.name ?? "아스카" : Script.protagonist,
                 DeckRepository.GetCharacter(episode.charId), lines, ReturnToEpisodes, rpg: true,
                 rpgBackdrop: region.StoryBackdrop,
                 preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1), rpgEpisode: index + 1,

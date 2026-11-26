@@ -15,6 +15,7 @@ namespace YGOPortable.UI
         public string speaker;
         public string text;
         public string cutscene;
+        public string memoryTitle;
         public string emotion;
         public string fx;
         public StoryStageAction[] stage;

@@ -388,13 +388,14 @@ namespace YGOPortable.UI
         private void CloseCollectionShop() => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title :
             _rpgCardShopOpen ? AppScreen.TagForceWorld : AppScreen.MainMenu);
 
-        internal void OpenRpgRecap()
+        internal void OpenRpgRecap() => OpenRpgRecap(_tagForceWorld.RpgClears - 1);
+
+        internal void OpenRpgRecap(int episode, string cutscene = null)
         {
-            if (_screen != AppScreen.TagForceWorld || _tagForceWorld.RpgClears == 0) return;
-            int episode = _tagForceWorld.RpgClears - 1;
+            if (_screen != AppScreen.TagForceWorld || episode < 0 || episode >= _tagForceWorld.RpgClears) return;
             _storyMode.UseRpgCampaign(true, fromField: true, seriesId: _tagForceWorld.RpgCampaignId);
             ShowScreen(AppScreen.StoryMode);
-            _storyMode.OpenFieldRecap(episode);
+            _storyMode.OpenFieldRecap(episode, cutscene);
         }
 
         public void ShowScreen(AppScreen screen)
