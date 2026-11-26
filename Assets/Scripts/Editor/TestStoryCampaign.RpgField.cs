@@ -544,7 +544,8 @@ namespace YGOPortable.Editor
                 foreach (int id in ids)
                 {
                     string cycle = Path.Combine(streaming, $"TagForce/5DS/WalkCycles/sd_{id}");
-                    Require(File.Exists(cycle + "_directions.png") || File.Exists(cycle + "_side_idle.png"),
+                    Require(File.Exists(cycle + "_field.png") ||
+                        File.Exists(cycle + "_directions.png") || File.Exists(cycle + "_side_idle.png"),
                         $"RPG field character {id} lacked a side-facing sprite.");
                 }
                 Require(world.EnterRpgRegion(RpgGarage), "Could not reset the garage.");
@@ -812,7 +813,39 @@ namespace YGOPortable.Editor
                 foreach (string mood in fullCast.Contains(id) ? featuredMoods.Concat(new[] { "blush", "hurt" }) : featuredMoods)
                     Require(File.Exists(Path.Combine(streaming, standing, $"full_{id}_{mood}.png")),
                         $"Missing authored dialogue expression {id}/{mood}.");
-                Require(File.Exists(Path.Combine(streaming, standing, "full_protagonist.png")), "Missing Kai's neutral portrait.");
+                var expressionSuffixes = featuredMoods.Concat(new[] { "blush", "hurt" }).ToArray();
+                var files = Directory.GetFiles(Path.Combine(streaming, standing), "full_*.png");
+                var expressions = files.Where(file => expressionSuffixes.Any(mood =>
+                    file.EndsWith($"_{mood}.png", StringComparison.Ordinal))).ToArray();
+                Require(expressions.Length >= 94, "A shipped RPG expression was removed.");
+                var portraitFrame = new Rect(0, 0, 448, 576);
+                foreach (string expression in expressions)
+                    VerifyPortraitCrop(expression, portraitFrame);
+                foreach (string id in fullCast.Concat(featuredCast))
+                    VerifyPortraitCrop(Path.Combine(streaming, standing, $"full_{id}.png"), portraitFrame);
+
+                void VerifyPortraitCrop(string path, Rect frame)
+                {
+                    var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    Sprite cropped = null;
+                    Texture2D donor = null;
+                    try
+                    {
+                        Require(texture.LoadImage(File.ReadAllBytes(path)), $"Invalid standing image {path}.");
+                        bool alreadyUpperBody = texture.height / (float)texture.width < 1.38f;
+                        cropped = RpgDialoguePortrait.Crop(texture, new Rect(0, 0, texture.width, texture.height),
+                            Path.GetFileNameWithoutExtension(path));
+                        donor = cropped.texture;
+                        Require(cropped.rect == frame && (donor == texture) == alreadyUpperBody,
+                            $"Standing image {path} did not retain the 448 × 576 dialogue frame.");
+                    }
+                    finally
+                    {
+                        if (cropped != null) UnityEngine.Object.DestroyImmediate(cropped);
+                        if (donor != null && donor != texture) UnityEngine.Object.DestroyImmediate(donor);
+                        UnityEngine.Object.DestroyImmediate(texture);
+                    }
+                }
                 var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
                 foreach (int id in new[] { 21, 24, 3204, 220, 230, 28, 19, 4, 3203 })
                 {
@@ -821,7 +854,8 @@ namespace YGOPortable.Editor
                         walk[0].rect.y > walk[3].rect.y && walk[3].rect.y > walk[6].rect.y,
                         $"Missing directional frames for actor {id}.");
                 }
-                Debug.Log($"[VERIFY 5DS PORTRAITS] Base portrait for {cast.Count} IDs, 58 expressions and nine directional atlases passed.");
+                Debug.Log($"[VERIFY 5DS PORTRAITS] Base portrait for {cast.Count} IDs, {expressions.Length} uncropped expressions, " +
+                    "13 aligned neutral frames and nine directional atlases passed.");
             }
 
             void WalkToQuestScene(RectTransform player)

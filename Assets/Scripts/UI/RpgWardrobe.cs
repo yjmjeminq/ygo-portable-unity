@@ -40,7 +40,9 @@ namespace YGOPortable.UI
         }
 
         internal static string PortraitStem(int id, string outfit) =>
-            $"Characters_Standing/full_{id}" + (outfit == null || outfit == Everyday ? "" : $"_{outfit}");
+            $"Characters_Standing/full_{id}" + (UsesBasePortrait(outfit) ? "" : $"_{outfit}");
+
+        internal static bool UsesBasePortrait(string outfit) => outfit == null || outfit == Duel;
 
         internal static string Preview(int id, string outfit) => $"{PortraitStem(id, outfit)}_determined.png";
 

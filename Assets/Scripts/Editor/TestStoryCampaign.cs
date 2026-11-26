@@ -213,11 +213,13 @@ namespace YGOPortable.Editor
                             speakerPortrait.sprite != restingPortrait && !speakerReaction.enabled &&
                             speakerPortrait.color.g > .98f && speakerPortrait.color.b > .98f,
                             "The authored blush did not return cleanly after fading out the CG.");
+                        var listeningPortrait = speakerPortrait.sprite;
                         next.onClick.Invoke();
                         dialogue.Update(.4f);
                         Require(playerPortrait.enabled && speakerPortrait.enabled &&
-                            playerPortrait.sprite.rect.height < playerPortrait.sprite.texture.height,
-                            "Switching speakers did not retain the listening character.");
+                            speakerPortrait.sprite == listeningPortrait &&
+                            playerPortrait.sprite.rect.size == new Vector2(448f, 576f),
+                            "Switching speakers did not keep the listener and Kai's aligned neutral frame.");
                         next.onClick.Invoke();
                         dialogue.Update(.4f);
                         Require(!badge.activeSelf && playerPortrait.enabled && speakerPortrait.enabled &&

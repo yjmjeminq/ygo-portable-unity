@@ -854,16 +854,14 @@ namespace YGOPortable.UI
             private Sprite LoadActorBust(int id, string emotion)
             {
                 string outfit = RpgWardrobe.ForStory(id, _rpgEpisode);
-                if (outfit != null)
+                string stem = RpgWardrobe.PortraitStem(id, outfit);
+                if (!RpgWardrobe.UsesBasePortrait(outfit))
                 {
-                    var bust = LoadExpression(RpgWardrobe.PortraitStem(id, outfit), emotion) ??
-                        LoadRpgSprite(RpgWardrobe.Preview(id, outfit));
+                    var bust = LoadExpression(stem, emotion) ?? LoadRpgSprite(RpgWardrobe.Preview(id, outfit));
                     if (bust != null) return bust;
+                    stem = RpgWardrobe.PortraitStem(id, null);
                 }
-                string stem = RpgWardrobe.PortraitStem(id, null);
-                // Aki's unsuffixed expression files belong to her everyday clothes.
-                var fallbackPose = id == 1 ? null : LoadExpression(stem, emotion);
-                return fallbackPose ?? LoadRpgSprite(stem + ".png", waistUp: true);
+                return LoadBust(stem, emotion);
             }
 
             private Sprite LoadBust(string stem, string emotion)
@@ -905,9 +903,9 @@ namespace YGOPortable.UI
                         if (texture.LoadImage(File.ReadAllBytes(path), markNonReadable: !waistUp))
                         {
                             var rect = new Rect(0f, 0f, texture.width, texture.height);
-                            sprite = waistUp ? RpgDialoguePortrait.Crop(texture, rect) :
+                            sprite = waistUp ? RpgDialoguePortrait.Crop(texture, rect, Path.GetFileNameWithoutExtension(name)) :
                                 Sprite.Create(texture, rect, Vector2.one * .5f, 100f, 0, SpriteMeshType.FullRect);
-                            if (waistUp) texture.Apply(false, true);
+                            if (waistUp && sprite.texture == texture) texture.Apply(false, true);
                         }
                     }
                 }
@@ -915,7 +913,7 @@ namespace YGOPortable.UI
                 {
                     Debug.LogWarning($"[StoryMode] Could not load story illustration {name}: {error.Message}");
                 }
-                finally { if (sprite == null && texture != null) DestroyArtwork(texture); }
+                finally { if (texture != null && sprite?.texture != texture) DestroyArtwork(texture); }
                 _rpgSprites.Add(path, sprite);
                 return sprite;
             }
