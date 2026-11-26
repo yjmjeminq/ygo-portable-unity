@@ -25,9 +25,10 @@ namespace YGOPortable.UI
             _browser.interactable = _browser.blocksRaycasts = false;
             _browser.gameObject.SetActive(false);
             _app.RpgField.Root.SetActive(false);
-            string map = "Maps/" + TagForceWorldUI.RpgRegions[TagForceWorldUI.RegionForEpisode(index + 1)].Id + ".png";
+            var region = TagForceWorldUI.RpgRegions[TagForceWorldUI.RegionForEpisode(index + 1)];
             _dialogue.Open("지난 이야기 · " + TitleOf(episode), Script.protagonist,
-                DeckRepository.GetCharacter(episode.charId), lines, ReturnToEpisodes, rpg: true, rpgBackdrop: map);
+                DeckRepository.GetCharacter(episode.charId), lines, ReturnToEpisodes, rpg: true,
+                rpgBackdrop: region.StoryBackdrop, preferredRpgBackdrop: region.LightingBackdrop);
         }
 
         private void PlayRpgFaceoff(StoryEpisodeData episode, Action finish)

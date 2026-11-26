@@ -21,29 +21,33 @@ namespace YGOPortable.UI
         {
             internal readonly string Id, Name;
             internal readonly int RequiredEpisode;
+            private readonly string _lighting;
 
-            internal RpgRegion(string id, string name, int requiredEpisode)
+            internal RpgRegion(string id, string name, int requiredEpisode, string lighting = null)
             {
                 Id = id;
                 Name = name;
                 RequiredEpisode = requiredEpisode;
+                _lighting = lighting;
             }
 
-            internal string Background => RpgArt + "Maps/" + Id + ".png";
+            internal string StoryBackdrop => $"Maps/{Id}.png";
+            internal string LightingBackdrop => _lighting == null ? null : $"Maps/{Id}_{_lighting}.png";
+            internal string Background => RpgArt + StoryBackdrop;
             internal string FieldBackground => RpgArt + "Maps/" + Id + "_field.png";
             internal bool IsOpen(int clears) => clears >= RequiredEpisode;
         }
 
         internal static readonly RpgRegion[] RpgRegions =
         {
-            new("spot_kai_garage", "카이의 정비소", 0),
+            new("spot_kai_garage", "카이의 정비소", 0, "morning"),
             new("spot_satellite_hideout", "새틀라이트 은신처", 0),
             new("spot_facility_prison", "시큐리티 수용소", 6),
-            new("spot_poppo_time", "폿포 타임", 8),
+            new("spot_poppo_time", "폿포 타임", 8, "spring"),
             new("spot_fortune_stadium", "포춘 컵 스타디움", 8),
             new("spot_old_moment", "구 모멘트 폐허", 18),
-            new("spot_daedalus_bridge", "다이달로스 브리지", 27),
-            new("spot_wrgp_circuit", "WRGP 서킷", 34),
+            new("spot_daedalus_bridge", "다이달로스 브리지", 27, "daylight"),
+            new("spot_wrgp_circuit", "WRGP 서킷", 34, "blue_hour"),
             new("spot_ark_cradle", "아크 크레이들", 44),
         };
 
@@ -270,7 +274,9 @@ namespace YGOPortable.UI
             return true;
         }
 
-        private Sprite GetRpgFieldArt(RpgRegion region) => _images.Get(region.FieldBackground) ?? _images.Get(region.Background);
+        private Sprite GetRpgFieldArt(RpgRegion region) =>
+            (region.LightingBackdrop is string lighting ? _images.Get(RpgArt + lighting) : null) ??
+            _images.Get(region.FieldBackground) ?? _images.Get(region.Background);
 
         private void BuildRpgField()
         {

@@ -45,6 +45,13 @@ namespace YGOPortable.Editor
                 Require(File.Exists(Path.Combine(streaming, region.Background)), $"Missing 5D's map {region.Id}.");
                 Require(File.Exists(Path.Combine(streaming, region.FieldBackground)), $"Missing 5D's field art {region.Id}.");
             }
+            string[] lightingBackdrops =
+            {
+                "Maps/spot_kai_garage_morning.png", "Maps/spot_poppo_time_spring.png",
+                "Maps/spot_daedalus_bridge_daylight.png", "Maps/spot_wrgp_circuit_blue_hour.png",
+            };
+            Require(regions.Select(region => region.LightingBackdrop).Where(path => path != null).SequenceEqual(lightingBackdrops),
+                "The four relit maps were not registered in their intended regions.");
 
             const string preference = "ygo.5ds-rpg.last-region";
             string oldPreference = PlayerPrefs.GetString(preference);
@@ -166,6 +173,7 @@ namespace YGOPortable.Editor
                         $"The region {request.Region} was missing its quest giver or SD art.");
                     VerifyAtmosphere(region);
                 }
+                VerifyMapLighting();
                 PressRpgNavigation("Quests");
                 Press(panel, "QuestPageNext");
                 Require(panel.Find("QuestPage/Label").GetComponent<Text>().text == "2 / 3",
@@ -208,6 +216,26 @@ namespace YGOPortable.Editor
                 world.Update(.31f);
                 Require(mote.anchorMin != origin && light.color.a != opacity,
                     $"The atmosphere of {regions[region].Id} did not animate in the field.");
+            }
+
+            void VerifyMapLighting()
+            {
+                var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
+                foreach (var (region, index) in regions.Select((region, index) => (region, index)))
+                {
+                    Require(world.EnterRpgRegion(index), $"Could not enter {region.Id} for the map lighting check.");
+                    var baseScenery = images.Get(region.FieldBackground);
+                    var expected = region.LightingBackdrop == null ? baseScenery : images.Get("TagForce/5DS/" + region.LightingBackdrop);
+                    Require(expected != null && expected.rect.size == baseScenery.rect.size &&
+                        FieldScene().Find("Scenery").GetComponent<Image>().sprite == expected,
+                        $"The field used incorrect artwork or altered the framing of {region.Id}.");
+                }
+                PressRpgNavigation("Map");
+                foreach (var region in regions.Where(region => region.LightingBackdrop != null))
+                    Require(panel.Find($"{region.Id}/MapPreview").GetComponent<Image>().sprite ==
+                        images.Get("TagForce/5DS/" + region.LightingBackdrop), $"The map preview used old artwork for {region.Id}.");
+                world.Back();
+                Debug.Log("[VERIFY 5DS MAP LIGHTING] All nine fields and the four revised map previews loaded with the original framing.");
             }
 
             Transform FieldScene() => panel.Find("FieldViewport/Camera");
@@ -925,6 +953,12 @@ namespace YGOPortable.Editor
                 Press(panel, "ResidentChoices/WorkbenchMenu");
                 Press(panel, "ResidentChoices/Recall");
                 Require(storyRoot.gameObject.activeSelf && !world.Root.activeSelf, "Workbench recall did not launch the last story.");
+                var view = (StoryModeUI.StoryDialogueView)typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
+                var storyArt = (Dictionary<string, Sprite>)typeof(StoryModeUI.StoryDialogueView).GetField("_rpgSprites", flags).GetValue(view);
+                string recallPath = Path.Combine(streaming, "TagForce/5DS", regions[0].LightingBackdrop);
+                Require(storyArt.TryGetValue(recallPath, out var relitRecall) && relitRecall != null &&
+                    storyRoot.Find("Scene/RpgStage").GetComponent<Image>().sprite == relitRecall,
+                    "The recap did not load the new lighting artwork.");
                 story.Back();
                 Require(world.CanWalk && world.RpgClears == 1, "Leaving a recap altered the story progress.");
                 int launches = 0;
@@ -938,6 +972,11 @@ namespace YGOPortable.Editor
                 var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
                 var loadedArt = (Dictionary<string, Sprite>)typeof(TagForceWorldImages).GetField("_loaded", flags).GetValue(images);
                 images.Clear();
+                loadedArt["TagForce/5DS/" + regions[0].LightingBackdrop] = null;
+                var previousField = images.Get(regions[0].FieldBackground);
+                Require(previousField != null && world.EnterRpgRegion(0) &&
+                    FieldScene().Find("Scenery").GetComponent<Image>().sprite == previousField,
+                    "Missing lighting artwork did not fall back to the matching field version.");
                 loadedArt[regions[0].FieldBackground] = null;
                 var originalGarage = images.Get(regions[0].Background);
                 Require(originalGarage != null && world.EnterRpgRegion(0) &&

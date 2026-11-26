@@ -247,7 +247,8 @@ namespace YGOPortable.UI
 
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
                 Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
-                string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null)
+                string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
+                string preferredRpgBackdrop = null)
             {
                 Close();
                 _field = field;
@@ -269,7 +270,10 @@ namespace YGOPortable.UI
                 _opponent.rectTransform.anchorMin = rpg ? (onField ? new Vector2(.765f, .32f) : bustMin) : new Vector2(.508f, .26f);
                 _opponent.rectTransform.anchorMax = rpg ? (onField ? new Vector2(.975f, .91f) : bustMax) : new Vector2(.93f, .855f);
                 if (rpg && !onField)
-                    SetSprite(_stage, LoadRpgSprite(rpgBackdrop));
+                {
+                    var preferred = preferredRpgBackdrop == null ? null : LoadRpgSprite(preferredRpgBackdrop);
+                    SetSprite(_stage, preferred ?? LoadRpgSprite(rpgBackdrop));
+                }
                 if (!rpg && !onField)
                 {
                     SetSprite(_hero, DuelProfileArt.Player);
