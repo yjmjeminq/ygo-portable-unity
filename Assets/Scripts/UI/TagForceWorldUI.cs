@@ -463,6 +463,12 @@ namespace YGOPortable.UI
             bool traveling = _rpgPendingRegion >= 0;
             if (_rpgField) UpdateRpgField(delta);
             if (traveling || !CanWalk) return;
+            if (_rpgField && !_fieldMenu && (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) ||
+                Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Z)))
+            {
+                ActivateRpgInteraction();
+                return;
+            }
             Vector2 movement = _fieldMenu ? Vector2.zero : padDirection;
             if (!_fieldMenu && movement == Vector2.zero)
             {
@@ -1286,10 +1292,13 @@ namespace YGOPortable.UI
 
         internal Sprite GetBust(string path)
         {
-            var source = Get(path);
+            var source = Get(path, readable: true);
             if (source == null) return null;
             if (!_busts.TryGetValue(path, out var bust))
+            {
                 _busts[path] = bust = RpgDialoguePortrait.Crop(source.texture, source.rect);
+                if (source.texture.isReadable) source.texture.Apply(false, true);
+            }
             return bust;
         }
 

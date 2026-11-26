@@ -208,6 +208,10 @@ namespace YGOPortable.UI
             {
                 _rpgBeatLines = null;
                 ApplyRpgBeat(lines, index, int.MaxValue, animate: false);
+                var focus = lines[index].stage?.Where(action => action?.action == "focus")
+                    .OrderBy(action => action.step).LastOrDefault();
+                if (focus != null && _rpgStageIds.TryGetValue(focus.actor, out var subject)) SetRpgCameraFocus(subject);
+                FrameRpgCamera(RpgDialogueCameraFocus());
             }
         }
 

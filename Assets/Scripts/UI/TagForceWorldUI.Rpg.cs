@@ -16,18 +16,21 @@ namespace YGOPortable.UI
         private const string RpgRegionPreference = "ygo.5ds-rpg.last-region";
         private const float RpgSceneRadius = .096f;
         private static readonly Vector2 RpgArrival = new(.50f, .20f);
+        internal const int RpgAcademia = 0, RpgGarage = 1, RpgHideout = 2, RpgPrison = 3, RpgPoppo = 4,
+            RpgStadium = 5, RpgMoment = 6, RpgCrashTown = 7, RpgBridge = 8, RpgWrgp = 9, RpgArk = 10;
 
         internal readonly struct RpgRegion
         {
             internal readonly string Id, Name;
-            internal readonly int RequiredEpisode;
+            internal readonly int RequiredEpisode, AdventureSlot;
             private readonly string _lighting;
 
-            internal RpgRegion(string id, string name, int requiredEpisode, string lighting = null)
+            internal RpgRegion(string id, string name, int requiredEpisode, int adventureSlot, string lighting = null)
             {
                 Id = id;
                 Name = name;
                 RequiredEpisode = requiredEpisode;
+                AdventureSlot = adventureSlot;
                 _lighting = lighting;
             }
 
@@ -40,24 +43,26 @@ namespace YGOPortable.UI
 
         internal static readonly RpgRegion[] RpgRegions =
         {
-            new("spot_kai_garage", "카이의 정비소", 0, "morning"),
-            new("spot_satellite_hideout", "새틀라이트 은신처", 0),
-            new("spot_facility_prison", "시큐리티 수용소", 6),
-            new("spot_poppo_time", "폿포 타임", 8, "spring"),
-            new("spot_fortune_stadium", "포춘 컵 스타디움", 8),
-            new("spot_old_moment", "구 모멘트 폐허", 18),
-            new("spot_daedalus_bridge", "다이달로스 브리지", 27, "daylight"),
-            new("spot_wrgp_circuit", "WRGP 서킷", 34, "blue_hour"),
-            new("spot_ark_cradle", "아크 크레이들", 44),
+            new("spot_duel_academia", "듀얼 아카데미아", 0, 9),
+            new("spot_kai_garage", "카이의 정비소", 0, 0, "morning"),
+            new("spot_satellite_hideout", "새틀라이트 은신처", 2, 1),
+            new("spot_facility_prison", "시큐리티 수용소", 6, 2),
+            new("spot_poppo_time", "폿포 타임", 8, 3, "spring"),
+            new("spot_fortune_stadium", "포춘 컵 스타디움", 8, 4),
+            new("spot_old_moment", "구 모멘트 폐허", 18, 5),
+            new("spot_crash_town", "크래시 타운", 27, 10),
+            new("spot_daedalus_bridge", "다이달로스 브리지", 27, 6, "daylight"),
+            new("spot_wrgp_circuit", "WRGP 서킷", 34, 7, "blue_hour"),
+            new("spot_ark_cradle", "아크 크레이들", 44, 8),
         };
 
         private static readonly int[] EpisodeRegionMap =
         {
-            0, 0, 0, 1, 1, 1, 2, 2, 4, 4, // 01–10
-            4, 4, 4, 3, 3, 3, 3, 3, 5, 5, // 11–20
-            5, 5, 5, 5, 5, 5, 5, 6, 6, 3, // 21–30
-            3, 0, 3, 0, 7, 7, 7, 7, 7, 7, // 31–40
-            7, 7, 7, 7, 8, 8, 8, 8, 8, 6, // 41–50
+            0, 0, 1, 2, 2, 2, 3, 3, 5, 5, // 01–10
+            5, 5, 5, 4, 4, 4, 4, 4, 6, 6, // 11–20
+            6, 6, 6, 6, 6, 6, 6, 7, 7, 4, // 21–30
+            4, 1, 4, 1, 9, 9, 9, 9, 9, 9, // 31–40
+            9, 9, 9, 9, 10, 10, 10, 10, 10, 8, // 41–50
         };
 
         private static readonly Vector2[] RpgNpcSlots = { new(.48f, .40f), new(.23f, .33f), new(.74f, .36f) };
@@ -92,6 +97,9 @@ namespace YGOPortable.UI
 
         internal static int RegionForEpisode(int episodeNumber) =>
             EpisodeRegionMap[Mathf.Clamp(episodeNumber, 1, EpisodeRegionMap.Length) - 1];
+
+        internal static string LightingForEpisode(RpgRegion region, int episodeNumber) =>
+            region.Id == RpgRegions[RpgBridge].Id && episodeNumber >= EpisodeRegionMap.Length ? null : region.LightingBackdrop;
 
         internal static string NewlyUnlockedRegions(int before, int after) => string.Join(" · ",
             RpgRegions.Where(region => !region.IsOpen(before) && region.IsOpen(after)).Select(region => region.Name));
@@ -186,7 +194,7 @@ namespace YGOPortable.UI
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(page != Page.Field);
             _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
-            DuelAudio.PlayTagForceBgm(_rpgLocation is 3 or 4 or 5);
+            DuelAudio.PlayTagForceBgm(_rpgLocation is RpgPoppo or RpgStadium or RpgMoment);
             switch (page)
             {
                 case Page.Map: BuildRpgMap(); break;
@@ -227,9 +235,9 @@ namespace YGOPortable.UI
             {
                 int index = i;
                 var region = RpgRegions[i];
-                float x = .025f + i % 3 * .324f;
-                float y = .678f - i / 3 * .323f;
-                var tile = Area(_body, region.Id, x, y, x + .30f, y + .292f);
+                float x = .022f + i % 4 * .242f;
+                float y = .678f - i / 4 * .323f;
+                var tile = Area(_body, region.Id, x, y, x + .228f, y + .292f);
                 RpgUiStyle.Panel(tile, accent: i == target);
                 bool open = region.IsOpen(cleared);
                 var poster = GetRpgFieldArt(region);
@@ -240,7 +248,7 @@ namespace YGOPortable.UI
                     DrawRpgIcon(Area(tile, "MapLock", .413f, .47f, .587f, .83f), "icon_map_lock.png", "잠김", DuelUiKit.GoldAccent);
                 var travel = RpgButton(Area(tile, "Travel", .037f, .047f, .965f, .273f),
                     open ? i == _rpgLocation ? $"{region.Name} · 현재" : region.Name :
-                        $"{region.Name} · {region.RequiredEpisode}화 클리어", () =>
+                        $"{region.Name} · 이야기 진행 시 개방", () =>
                     {
                         if (index == _rpgLocation) Show(Page.Field);
                         else BeginRpgTravel(index, RpgArrival);
@@ -275,7 +283,7 @@ namespace YGOPortable.UI
         }
 
         private Sprite GetRpgFieldArt(RpgRegion region) =>
-            (region.LightingBackdrop is string lighting ? _images.Get(RpgArt + lighting) : null) ??
+            (LightingForEpisode(region, RpgClears + 1) is string lighting ? _images.Get(RpgArt + lighting) : null) ??
             _images.Get(region.FieldBackground) ?? _images.Get(region.Background);
 
         private void BuildRpgField()
@@ -315,7 +323,7 @@ namespace YGOPortable.UI
                     Show(Page.Talk);
                 });
             }
-            string sideObjective = sideQuest != null ? AddRpgSideQuest(sideQuest) : null;
+            var sideObjective = sideQuest != null ? AddRpgSideQuest(sideQuest) : null;
             AddRpgShopkeeper();
             BuildRpgCompanion();
             _player = Anchor(_rpgSceneSpace, "Player", _position, RpgFieldActorSize);
@@ -361,7 +369,14 @@ namespace YGOPortable.UI
                 RpgResidentRole.Shop => "팩 구매",
                 _ => "대화",
             };
-            RegisterRpgInteraction(actor, $"{name} · {verb}", Approach);
+            var priority = role switch
+            {
+                RpgResidentRole.Story => RpgActionPriority.Story,
+                RpgResidentRole.Request or RpgResidentRole.Delivery or RpgResidentRole.Reward => RpgActionPriority.Request,
+                RpgResidentRole.Shop => RpgActionPriority.Service,
+                _ => RpgActionPriority.Conversation,
+            };
+            RegisterRpgInteraction(actor, $"{name} · {verb}", Approach, priority);
         }
 
         private void DrawRpgIcon(RectTransform anchor, string name, string fallback, Color color)
@@ -410,12 +425,13 @@ namespace YGOPortable.UI
         {
             if (speakerId is int id)
             {
+                var speaker = FaceRpgConversationSpeaker(id);
                 var bust = _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgArtKey(id)}.png");
                 if (bust == null && id != RpgShopkeeperId)
                     bust = DuelProfileArt.Opponent(DeckRepository.GetCharacter(id));
                 if (bust != null && bust != DuelProfileArt.MissingOpponent)
                 {
-                    bool showOnLeft = _rpgResidents.TryGetValue(id, out var speaker) && speaker.anchorMin.x > .62f;
+                    bool showOnLeft = speaker != null && speaker.anchorMin.x > .62f;
                     var portrait = Area(_body, "ConversationPortrait", showOnLeft ? .025f : .765f, .35f,
                         showOnLeft ? .235f : .975f, .97f);
                     DuelUiKit.AddImage(portrait.gameObject, bust, Color.white, true, false);
@@ -432,6 +448,20 @@ namespace YGOPortable.UI
             StartTypingDialogue(conversation, line);
             UiEntranceMotion.Play(panel.gameObject, .84f, .18f);
             return panel;
+        }
+
+        private RectTransform FaceRpgConversationSpeaker(int id)
+        {
+            _rpgResidents.TryGetValue(id, out var speaker);
+            if (speaker == null && id == RpgPartnerId) speaker = _rpgCompanion;
+            if (speaker == null) return null;
+
+            var art = (speaker.Find("SD") ?? speaker.Find("Sprite")) as RectTransform;
+            var towardSpeaker = speaker.anchorMin - _position;
+            PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, towardSpeaker);
+            PoseRpgWalker(speaker, art, speaker.anchorMin, Vector2.zero, false, -towardSpeaker);
+            FrameRpgCamera(Vector2.Lerp(_position, speaker.anchorMin, .32f));
+            return speaker;
         }
 
         private static Button AddRpgConversationActions(RectTransform panel, List<(string Id, string Label, Action Select)> actions)
@@ -488,6 +518,7 @@ namespace YGOPortable.UI
 
         private void UpdateRpgField(float delta)
         {
+            UpdateRpgQuestReward(delta);
             UpdateRpgAtmosphere(delta);
             UpdateRpgExploration(delta);
             UpdateRpgPresentation(delta);

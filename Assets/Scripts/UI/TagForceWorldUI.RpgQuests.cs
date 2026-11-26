@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI;
 using YGOPortable.Core;
 
 namespace YGOPortable.UI
@@ -10,6 +11,8 @@ namespace YGOPortable.UI
     {
         private RpgSideQuest _rpgQuestResident;
         private int _rpgQuestPage;
+        private RectTransform _rpgQuestRewardBanner;
+        private float _rpgQuestRewardTime;
         private static readonly Vector2 RpgQuestGiverPosition = new(.34f, .245f);
 
         private static string RpgQuestName(RpgSideQuest quest) => DeckRepository.GetCharacter(quest.Giver)?.name ?? "의뢰인";
@@ -32,7 +35,20 @@ namespace YGOPortable.UI
             Show(Page.Talk);
         }
 
-        private string AddRpgSideQuest(RpgSideQuest quest)
+        private static string RpgQuestReward(RpgSideQuest quest) => FormatRpgQuestReward(
+            quest.Reward, quest.Experience, quest.Affinity, quest.PackTicket);
+
+        private static string FormatRpgQuestReward(int dp, int experience, int affinity, bool packTicket)
+        {
+            var rewards = new List<string>();
+            if (dp > 0) rewards.Add($"+{dp:N0} DP");
+            if (experience > 0) rewards.Add($"+{experience} EXP");
+            if (affinity > 0) rewards.Add($"호감도 +{affinity}");
+            if (packTicket) rewards.Add("UR 팩 획득권 ×1");
+            return string.Join(" · ", rewards);
+        }
+
+        private (RpgSideQuest Quest, string Objective)? AddRpgSideQuest(RpgSideQuest quest)
         {
             var state = CollectionProgress.GetRpgQuestState(quest.Id);
             var delivery = RpgPendingDeliveries(quest).FirstOrDefault();
@@ -57,19 +73,22 @@ namespace YGOPortable.UI
                     $"{quest.Item} 확보 · {RpgQuestName(quest)}에게 돌아가세요.");
                 void Approach() => MoveTo(quest.Point, Investigate);
                 RpgButton(item, "조사 · " + quest.Item, Approach, 16, primary: true);
-                RegisterRpgInteraction(item, $"{quest.Item} · 조사", Approach);
+                RegisterRpgInteraction(item, $"{quest.Item} · 줍기", Approach, RpgActionPriority.Request);
             }
 
-            string hint = delivery?.Objective ?? (state switch
-            {
-                RpgQuestState.Active => quest.Objective,
-                RpgQuestState.Ready => RpgQuestReturn(quest),
-                _ => null,
-            });
             if ((_rpgLocation == RpgGarage || _rpgLocation == RpgBridge) &&
                 RpgCouplerState is RpgQuestState.Active or RpgQuestState.Ready)
-                hint = RpgCouplerState == RpgQuestState.Active ? RpgCouplerQuest.Objective : RpgQuestReturn(RpgCouplerQuest);
-            return hint;
+                return (RpgCouplerQuest, RpgCouplerState == RpgQuestState.Active ? RpgCouplerQuest.Objective : RpgQuestReturn(RpgCouplerQuest));
+            if (delivery != null) return (delivery, delivery.Objective);
+            if (state == RpgQuestState.Active) return (quest, quest.Objective);
+            if (state == RpgQuestState.Ready) return (quest, RpgQuestReturn(quest));
+            foreach (var pending in RpgSideQuest.All)
+            {
+                var status = CollectionProgress.GetRpgQuestState(pending.Id);
+                if (status == RpgQuestState.Active) return (pending, pending.Objective);
+                if (status == RpgQuestState.Ready) return (pending, RpgQuestReturn(pending));
+            }
+            return null;
         }
 
         private static string RpgQuestDialogue(RpgSideQuest quest)
@@ -91,7 +110,7 @@ namespace YGOPortable.UI
                 RpgQuestState.Active => quest.Objective,
                 RpgQuestState.Ready => "수고했어. 약속한 보상을 받아 가.",
                 RpgQuestState.Complete => $"{quest.Item} 건은 지난번에 도와줘서 고마웠어.",
-                _ => quest.Greeting,
+                _ => $"{quest.Greeting}\n보상  {RpgQuestReward(quest)}",
             };
         }
 
@@ -115,14 +134,36 @@ namespace YGOPortable.UI
 
         private void AdvanceRpgQuest(RpgSideQuest quest, RpgQuestState from, Page page, string message)
         {
+            int experience = CollectionProgress.RpgExperience;
+            int affinity = CollectionProgress.RpgAffinity;
+            int tickets = CollectionProgress.PackUrTickets;
             if (!CollectionProgress.TryAdvanceRpgQuest(quest.Id, from, out int reward, out string error))
             {
                 ShowStatus(error);
                 return;
             }
-            if (from == RpgQuestState.Ready) DuelAudio.PlayTagForceReward();
             Show(page);
-            ShowStatus(message ?? $"{quest.Title} · 완료 · +{reward:N0} DP");
+            if (from != RpgQuestState.Ready)
+            {
+                ShowStatus(message);
+                return;
+            }
+            DuelAudio.PlayTagForceReward();
+            string received = FormatRpgQuestReward(reward, CollectionProgress.RpgExperience - experience,
+                CollectionProgress.RpgAffinity - affinity, CollectionProgress.PackUrTickets > tickets);
+            _rpgQuestRewardBanner = Area(_body, "QuestRewardBanner", .25f, .865f, .75f, .962f);
+            PaintRpgHudPlate(_rpgQuestRewardBanner);
+            HudLabel(_rpgQuestRewardBanner, $"의뢰 완료!  {quest.Title}\n{received}", 21, Color.white,
+                align: TextAnchor.MiddleCenter, heading: true);
+            _rpgQuestRewardTime = 3.4f;
+            UiEntranceMotion.Play(_rpgQuestRewardBanner.gameObject, .84f, .2f);
+        }
+
+        private void UpdateRpgQuestReward(float delta)
+        {
+            if (_rpgQuestRewardBanner == null) return;
+            _rpgQuestRewardTime -= delta;
+            if (_rpgQuestRewardTime <= 0f) _rpgQuestRewardBanner.gameObject.SetActive(false);
         }
 
         private void BuildRpgQuestJournal()
@@ -156,15 +197,17 @@ namespace YGOPortable.UI
                 {
                     RpgQuestState.Active => quest.Objective,
                     RpgQuestState.Ready => RpgQuestReturn(quest),
-                    RpgQuestState.Complete => $"{quest.Reward:N0} DP 보상 수령",
-                    _ => $"{RpgQuestRegionName(quest)} · {RpgQuestName(quest)} · 보상 {quest.Reward:N0} DP",
+                    RpgQuestState.Complete => "보상 수령 완료",
+                    _ => $"{RpgQuestRegionName(quest)} · {RpgQuestName(quest)}",
                 };
                 float top = 1f - rowIndex++ / (float)perPage;
                 var row = Area(entries, quest.Id, 0f, top - .223f, 1f, top - .01f);
                 RpgUiStyle.Panel(row, accent: state is RpgQuestState.Active or RpgQuestState.Ready);
                 HudLabel(Area(row, "Title", .026f, .48f, .974f, .93f), $"[{progress}]  {quest.Title}",
                     22, Color.white, heading: true);
-                HudLabel(Area(row, "Detail", .026f, .07f, .974f, .48f), detail, 18, new Color(.72f, .83f, .90f));
+                HudLabel(Area(row, "Detail", .026f, .22f, .974f, .49f), detail, 18, new Color(.72f, .83f, .90f));
+                if (state != RpgQuestState.Complete)
+                    HudLabel(Area(row, "Reward", .026f, .024f, .974f, .23f), RpgQuestReward(quest), 17, DuelUiKit.GoldAccent);
             }
             if (pages == 1) return;
             RpgButton(Area(_body, "QuestPagePrev", .08f, .027f, .29f, .126f), "이전", () => ChangePage(-1))

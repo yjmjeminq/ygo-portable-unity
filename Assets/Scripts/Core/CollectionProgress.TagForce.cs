@@ -28,6 +28,13 @@ namespace YGOPortable.Core
             var state = (RpgQuestState)((int)from + 1);
             int dp = state == RpgQuestState.Complete ? Math.Min(int.MaxValue - Balance, quest.Reward) : 0;
             var next = WithBalance(Balance + dp);
+            if (state == RpgQuestState.Complete)
+            {
+                next.rpgAdventure = next.rpgAdventure.Copy();
+                next.rpgAdventure.xp = Math.Min(RpgRankThreshold(RpgMaxRank), next.rpgAdventure.xp + quest.Experience);
+                next.rpgAdventure.affinity = Math.Min(RpgMaxAffinity, next.rpgAdventure.affinity + quest.Affinity);
+                if (quest.PackTicket) AwardRpgTicket(next);
+            }
             next.rpgQuests = _profile.rpgQuests.Where(entry => entry.id != id).ToList();
             next.rpgQuests.Add(new RpgQuestRecord { id = id, state = state });
             if (!Write(next, _owned, out error)) return false;

@@ -46,6 +46,12 @@ namespace YGOPortable.UI
             float coverWidth = _rpgBackdropAspect / aspect;
             // Keep some horizontal travel on wide displays while limiting how much scenery is cropped vertically.
             float width = Mathf.Max(coverWidth, Mathf.Clamp(1.77f * coverWidth, 1.12f, 1.32f));
+            if (_rpgDialogueCast != null)
+            {
+                var (min, max) = RpgStageBounds();
+                float castWidth = Mathf.Max(.01f, max.x - min.x);
+                width = Mathf.Max(Mathf.Max(1f, coverWidth), Mathf.Min(width, .86f / castWidth));
+            }
             return new Vector2(width, width / coverWidth);
         }
 
@@ -57,17 +63,13 @@ namespace YGOPortable.UI
                 center.y = .61f;
                 if (_rpgDialogueCast != null)
                 {
-                    float lowest = _player.anchorMin.y;
-                    float highest = lowest;
-                    foreach (var actor in _rpgStageActors)
-                    {
-                        if (!actor.Root.gameObject.activeSelf) continue;
-                        float y = actor.Root.anchorMin.y;
-                        lowest = Mathf.Min(lowest, y);
-                        highest = Mathf.Max(highest, y);
-                    }
-                    float lowerCenter = .425f + (position.y - lowest) * span.y;
-                    float upperCenter = .875f + (position.y - highest) * span.y;
+                    var (min, max) = RpgStageBounds();
+                    float leftCenter = .07f + (position.x - min.x) * span.x;
+                    float rightCenter = .93f + (position.x - max.x) * span.x;
+                    center.x = leftCenter <= rightCenter ? Mathf.Clamp(center.x, leftCenter, rightCenter) :
+                        (leftCenter + rightCenter) * .5f;
+                    float lowerCenter = .425f + (position.y - min.y) * span.y;
+                    float upperCenter = .875f + (position.y - max.y) * span.y;
                     center.y = Mathf.Clamp(center.y, lowerCenter, Mathf.Max(lowerCenter, upperCenter));
                 }
             }
@@ -79,6 +81,19 @@ namespace YGOPortable.UI
             }
             return center - Vector2.one * .5f - Vector2.Scale(position - Vector2.one * .5f, span) -
                 Vector2.right * _rpgCameraLead;
+        }
+
+        private (Vector2 Min, Vector2 Max) RpgStageBounds()
+        {
+            var min = _player.anchorMin;
+            var max = min;
+            foreach (var actor in _rpgStageActors)
+            {
+                if (!actor.Root.gameObject.activeSelf) continue;
+                min = Vector2.Min(min, actor.Root.anchorMin);
+                max = Vector2.Max(max, actor.Root.anchorMin);
+            }
+            return (min, max);
         }
 
         private Vector2 ClampRpgCameraPan(Vector2 pan, Vector2 span)

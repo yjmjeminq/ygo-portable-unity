@@ -9,7 +9,7 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private const int RpgGarage = 0, RpgBridge = 6, RpgCrow = 10;
+        private const int RpgCrow = 10;
         private static readonly Vector2 RpgQuestCrowBench = new(.67f, .28f);
         private static readonly Vector2[] RpgExitPoints =
         {
@@ -18,18 +18,22 @@ namespace YGOPortable.UI
 
         private static readonly (int Region, int Exit, int Other, int Entrance)[] RpgPaths =
         {
-            (0, 1, 1, 0), (0, 2, 3, 0), (1, 2, 2, 0), (1, 3, 5, 0),
-            (1, 1, 6, 0), (3, 1, 4, 0), (6, 1, 7, 0), (7, 3, 8, 0),
+            (RpgAcademia, 1, RpgGarage, 0), (RpgGarage, 1, RpgHideout, 0), (RpgGarage, 2, RpgPoppo, 0),
+            (RpgHideout, 2, RpgPrison, 0), (RpgHideout, 3, RpgMoment, 0), (RpgHideout, 1, RpgBridge, 0),
+            (RpgPoppo, 1, RpgStadium, 0), (RpgBridge, 2, RpgCrashTown, 0), (RpgBridge, 1, RpgWrgp, 0),
+            (RpgWrgp, 3, RpgArk, 0),
         };
 
         private static readonly (string Name, Vector2 Position, string Description)[] RpgLandmarks =
         {
+            ("교정 게시판", new(.66f, .30f), "교정 게시판에는 실습장 안내와 수업 대진표가 붙어 있다."),
             ("정비 작업대", new(.67f, .275f), "듀얼 러너의 분해 도면과 부품함이 작업대에 놓여 있다."),
             ("벽의 표식", new(.66f, .27f), "벽에 그려진 작은 화살표는 밤에도 은신처 입구를 찾을 수 있게 표시한 것이다."),
             ("수용소 게시판", new(.58f, .34f), "교대 시간표 아래에 통신기가 끊겼다는 메모가 붙어 있다."),
             ("라디오", new(.67f, .29f), "낡은 라디오에서 포춘 컵 경기 결과가 흘러나온다."),
             ("경기 대진표", new(.62f, .29f), "대진표 아래에 선수들이 마지막으로 등록한 듀얼 러너 번호가 보인다."),
             ("희미한 흔적", new(.70f, .28f), "그을음 사이로 케이블이 끌려간 흔적이 남아 있다."),
+            ("광산 안내판", new(.66f, .30f), "광산 안내판에는 바람에 바랜 광맥 지도가 붙어 있다."),
             ("다리 난간", new(.69f, .27f), "난간 아래를 살피자 지나간 듀얼 러너의 타이어 자국이 보인다."),
             ("서킷 전광판", new(.64f, .32f), "마지막 주자의 기록이 아직 전광판에 남아 있다."),
             ("제어 단말기", new(.68f, .30f), "희미하게 켜진 단말기가 중단된 제어 기록을 반복해서 보여 준다."),
@@ -67,7 +71,7 @@ namespace YGOPortable.UI
             void Inspect() => MoveTo(landmark.Position, OpenRpgLandmark);
             RpgButton(marker, landmark.Name, Inspect, 16);
             _rpgLandmarkLabel = marker.GetComponentInChildren<Text>();
-            RegisterRpgInteraction(marker, $"{landmark.Name} · 조사", Inspect);
+            RegisterRpgInteraction(marker, $"{landmark.Name} · 조사", Inspect, RpgActionPriority.Service);
 
             void AddExit(int slot, int destination, int entry)
             {
@@ -76,11 +80,14 @@ namespace YGOPortable.UI
                     RpgExitPoints[slot] + new Vector2(0f, .047f), new Vector2(196f, 32f));
                 _rpgExitSigns.Add(gate);
                 string arrow = slot switch { 0 => "‹", 1 => "›", _ => "↑" };
+                void Go() => MoveTo(RpgExitPoints[slot], () => FollowRpgExit(destination, entry));
                 var button = RpgButton(gate, open ? $"{arrow}  {RpgRegions[destination].Name}" :
-                    $"{RpgRegions[destination].Name} · {RpgRegions[destination].RequiredEpisode}화", () =>
-                        MoveTo(RpgExitPoints[slot], () => FollowRpgExit(destination, entry)), 15);
+                    $"{RpgRegions[destination].Name} · 이야기 진행 시 개방", Go, 15);
                 button.interactable = open;
-                if (open) _rpgExits.Add((slot, destination, entry));
+                if (!open) return;
+                _rpgExits.Add((slot, destination, entry));
+                var target = Anchor(_rpgFieldObjects, $"ExitTarget_{destination}", RpgExitPoints[slot], Vector2.zero);
+                RegisterRpgInteraction(target, $"{RpgRegions[destination].Name} · 이동", Go, RpgActionPriority.Exit);
             }
         }
 

@@ -103,6 +103,9 @@ namespace YGOPortable.UI
             private bool _rpg;
             private bool _showCutscene;
             private bool _akiBlush;
+            private readonly Image _heroPrevious, _opponentPrevious;
+            private readonly Text _heroReaction, _opponentReaction;
+            private float _heroFade, _opponentFade, _heroSlide, _opponentSlide;
             private TagForceWorldUI _field;
             private bool _stageCaption;
             private OpponentCharacter _sceneOpponent;
@@ -155,6 +158,10 @@ namespace YGOPortable.UI
                 var opponent = Region(portraits, "Opponent", .59f, .30f, .957f, .855f);
                 _hero = DuelUiKit.AddImage(hero.gameObject, DuelProfileArt.Player, Color.white, true, false);
                 _opponent = DuelUiKit.AddImage(opponent.gameObject, null, Listening, true, false);
+                _heroPrevious = PortraitGhost(hero, "OutgoingHero");
+                _opponentPrevious = PortraitGhost(opponent, "OutgoingOpponent");
+                _heroReaction = Reaction(hero);
+                _opponentReaction = Reaction(opponent);
                 _blush = DuelUiKit.AddImage(Region(opponent, "Blush", .40f, .72f, .60f, .80f).gameObject,
                     null, new Color(1f, .36f, .60f, .28f), false, false);
                 for (int i = 0; i < _hearts.Length; i++)
@@ -263,12 +270,10 @@ namespace YGOPortable.UI
                 _sceneOpponent = opponent;
                 _rpg = rpg;
                 ApplyDialogueStyle(rpg);
-                var bustMin = new Vector2(.24f, .378f);
-                var bustMax = new Vector2(.76f, .868f);
-                _hero.rectTransform.anchorMin = rpg ? (onField ? new Vector2(.025f, .32f) : bustMin) : new Vector2(.07f, .26f);
-                _hero.rectTransform.anchorMax = rpg ? (onField ? new Vector2(.235f, .91f) : bustMax) : new Vector2(.493f, .855f);
-                _opponent.rectTransform.anchorMin = rpg ? (onField ? new Vector2(.765f, .32f) : bustMin) : new Vector2(.508f, .26f);
-                _opponent.rectTransform.anchorMax = rpg ? (onField ? new Vector2(.975f, .91f) : bustMax) : new Vector2(.93f, .855f);
+                _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, onField ? .32f : .385f) : new Vector2(.07f, .26f);
+                _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .91f) : new Vector2(.493f, .855f);
+                _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, onField ? .32f : .385f) : new Vector2(.508f, .26f);
+                _opponent.rectTransform.anchorMax = rpg ? new Vector2(.975f, .91f) : new Vector2(.93f, .855f);
                 if (rpg && !onField)
                 {
                     var preferred = preferredRpgBackdrop == null ? null : LoadRpgSprite(preferredRpgBackdrop);
@@ -308,6 +313,12 @@ namespace YGOPortable.UI
                 SetSprite(_stage, null);
                 SetSprite(_hero, null);
                 SetSprite(_opponent, null);
+                SetSprite(_heroPrevious, null);
+                SetSprite(_opponentPrevious, null);
+                _heroReaction.enabled = _opponentReaction.enabled = false;
+                _heroFade = _opponentFade = _heroSlide = _opponentSlide = 0f;
+                _hero.rectTransform.localScale = _opponent.rectTransform.localScale = Vector3.one;
+                _hero.rectTransform.anchoredPosition = _opponent.rectTransform.anchoredPosition = Vector2.zero;
                 foreach (var sprite in _rpgSprites.Values)
                 {
                     if (sprite == null) continue;
@@ -346,12 +357,14 @@ namespace YGOPortable.UI
                 _poseTime += delta;
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
                 float sceneAlpha = 1f - _cutsceneOverlay.alpha;
-                float portraitAlpha = _field?.RpgStageRunning == true ? 0f : sceneAlpha;
+                float portraitAlpha = _field?.RpgStageRunning == true ? sceneAlpha * .16f : sceneAlpha;
                 _portraitGroup.alpha = Mathf.MoveTowards(_portraitGroup.alpha, portraitAlpha, delta * 8f);
                 _heading.canvasRenderer.SetAlpha(sceneAlpha);
                 _heroIdentity.canvasRenderer.SetAlpha(sceneAlpha);
-                AnimatePortrait(_hero, _heroSpeaking, delta, _heroSpeaking ? _emotion : null, _poseTime);
-                AnimatePortrait(_opponent, _opponentSpeaking, delta, _opponentSpeaking ? _emotion : null, _poseTime);
+                AnimatePortrait(_hero, _heroPrevious, _heroReaction, _heroSpeaking, delta,
+                    _heroSpeaking ? _emotion : null, _poseTime, -1f, ref _heroFade, ref _heroSlide);
+                AnimatePortrait(_opponent, _opponentPrevious, _opponentReaction, _opponentSpeaking, delta,
+                    _opponentSpeaking ? _emotion : null, _poseTime, 1f, ref _opponentFade, ref _opponentSlide);
                 AnimateHearts();
                 RefreshCaret();
                 if (_stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
@@ -445,6 +458,8 @@ namespace YGOPortable.UI
                 bool narration = IsNarration(line.speaker);
                 _speakerBadge.SetActive(!narration);
                 _speaker.text = narration ? "" : line.speaker;
+                bool heroPreviouslySpeaking = _heroSpeaking;
+                bool opponentPreviouslySpeaking = _opponentSpeaking;
                 _heroSpeaking = !narration && (line.speaker == _protagonist ||
                     line.speaker.StartsWith("주인공", StringComparison.Ordinal) ||
                     line.speaker.StartsWith("여주인공", StringComparison.Ordinal));
@@ -462,9 +477,13 @@ namespace YGOPortable.UI
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
                 if (_rpg)
                 {
-                    ShowBust(_hero, _heroSpeaking ? LoadHeroBust(_emotion) : null);
-                    ShowBust(_opponent, speaker != null ? LoadBust($"Characters_Standing/full_{speaker.id}", _emotion)
-                        ?? DuelProfileArt.Opponent(speaker) : null);
+                    if (_heroSpeaking || _hero.sprite == null)
+                        ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
+                    if ((speaker ?? (_opponent.sprite == null ? _sceneOpponent : null)) is { } actor)
+                        ShowBust(_opponent, _opponentPrevious, LoadBust($"Characters_Standing/full_{actor.id}", speaker != null ? _emotion : null)
+                            ?? DuelProfileArt.Opponent(actor), ref _opponentFade, ref _opponentSlide);
+                    if (_heroSpeaking && !heroPreviouslySpeaking) _heroSlide = Mathf.Max(_heroSlide, .12f);
+                    if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
                 }
                 AnimateHearts();
                 BindCutscene(_rpg ? line.cutscene : null);
@@ -734,14 +753,32 @@ namespace YGOPortable.UI
                     DeckRepository.Characters.FirstOrDefault(character => character.aliases?.Contains(name) == true);
             }
 
-            private static void ShowBust(Image image, Sprite bust)
+            private static Image PortraitGhost(RectTransform image, string name)
             {
-                if (image.sprite == bust) return;
+                return DuelUiKit.AddImage(DuelUiKit.FillRect(name, image).gameObject, null, Color.white, true, false);
+            }
+
+            private static Text Reaction(RectTransform portrait)
+            {
+                var label = AddLabel(portrait, "Reaction", .65f, .74f, .97f, .95f, 32, color: Color.white);
+                label.raycastTarget = label.enabled = false;
+                return label;
+            }
+
+            private static void ShowBust(Image image, Image ghost, Sprite bust, ref float fade, ref float slide)
+            {
+                if (image.sprite == bust || bust == null) return;
+                SetSprite(ghost, image.sprite);
+                ghost.color = image.color;
+                fade = .12f;
+                if (image.sprite == null)
+                {
+                    slide = .24f;
+                    float side = image.rectTransform.anchorMin.x < .5f ? -1f : 1f;
+                    image.rectTransform.anchoredPosition = Vector2.right * (47f * side);
+                }
                 SetSprite(image, bust);
-                if (bust == null) return;
-                image.color = new Color(1f, 1f, 1f, .62f);
-                image.rectTransform.localScale = Vector3.one;
-                image.rectTransform.anchoredPosition = Vector2.zero;
+                image.color = new Color(1f, 1f, 1f, 0f);
             }
 
             private Sprite LoadHeroBust(string emotion) =>
@@ -751,8 +788,13 @@ namespace YGOPortable.UI
             {
                 if (emotion is "smile" or "blush" or "sad" or "determined" or "shock" or "hurt")
                 {
-                    var pose = LoadRpgSprite($"{stem}_{emotion}.png", waistUp: true);
+                    var pose = LoadRpgSprite($"{stem}_{emotion}.png");
                     if (pose != null) return pose;
+                }
+                if (stem == "Characters_Standing/full_1")
+                {
+                    var neutral = LoadRpgSprite($"{stem}_determined.png");
+                    if (neutral != null) return neutral;
                 }
                 return LoadRpgSprite(stem + ".png", waistUp: true);
             }
@@ -784,11 +826,12 @@ namespace YGOPortable.UI
                     if (File.Exists(path))
                     {
                         texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                        if (texture.LoadImage(File.ReadAllBytes(path), markNonReadable: true))
+                        if (texture.LoadImage(File.ReadAllBytes(path), markNonReadable: !waistUp))
                         {
                             var rect = new Rect(0f, 0f, texture.width, texture.height);
                             sprite = waistUp ? RpgDialoguePortrait.Crop(texture, rect) :
                                 Sprite.Create(texture, rect, Vector2.one * .5f, 100f, 0, SpriteMeshType.FullRect);
+                            if (waistUp) texture.Apply(false, true);
                         }
                     }
                 }
@@ -842,8 +885,10 @@ namespace YGOPortable.UI
                 }
             }
 
-            private static void AnimatePortrait(Image image, bool speaking, float delta, string emotion, float elapsed)
+            private void AnimatePortrait(Image image, Image ghost, Text reaction, bool speaking, float delta,
+                string emotion, float elapsed, float side, ref float fade, ref float slide)
             {
+                if (!image.enabled) return;
                 float mix = 1f - Mathf.Exp(-delta * 12f);
                 Color mood = emotion switch
                 {
@@ -865,9 +910,48 @@ namespace YGOPortable.UI
                     "determined" => new Vector2(3f * settle, 0f),
                     _ => Vector2.zero,
                 };
-                image.color = Color.Lerp(image.color, speaking ? mood : Listening, mix);
-                image.rectTransform.localScale = Vector3.Lerp(image.rectTransform.localScale, Vector3.one * (speaking ? 1.05f : 1f), mix);
+                fade = Mathf.Max(0f, fade - delta);
+                slide = Mathf.Max(0f, slide - delta);
+                float outgoing = fade / .12f;
+                if (ghost.enabled)
+                {
+                    var previousTint = ghost.color;
+                    previousTint.a = outgoing;
+                    ghost.color = previousTint;
+                    if (fade <= 0f) SetSprite(ghost, null);
+                }
+                var tint = Color.Lerp(image.color, speaking ? mood : Listening, mix);
+                tint.a = 1f - outgoing;
+                image.color = tint;
+                float scale = speaking ? 1.05f : _rpg ? .96f : 1f;
+                if (emotion == "determined") scale += settle * .025f;
+                if (_rpg) scale += .015f * Mathf.Sin((1f - outgoing) * Mathf.PI);
+                image.rectTransform.localScale = Vector3.Lerp(image.rectTransform.localScale, Vector3.one * scale, mix);
+                if (_rpg)
+                {
+                    motion.y += 1.7f * Mathf.Sin(Time.unscaledTime * 2.2f + side);
+                    float entrance = slide / .24f;
+                    motion.x += side * 47f * entrance * entrance * entrance;
+                }
                 image.rectTransform.anchoredPosition = Vector2.Lerp(image.rectTransform.anchoredPosition, motion, mix);
+
+                var (glyph, color) = emotion switch
+                {
+                    "shock" => ("!?", new Color(1f, .82f, .54f)),
+                    "determined" => ("✧", new Color(1f, .72f, .31f)),
+                    "smile" => ("✦", new Color(1f, .91f, .55f)),
+                    "sad" => ("●", new Color(.51f, .80f, 1f)),
+                    "hurt" => ("✷", new Color(1f, .43f, .45f)),
+                    "blush" => ("♥", new Color(1f, .48f, .69f)),
+                    _ => ("", Color.clear),
+                };
+                float react = Mathf.Clamp01(elapsed / .72f);
+                reaction.enabled = _rpg && glyph.Length != 0 && react < 1f;
+                if (!reaction.enabled) return;
+                reaction.text = glyph;
+                reaction.rectTransform.anchoredPosition = new Vector2(0f, Mathf.Lerp(-8f, 13f, react));
+                color.a = Mathf.Lerp(1f, 0f, react);
+                reaction.color = color;
             }
 
             private static (GameObject Root, RectTransform Panel) BuildPopup(Transform parent, string name,

@@ -15,20 +15,22 @@ namespace YGOPortable.UI
         private const string RpgPartnerName = "후도 유세이";
         private static readonly string[] RpgPartnerLines =
         {
+            "아카데미아 실습장부터 둘러보자. 교정에 오늘의 대진표가 있어.",
             "공구랑 부품은 작업대에 있어. 출발 전에 덱도 확인하자.",
             "은신처 안쪽까지 둘러보자. 구석에 남겨둔 물건이 있을 거야.",
             "너무 서두르지 마. 수용소에서는 게시판부터 확인하는 게 좋아.",
             "폿포 타임에서는 잠깐 쉬어 가자. 라디오 소리가 들려.",
             "관중석이 벌써 소란스럽군. 경기 전에 상대 덱을 생각해 보자.",
             "발밑을 조심해. 구 모멘트에는 아직 켜져 있는 장치가 있어.",
+            "모래바람이 불기 전에 큰길을 건너자. 광산 입구 쪽은 조심해.",
             "바람이 세다. 난간에 걸린 물건이 없는지 살펴봐.",
             "출발선에서는 한 번의 실수도 크게 돌아와. 준비를 끝내자.",
             "여기까지 왔군. 마지막까지 네 덱을 믿어.",
         };
         private static readonly Vector2[] RpgCachePoints =
         {
-            new(.14f, .34f), new(.79f, .26f), new(.84f, .32f), new(.14f, .30f), new(.83f, .29f),
-            new(.16f, .32f), new(.81f, .34f), new(.17f, .32f), new(.82f, .26f),
+            new(.84f, .32f), new(.14f, .34f), new(.79f, .26f), new(.84f, .32f), new(.14f, .30f),
+            new(.83f, .29f), new(.16f, .32f), new(.15f, .31f), new(.81f, .34f), new(.17f, .32f), new(.82f, .26f),
         };
 
         private StoryModeUI.StoryDialogueView _rpgIntroDialogue;
@@ -57,7 +59,7 @@ namespace YGOPortable.UI
             {
                 new StoryDialogueLine { speaker = RpgPartnerName, text = "카이, 일어났군. 스틱이나 방향키로 걸어 봐. 화면을 눌러도 그쪽으로 갈 수 있어." },
                 new StoryDialogueLine { speaker = RpgPartnerName, text = "가까이 가면 조사나 대화 버튼이 보여. 패드는 선택 버튼으로 실행하고, 위쪽 버튼으로 메뉴를 열어." },
-                new StoryDialogueLine { speaker = RpgPartnerName, text = "정비소 출구로 나가면 새틀라이트야. 머리 위에 느낌표가 보이는 사람에게 다가가면 다음 이야기가 시작돼." },
+                new StoryDialogueLine { speaker = RpgPartnerName, text = "첫 약속은 듀얼 아카데미아에 있어. 교정에서 머리 위에 느낌표가 보이는 사람에게 다가가 봐." },
             } : new[]
             {
                 new StoryDialogueLine { speaker = "내레이션", text = "새틀라이트의 밤. 철길 너머의 불빛은 새벽이 와도 좀처럼 가까워지지 않았다." },
@@ -74,29 +76,32 @@ namespace YGOPortable.UI
             bool saved = CollectionProgress.TrySaveRpgCheckpoint(true, out var error);
             _rpgIntroOnOpen = false;
             _rpgAnnounceArrival = true;
-            Show(Page.Field);
+            if (!TravelRpgRegion(RegionForEpisode(RpgClears + 1), RpgArrival)) Show(Page.Field);
             if (!saved) ShowStatus(error);
         }
 
         private void BuildRpgCache()
         {
             int region = _rpgLocation;
-            if (CollectionProgress.RpgCacheFound(region)) return;
+            int saveSlot = RpgRegions[region].AdventureSlot;
+            if (CollectionProgress.RpgCacheFound(saveSlot)) return;
             var point = RpgCachePoints[region];
             var cache = Anchor(_rpgFieldObjects, "HiddenCache", point, new Vector2(56f, 52f));
             void Take()
             {
-                if (!CollectionProgress.TryFindRpgCache(region, out string result)) { ShowStatus(result); return; }
+                if (!CollectionProgress.TryFindRpgCache(saveSlot, out string result)) { ShowStatus(result); return; }
                 DuelAudio.PlayTagForceReward();
                 Show(Page.Field);
                 ShowStatus(result);
             }
             void Search() => MoveTo(point, Take);
-            var open = Btn(cache, "✦", Search, 32);
-            open.targetGraphic.color = new Color(.05f, .15f, .215f, .48f);
-            cache.GetComponentInChildren<Text>().color = new Color(1f, .87f, .47f);
+            var click = DuelUiKit.AddImage(cache.gameObject, DuelUiKit.WhiteSprite, new Color(.05f, .15f, .215f, .48f), false, true);
+            var open = cache.gameObject.AddComponent<Button>();
+            open.targetGraphic = click;
+            open.onClick.AddListener(Search);
+            DrawRpgIcon(Area(cache, "Icon", .15f, .11f, .85f, .89f), "icon_treasure.png", "✦", DuelUiKit.GoldAccent);
             _questMarkers.Add(cache);
-            RegisterRpgInteraction(cache, "반짝이는 물건 · 조사", Search);
+            RegisterRpgInteraction(cache, "반짝이는 물건 · 줍기", Search, RpgActionPriority.Service);
         }
 
         private void BuildRpgCompanion()
@@ -109,6 +114,7 @@ namespace YGOPortable.UI
             if (_page != Page.Field) return;
             void Speak() => OpenRpgService(RpgPartnerId);
             if (_rpgCompanionArt != null) BindPortrait(_rpgCompanionArt, Speak);
+            RegisterRpgInteraction(_rpgCompanion, $"{RpgPartnerName} · 대화", Speak, radius: .055f);
         }
 
         private void FollowRpgPlayer(float delta)
@@ -133,7 +139,7 @@ namespace YGOPortable.UI
             if (!CanWalk) return;
             _rpgServiceSpeaker = speaker;
             string error = "";
-            if (speaker == RpgPartnerId && CollectionProgress.TryTalkToRpgPartner(_rpgLocation, out error))
+            if (speaker == RpgPartnerId && CollectionProgress.TryTalkToRpgPartner(RpgRegions[_rpgLocation].AdventureSlot, out error))
                 DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm, .6f);
             Show(Page.Talk);
             if (!string.IsNullOrEmpty(error)) ShowStatus(error);

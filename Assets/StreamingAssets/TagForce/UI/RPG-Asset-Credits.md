@@ -29,3 +29,11 @@ OpenAI 내장 이미지 생성 도구로 여섯 장을 각각 생성한 뒤 1920
 | `spot_old_moment.png` | 지하 발전로 폐허, 보라색 기하학 문양의 제단과 균열이 있는 석재 바닥 |
 | `spot_wrgp_circuit.png` | 해질녘 고가 서킷과 피트 레인, 도시와 홀로그램 가드레일, 아스팔트 바닥 |
 | `spot_ark_cradle.png` | 구름과 금빛 오로라 위의 백금빛 요새, 큰 톱니바퀴와 금속·유리 통로 |
+
+## 11개 지역과 대화 에셋
+
+- `5DS/Maps/spot_duel_academia*.png`와 `spot_crash_town*.png`는 OpenAI 내장 이미지 생성 도구로 제작했습니다. 16:9의 2.5D 시점에서 교정은 맑은 아침의 옅은 석재와 유리 건물, 크래시 타운은 푸른 하늘 아래 서부 광산 마을을 요청했습니다. 두 이미지 모두 하단을 보행 공간으로 비웠습니다.
+- `5DS/Characters_Standing/full_*_{smile,blush,sad,determined,shock,hurt}.png`는 프로젝트 스탠딩을 참고해 제작한 대화 표정입니다. 같은 인물의 얼굴과 구도, 시선, 허리 높이를 맞추고 실제 투명 배경으로 저장했습니다. 아키는 일상 대화를 위해 크림 블라우스와 버건디 재킷을 입은 포즈를 사용합니다.
+- `5DS/WalkCycles/sd_*_field.png`의 추가 시트는 기존 프로젝트 SD를 참고했습니다. 위부터 옆·앞·뒤, 각 행은 대기·왼발·오른발을 배치한 투명 3×3 시트입니다.
+- `5DS/Cutscenes/cg_dark_signer_altar.jpg`, `cg_aki_garage_training.jpg`, `cg_wrgp_riding_clash.jpg`, `cg_ark_cradle_final.jpg`는 각각 보라색 제단, 아침 정비소의 실습, 서킷의 라이딩 대결, 공중 요새의 마지막 장면을 새 구도로 제작했습니다.
+- `icon_shop.png`, `icon_treasure.png`, `icon_talk.png`는 프로젝트용 카드, 반짝임, 대화 아이콘을 128×128 투명 PNG로 직접 그린 파일입니다.

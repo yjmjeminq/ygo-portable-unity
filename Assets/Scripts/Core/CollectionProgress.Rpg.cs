@@ -29,6 +29,7 @@ namespace YGOPortable.Core
         {
             (180, 0u, false), (0, 0u, true), (280, 0u, false), (0, 44508094u, false),
             (380, 0u, false), (0, 0u, true), (0, 2469606u, false), (480, 0u, false), (0, 0u, true),
+            (150, 0u, false), (400, 0u, false),
         };
 
         internal static bool RpgIntroSeen => _profile?.rpgAdventure?.introSeen == true;

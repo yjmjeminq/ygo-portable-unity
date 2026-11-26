@@ -28,7 +28,8 @@ namespace YGOPortable.UI
             var region = TagForceWorldUI.RpgRegions[TagForceWorldUI.RegionForEpisode(index + 1)];
             _dialogue.Open("지난 이야기 · " + TitleOf(episode), Script.protagonist,
                 DeckRepository.GetCharacter(episode.charId), lines, ReturnToEpisodes, rpg: true,
-                rpgBackdrop: region.StoryBackdrop, preferredRpgBackdrop: region.LightingBackdrop);
+                rpgBackdrop: region.StoryBackdrop,
+                preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1));
         }
 
         private void PlayRpgFaceoff(StoryEpisodeData episode, Action finish)

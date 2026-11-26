@@ -165,7 +165,8 @@ namespace YGOPortable.Editor
                     var cgLines = loaded.episodes.SelectMany(episode =>
                         episode.preDialogues.Concat(episode.postWinDialogues).Concat(episode.postLoseDialogues))
                         .Where(line => !string.IsNullOrEmpty(line.cutscene)).ToArray();
-                    Require(cgLines.Length == 3, "The authored RPG cutscenes were missing.");
+                    Require(cgLines.Length == 10 && cgLines.Select(line => line.cutscene).Distinct().Count() == 7,
+                        "The authored RPG cutscenes were missing.");
                     foreach (var line in cgLines)
                     {
                         dialogue.Open("컷씬 확인", "카이", DeckRepository.GetCharacter(1),
@@ -176,9 +177,9 @@ namespace YGOPortable.Editor
                                 new StoryDialogueLine { speaker = "카이", text = "그래." },
                                 new StoryDialogueLine { speaker = "설명", text = "바람이 스쳤다." },
                             }, () => { }, rpg: true);
-                        Require(!badge.activeSelf && !playerPortrait.enabled && !speakerPortrait.enabled &&
+                        Require(!badge.activeSelf && playerPortrait.enabled && speakerPortrait.enabled &&
                             scene.Find("ProtagonistSD") == null && scene.Find("OpponentSD") == null,
-                            "Narration displayed a portrait or an SD character.");
+                            "Narration lost the two stage portraits or displayed an SD character inside the panel.");
                         Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.25f) &&
                             body.font == Resources.Load<Font>("StoryFonts/Pretendard-Medium") &&
                             scene.Find("DialogueBox").GetComponent<Image>() is { type: Image.Type.Sliced } panel &&
@@ -201,8 +202,7 @@ namespace YGOPortable.Editor
                             "Typing leaked rich-text markup or showed the advance caret too soon.");
                         dialogue.Update(.35f);
                         Require(cutscene.alpha == 0f && portraits.alpha == 1f && badge.activeSelf &&
-                            !playerPortrait.enabled && speakerPortrait.enabled &&
-                            speakerPortrait.sprite.rect.height < speakerPortrait.sprite.texture.height &&
+                            playerPortrait.enabled && speakerPortrait.enabled &&
                             caret.enabled && body.text == "<b>고마워.</b>" &&
                             badge.GetComponentInChildren<Text>().color == (Color)new Color32(0xFF, 0x40, 0x81, 255) &&
                             portraits.transform.Find("Opponent/Blush").GetComponent<Image>().enabled &&
@@ -210,13 +210,14 @@ namespace YGOPortable.Editor
                             "The portrait and blush did not return after fading out the CG.");
                         next.onClick.Invoke();
                         dialogue.Update(.4f);
-                        Require(playerPortrait.enabled && !speakerPortrait.enabled &&
+                        Require(playerPortrait.enabled && speakerPortrait.enabled &&
                             playerPortrait.sprite.rect.height < playerPortrait.sprite.texture.height,
-                            "Switching speakers did not display only Kai's upper-body portrait.");
+                            "Switching speakers did not retain the listening character.");
                         next.onClick.Invoke();
                         dialogue.Update(.4f);
-                        Require(!badge.activeSelf && !playerPortrait.enabled && !speakerPortrait.enabled,
-                            "A narration line left the speaker badge or portrait emphasis active.");
+                        Require(!badge.activeSelf && playerPortrait.enabled && speakerPortrait.enabled &&
+                            playerPortrait.rectTransform.localScale.x < 1f && speakerPortrait.rectTransform.localScale.x < 1f,
+                            "A narration line did not dim the two portraits.");
                     }
                     var fx = scene.GetComponent<StoryDialogueFx>();
                     var dialogueBox = (RectTransform)scene.Find("DialogueBox");
@@ -258,7 +259,7 @@ namespace YGOPortable.Editor
                 UnityEngine.Object.DestroyImmediate(canvas);
                 UnityEngine.Object.DestroyImmediate(events);
             }
-            Debug.Log("[VERIFY 5DS RPG] Fifty episodes, dedicated decks, riding openings, portraits and all three CG transitions passed.");
+            Debug.Log("[VERIFY 5DS RPG] Fifty episodes, dedicated decks, riding openings, portrait transitions and all seven CG assets passed.");
         }
 
         private static void VerifyDialogueChoices(UserDeck starter)

@@ -54,10 +54,15 @@ namespace YGOPortable.UI
             var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.06f),
                 story ? new Vector2(36f, 29f) : new Vector2(31f, 25f));
             DuelUiKit.AddImage(marker.gameObject, _rpgSpeechBubble ??= CreateRpgSpeechBubble(), tint, false, false);
-            var glyph = HudLabel(marker, symbol, story ? 21 : 19, new Color(.10f, .15f, .21f),
-                align: TextAnchor.MiddleCenter, heading: true);
-            glyph.rectTransform.anchorMin = new Vector2(.07f, .23f);
-            glyph.rectTransform.anchorMax = new Vector2(.93f, .96f);
+            string icon = role switch
+            {
+                RpgResidentRole.Story => "icon_quest_main.png",
+                RpgResidentRole.Request or RpgResidentRole.Delivery or RpgResidentRole.Reward => "icon_quest_sub.png",
+                RpgResidentRole.Shop => "icon_shop.png",
+                _ => "icon_talk.png",
+            };
+            var artSlot = Area(marker, "Icon", .13f, .24f, .87f, .95f);
+            DrawRpgIcon(artSlot, icon, symbol, new Color(.10f, .15f, .21f));
             var visibility = marker.gameObject.AddComponent<CanvasGroup>();
             visibility.blocksRaycasts = visibility.interactable = false;
             visibility.alpha = role == RpgResidentRole.Conversation ? 0f : 1f;

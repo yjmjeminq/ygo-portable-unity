@@ -31,6 +31,8 @@ namespace YGOPortable.UI
         private static readonly RpgAtmosphereStyle[] RpgAtmospheres =
         {
             // The light positions correspond to the fixtures already painted into each map.
+            new(new(.52f, .76f), new(.72f, .52f), new(.84f, .97f, 1f, .13f),
+                new(.12f, .11f), new(.16f, .72f), new(.73f, .95f, .96f, .36f), 14),
             new(new(.26f, .61f), new(.53f, .61f), new(.87f, .95f, 1f, .15f),
                 new(.095f, .13f), new(.13f, .68f), new(.90f, .97f, 1f, .34f), 16),
             new(new(.22f, .58f), new(.42f, .58f), new(1f, .68f, .35f, .25f),
@@ -43,6 +45,8 @@ namespace YGOPortable.UI
                 new(.17f, .056f), new(.18f, .69f), new(.49f, .90f, 1f, .36f), 12),
             new(new(.52f, .60f), new(.70f, .66f), new(.65f, .30f, 1f, .25f),
                 new(-.13f, .22f), new(.09f, .63f), new(.75f, .56f, 1f, .53f), 18),
+            new(new(.48f, .57f), new(.71f, .55f), new(.94f, .82f, .63f, .12f),
+                new(.24f, .036f), new(.10f, .60f), new(.86f, .76f, .62f, .38f), 16, true),
             new(new(.34f, .72f), new(.73f, .45f), new(.86f, .96f, 1f, .12f),
                 new(.45f, .048f), new(.13f, .69f), new(.86f, .96f, 1f, .30f), 16, true),
             new(new(.76f, .55f), new(.66f, .46f), new(.61f, .86f, 1f, .17f),
@@ -84,9 +88,9 @@ namespace YGOPortable.UI
             var upper = style.LightPosition + style.LightSize * .5f;
             var light = Area(layer, "Light", lower.x, lower.y, upper.x, upper.y);
             _rpgAtmosphereLight = DuelUiKit.AddImage(light.gameObject, RpgSoftLight, style.Light, false, false);
-            if (_rpgLocation is 5 or 6 or 8)
+            if (_rpgLocation is RpgMoment or RpgBridge or RpgArk)
             {
-                bool river = _rpgLocation == 6;
+                bool river = _rpgLocation == RpgBridge;
                 float height = river ? .67f : .23f;
                 var haze = Area(layer, "Haze", .01f, height - .075f, river ? .56f : .92f, height + .075f);
                 var tint = style.Particles;
