@@ -314,7 +314,7 @@ namespace YGOPortable.Editor
             var partnerSprite = partner.Find("Sprite");
             float quarterStep = 1f / (4f * 8f);
             float peak = quarterStep;
-            Call(world, "MoveTo", new Vector2(.1f, .16f), null);
+            Call(world, "MoveTo", new Vector2(.1f, .16f), null, null);
             Call(world, "AdvanceWalk", .5f, peak);
             Require(playerSprite.localScale.x == -1 && partnerSprite.localScale.x == -1 &&
                 Mathf.Abs(player.anchoredPosition.y - 6f) < .01f && partner.anchoredPosition.y != 0,
@@ -326,10 +326,10 @@ namespace YGOPortable.Editor
             Call(world, "AdvanceWalk", 2f, peak);
             Require(player.anchoredPosition == Vector2.zero && partner.anchoredPosition == Vector2.zero,
                 "Idle actors retained a bob offset.");
-            Call(world, "MoveTo", new Vector2(.1f, .5f), null);
+            Call(world, "MoveTo", new Vector2(.1f, .5f), null, null);
             Call(world, "AdvanceWalk", .5f, peak);
             Require(playerSprite.localScale.x == -1, "Vertical movement reset the last direction.");
-            Call(world, "MoveTo", new Vector2(.9f, .5f), null);
+            Call(world, "MoveTo", new Vector2(.9f, .5f), null, null);
             Call(world, "AdvanceWalk", .5f, peak);
             Require(playerSprite.localScale.x == 1 && partnerSprite.localScale.x == 1, "Moving right did not flip both sprites.");
             float x = player.anchorMin.x;
