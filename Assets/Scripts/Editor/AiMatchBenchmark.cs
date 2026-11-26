@@ -1060,7 +1060,8 @@ namespace YGOPortable.Editor
                 (51199, DuelDeckStyle.Development), (51439, DuelDeckStyle.Development),
                 (20672, DuelDeckStyle.Control), (20679, DuelDeckStyle.Control), (20682, DuelDeckStyle.Control),
                 (20675, DuelDeckStyle.Lock), (52150, DuelDeckStyle.Lock), (50961, DuelDeckStyle.Lock),
-                (50964, DuelDeckStyle.Lock), (51029, DuelDeckStyle.Lock),
+                // The current Millennium build summons Exodia Incarnate through Ankh and has no Exodia limbs.
+                (50964, DuelDeckStyle.Development), (51029, DuelDeckStyle.Lock),
                 (20673, DuelDeckStyle.Resource), (20687, DuelDeckStyle.Resource),
             };
             foreach (var (id, expected) in cases)

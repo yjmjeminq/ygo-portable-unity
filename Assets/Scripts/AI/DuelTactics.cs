@@ -313,6 +313,9 @@ namespace YGOPortable.AI
             if (effect.code == ForbiddenDroplet && !rival.mzone.Any(card =>
                 card is { IsFaceUp: true, effectsDisabled: false } && (card.type & YgoConstants.TYPE_EFFECT) != 0))
                 return false;
+            if (effect.code == ForbiddenDroplet && own.mzone.Any(DuelAiPolicy.IsEstablishedRitualAce) &&
+                !CanPayDropletWithoutRitualAce(own, effect))
+                return false;
             if (firstEffect && effect.code == KaliYuga)
             {
                 int enemySpells = rival.szone.Count(card => card != null);
@@ -1237,10 +1240,20 @@ namespace YGOPortable.AI
             card is { IsFaceUp: true, code: 3019642 or 41230939 or 77625948 } &&
             !own.szone.Any(equip => equip?.EquipTarget == (card.controller, card.sequence));
 
+        private static bool CanPayDropletWithoutRitualAce(PlayerFieldSnapshot own, SelectableCardItem spell) =>
+            own.hand.Any(card => card.code != ForbiddenDroplet) ||
+            own.hand.Count(card => card.code == ForbiddenDroplet) > (spell.location == YgoConstants.LOCATION_HAND ? 1 : 0) ||
+            own.mzone.Any(card => card != null && !DuelAiPolicy.IsEstablishedRitualAce(card) &&
+                (card.type & (YgoConstants.TYPE_TOKEN | YgoConstants.TYPE_PENDULUM)) == 0) ||
+            own.szone.Where((card, index) => spell.location != YgoConstants.LOCATION_SZONE || index != spell.sequence)
+                .Any(card => card != null && (card.type & YgoConstants.TYPE_PENDULUM) == 0 &&
+                    !(card.code == EternalSoul && card.IsFaceUp));
+
         internal static bool IsGxFieldCost(uint effect, ulong hint) =>
             hint == Release && (effect is AncientGearAdvance or VisionIncrease or MagiciansRod or DuelAiPolicy.MeteoroaDrytron ||
                 DuelAiPolicy.IsDrytronReleaseEffect(effect) || DuelAiPolicy.IsMachineAngelTribute(effect)) ||
             hint == Destroy && effect == NightmarePain || hint == ReturnToHand && effect == CyberdarkInferno ||
+            hint == SendToGrave && effect == ForbiddenDroplet ||
             hint == 511 && effect == Cartesia;
 
         internal static int SummonMaterialPriority(DuelSession duel, byte player, SelectableCardItem option,
@@ -1248,7 +1261,7 @@ namespace YGOPortable.AI
         {
             var own = duel.Players[player];
             if ((DuelAiPolicy.IsRitualSpell(source) || DuelAiPolicy.IsDrytronReleaseEffect(source) ||
-                    DuelAiPolicy.IsMachineAngelTribute(source)) &&
+                    DuelAiPolicy.IsMachineAngelTribute(source) || source == ForbiddenDroplet && hint == SendToGrave) &&
                 DuelAiPolicy.IsProtectedRitualMaterial(own, player, option))
                 return -20000;
             if (option.controller != player) return 10000 + SelectionPriority(duel, player, option, Destroy);

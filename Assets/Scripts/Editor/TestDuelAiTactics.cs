@@ -417,6 +417,27 @@ namespace YGOPortable.Editor
                 Require(!DuelTactics.CanActivate(duel, chain, droplet),
                     "Droplet broke Vanity's Emptiness to negate a summon already forbidden by it.");
             }
+            using (var duel = new DuelSession())
+            {
+                const uint droplet = DuelTactics.ForbiddenDroplet, herald = DuelAiPolicy.HeraldOfUltimateness;
+                var own = duel.Players[0];
+                own.mzone[0] = FieldMonster(herald);
+                duel.Players[1].mzone[0] = FieldMonster(Stratos);
+                var chain = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN };
+                var spell = new SelectableCardItem { code = droplet, location = YgoConstants.LOCATION_SZONE, sequence = 2 };
+                own.szone[2] = FieldMonster(droplet, 2);
+                Require(!DuelTactics.CanActivate(duel, chain, spell),
+                    "Droplet activated with only the established Herald available as its cost.");
+                own.hand.Add(FieldMonster(GeminiElf));
+                Require(DuelTactics.CanActivate(duel, chain, spell), "Droplet ignored a spare hand cost.");
+                duel.CurrentChain.Add(new ChainLinkInfo { code = droplet });
+                var cost = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, SelectionHint = DuelTactics.SendToGrave,
+                    min = 1, max = 1 };
+                cost.candidates.Add(new SelectableCardItem { code = herald, location = YgoConstants.LOCATION_MZONE });
+                cost.candidates.Add(new SelectableCardItem { code = GeminiElf, location = YgoConstants.LOCATION_HAND });
+                Require(Smart().ComputeResponse(duel, cost).SequenceEqual(DuelSession.PackCardSelection(1)),
+                    "Droplet sent Herald instead of the expendable card.");
+            }
             Debug.Log("[VERIFY GX SELF DAMAGE] Power Bond, native Squirmer, and Exodd Blaze timing passed.");
         }
 
