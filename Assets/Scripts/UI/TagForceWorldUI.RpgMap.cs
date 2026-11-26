@@ -10,7 +10,7 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private const string RpgMapArt = RpgArt + "Maps/world_map_5ds.png";
+        private string RpgMapArt => _rpgConfiguration?.assetConfig?.worldMapPath ?? "TagForce/5DS/Maps/world_map_5ds.png";
         private static readonly Vector2[] RpgNodePoints =
         {
             new(.642f, .536f), new(.173f, .281f), new(.066f, .22f), new(.230f, .587f),
@@ -30,12 +30,12 @@ namespace YGOPortable.UI
             RpgUiStyle.Display(HudLabel(Area(_body, "MapTitle", .013f, 1.018f, .108f, 1.127f), "월드맵", 35,
                 new Color(.93f, .97f, 1f)));
             RpgUiStyle.Reading(HudLabel(Area(_body, "MapArea", .113f, 1.022f, .61f, 1.115f),
-                "새틀라이트 · 네오 도미노 시티", 23, new Color(.76f, .83f, .94f)));
+                IsGxCampaign ? "듀얼 아카데미아 화산섬" : "새틀라이트 · 네오 도미노 시티", 23, new Color(.76f, .83f, .94f)));
             _rpgMapTime = 0f;
             _rpgMapPulses.Clear();
             int cleared = RpgClears;
             var episodes = _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>();
-            int target = cleared < episodes.Length ? RegionForEpisode(cleared + 1) : -1;
+            int target = cleared < episodes.Length ? CampaignRegionForEpisode(cleared + 1) : -1;
             BuildRpgMapLegend();
             var mapWell = Area(_body, "Atlas", .006f, .019f, .730f, .989f);
             RpgUiStyle.Glass(mapWell);
@@ -51,9 +51,9 @@ namespace YGOPortable.UI
 
             var paths = DuelUiKit.FillRect("Routes", atlas).gameObject.AddComponent<RpgWorldRoutes>();
             paths.raycastTarget = false;
-            foreach (var (from, _, to, _) in RpgPaths)
-                paths.Add(RpgNodePoints[from], RpgNodePoints[to], RpgRegions[from].IsOpen(cleared) &&
-                    RpgRegions[to].IsOpen(cleared));
+            foreach (var (from, _, to, _) in CampaignRoutes)
+                paths.Add(CampaignMapPoint(from), CampaignMapPoint(to), CampaignRegions[from].IsOpen(cleared) &&
+                    CampaignRegions[to].IsOpen(cleared));
 
             var dossier = Area(_body, "RegionPreview", .746f, .019f, .993f, .989f);
             RpgUiStyle.Glass(dossier);
@@ -82,7 +82,7 @@ namespace YGOPortable.UI
             int selected = -1;
             var travel = RpgButton(Area(dossier, "Travel", .068f, .037f, .932f, .127f), "이동하기", () =>
             {
-                if (selected < 0 || !RpgRegions[selected].IsOpen(RpgClears) || _rpgPendingRegion >= 0) return;
+                if (selected < 0 || !CampaignRegions[selected].IsOpen(RpgClears) || _rpgPendingRegion >= 0) return;
                 if (selected == _rpgLocation) Show(Page.Field);
                 else BeginRpgTravel(selected, RpgArrival);
             }, 23, primary: true, prominent: true);
@@ -93,17 +93,17 @@ namespace YGOPortable.UI
             var travelIcon = DuelUiKit.AddImage(Area(travel.transform, "TravelMark", .836f, .24f, .943f, .76f).gameObject,
                 RpgUiStyle.Glyph(RpgUiStyle.Symbol.Chevron), RpgUiStyle.Cyan, true, false);
 
-            var selections = new Image[RpgRegions.Length];
-            var pins = new Button[RpgRegions.Length];
+            var selections = new Image[CampaignRegions.Length];
+            var pins = new Button[CampaignRegions.Length];
             var nodes = DuelUiKit.FillRect("Nodes", atlas);
-            for (int i = 0; i < RpgRegions.Length; i++)
+            for (int i = 0; i < CampaignRegions.Length; i++)
             {
                 int index = i;
-                var region = RpgRegions[i];
+                var region = CampaignRegions[i];
                 bool open = region.IsOpen(cleared), current = i == _rpgLocation, goal = i == target;
                 Color color = goal ? RpgUiStyle.Gold : current ? RpgUiStyle.Cyan : open
                     ? new Color32(159, 209, 234, 255) : new Color32(163, 173, 198, 255);
-                var pin = Anchor(nodes, region.Id, RpgNodePoints[i], new Vector2(71f, 66f));
+                var pin = Anchor(nodes, region.Id, CampaignMapPoint(i), new Vector2(71f, 66f));
                 var button = pin.gameObject.AddComponent<Button>();
                 pins[i] = button;
                 DuelUiKit.AddImage(pin.gameObject, DuelUiKit.WhiteSprite, Color.clear, false, true);
@@ -160,7 +160,7 @@ namespace YGOPortable.UI
                 if (selected >= 0) selections[selected].enabled = false;
                 selected = index;
                 selections[selected].enabled = true;
-                var region = RpgRegions[index];
+                var region = CampaignRegions[index];
                 bool open = region.IsOpen(cleared), current = index == _rpgLocation;
                 _images.BeginPage();
                 _images.Get(RpgMapArt);
@@ -183,8 +183,8 @@ namespace YGOPortable.UI
                     return RpgPendingDeliveries(item).Any() || IsRpgQuestOpen(item, cleared) &&
                         status != RpgQuestState.Complete && (item.Id != RpgSideQuest.GarageCouplerId || status != RpgQuestState.Available);
                 });
-                main.text = open && story != null ? story.opponentName : "메인 사건 없음";
-                request.text = open && requestHere != null ? requestHere.Title : "의뢰 없음";
+                main.text = open && story != null ? story.isCutsceneOnly ? story.title : story.opponentName : "메인 사건 없음";
+                request.text = IsGxCampaign ? _rpgConfiguration.spots[index].subtitle : open && requestHere != null ? requestHere.Title : "의뢰 없음";
                 main.color = open && story != null ? (Color)RpgUiStyle.Gold : new Color(.59f, .66f, .75f);
                 request.color = open && requestHere != null ? (Color)RpgUiStyle.Cyan : new Color(.59f, .66f, .75f);
                 mainMark.color = main.color;

@@ -749,6 +749,15 @@ namespace YGOPortable.Core
                 (StoryCampaign.LegacyClearFor(episodeId) is { } legacy && cleared.Contains(legacy)));
         }
 
+        internal static bool TryClearStoryScene(string episodeId, out string error)
+        {
+            if (!CanTransact(out error)) return false;
+            if (IsStoryEpisodeCleared(episodeId)) return true;
+            var next = WithBalance(Balance);
+            next.clearedStoryEpisodes = new List<string>(_profile.clearedStoryEpisodes) { episodeId };
+            return Write(next, _owned, out error);
+        }
+
         internal static void MigrateStoryClears(IEnumerable<string> legacyClears)
         {
             if (!HasStarter || _profile.storyProgressMigrated || !CanTransact(out _)) return;
@@ -775,7 +784,8 @@ namespace YGOPortable.Core
         }
 
         internal static bool TryAwardStoryDuel(string episodeId, bool won, StoryRaid? raid, PresetDeckInfo opponentDeck,
-            StoryBattlePlan plan, out StoryPrize prize, out string error, System.Random random = null, bool rpgField = false)
+            StoryBattlePlan plan, out StoryPrize prize, out string error, System.Random random = null, bool rpgField = false,
+            bool awardPartnerAffinity = true)
         {
             prize = default;
             random ??= PackRandom;
@@ -821,7 +831,7 @@ namespace YGOPortable.Core
             }
             var next = WithBalance(Balance + reward);
             RpgBondReward bondReward = default;
-            if (rpgField && won) reward += ApplyRpgDuelGrowth(next, story: true, out bondReward);
+            if (rpgField && won) reward += ApplyRpgDuelGrowth(next, story: true, out bondReward, awardPartnerAffinity);
             next.dust += dust;
             next.tactics = next.tactics.Copy();
             int bond = won && plan.Stance == StoryStance.Bond && opponentDeck != null

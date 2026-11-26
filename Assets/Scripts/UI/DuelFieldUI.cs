@@ -48,7 +48,8 @@ namespace YGOPortable.UI
         private Text _oppNameText;
         private Text _oppLpText;
         private RectTransform _oppLpFill;
-        private Text _myLpText;
+        private Text _myLpText, _myNameText;
+        private Image _myPortrait;
         private GameObject _rankedChampionBadge;
         private Image _rankedAvatarRim;
         private Color _normalAvatarRim;
@@ -311,6 +312,19 @@ namespace YGOPortable.UI
                 CardDragManager.Instance.OnDragDropped += HandleDuelCardDrop;
                 CardDragManager.Instance.OnDragCancelled += HandleDuelDragCancelled;
             }
+        }
+
+        internal void SetStoryPlayer(string name, Sprite portrait)
+        {
+            _myNameText.text = string.IsNullOrWhiteSpace(name) ? "플레이어" : name;
+            _myPortrait.sprite = portrait ?? DuelProfileArt.Player;
+            _myPortrait.enabled = _myPortrait.sprite != null;
+        }
+
+        internal void SetStoryOpponent(string name, Sprite portrait)
+        {
+            if (!string.IsNullOrWhiteSpace(name)) _oppNameText.text = name;
+            if (portrait != null) _oppBustImg.sprite = portrait;
         }
 
         public void BindSession(DuelSession session, OpponentCharacter opponent, PresetDeckInfo opponentDeck)
@@ -1271,6 +1285,8 @@ namespace YGOPortable.UI
             var player = DuelUiKit.CreateRect("PlayerHUD", root, new Vector2(0.016f, 0.035f), new Vector2(0.221f, 0.132f),
                 Vector2.zero, Vector2.zero);
             var (name, lp, fill, portrait) = BuildPlayerHud(player, false);
+            _myNameText = name;
+            _myPortrait = portrait;
             name.text = "플레이어";
             _myLpFeedbackAnchor = (RectTransform)name.transform.parent;
             _myLpText = lp;

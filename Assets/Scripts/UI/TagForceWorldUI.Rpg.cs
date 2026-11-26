@@ -10,10 +10,9 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        internal const string RpgPracticeId = "5ds-rpg";
-        private const string RpgArt = "TagForce/5DS/";
+        internal const string RpgPracticeId = "5ds-rpg", GxRpgPracticeId = "gx-rpg";
+        internal static bool IsRpgPractice(string id) => id is RpgPracticeId or GxRpgPracticeId;
         private const string RpgIcons = "TagForce/UI/";
-        private const string RpgRegionPreference = "ygo.5ds-rpg.last-region";
         private const float RpgSceneRadius = .096f;
         private static readonly Vector2 RpgArrival = new(.50f, .20f);
         internal const int RpgAcademia = 0, RpgGarage = 1, RpgHideout = 2, RpgPrison = 3, RpgPoppo = 4,
@@ -23,21 +22,22 @@ namespace YGOPortable.UI
         {
             internal readonly string Id, Name;
             internal readonly int RequiredEpisode, AdventureSlot;
-            private readonly string _lighting;
+            private readonly string _lighting, _mapPath;
 
-            internal RpgRegion(string id, string name, int requiredEpisode, int adventureSlot, string lighting = null)
+            internal RpgRegion(string id, string name, int requiredEpisode, int adventureSlot, string lighting = null, string mapPath = null)
             {
                 Id = id;
                 Name = name;
                 RequiredEpisode = requiredEpisode;
                 AdventureSlot = adventureSlot;
                 _lighting = lighting;
+                _mapPath = mapPath;
             }
 
             internal string StoryBackdrop => $"Maps/{Id}.png";
             internal string LightingBackdrop => _lighting == null ? null : $"Maps/{Id}_{_lighting}.png";
-            internal string Background => RpgArt + StoryBackdrop;
-            internal string FieldBackground => RpgArt + "Maps/" + Id + "_field.png";
+            internal string Background => _mapPath ?? "TagForce/5DS/" + StoryBackdrop;
+            internal string FieldBackground => _mapPath ?? $"TagForce/5DS/Maps/{Id}_field.png";
             internal bool IsOpen(int clears) => clears >= RequiredEpisode;
         }
 
@@ -82,7 +82,19 @@ namespace YGOPortable.UI
         private bool _rpgField;
         private bool _rpgHeaderStyled;
 
-        internal int RpgClears => CountClearedRpgEpisodes(_rpgCampaign, CollectionProgress.IsStoryEpisodeCleared);
+        internal int RpgClears
+        {
+            get
+            {
+                int count = 0;
+                foreach (var episode in _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>())
+                {
+                    if (!CollectionProgress.IsStoryEpisodeCleared(StoryModeUI.RpgProgressId(episode, RpgCampaignId))) break;
+                    ++count;
+                }
+                return count;
+            }
+        }
 
         internal static int CountClearedRpgEpisodes(StoryScriptRoot script, Func<string, bool> isCleared)
         {
@@ -104,27 +116,28 @@ namespace YGOPortable.UI
         internal static string NewlyUnlockedRegions(int before, int after) => string.Join(" · ",
             RpgRegions.Where(region => !region.IsOpen(before) && region.IsOpen(after)).Select(region => region.Name));
 
-        internal void PrepareRpgField(bool openIntro = false)
+        internal bool PrepareRpgField(bool openIntro = false, string seriesId = StoryModeUI.RpgSeriesId)
         {
+            if (!LoadWorldCampaign(seriesId)) return false;
             _rpgField = true;
-            _rpgCampaign ??= StoryModeUI.LoadRpgScript(Application.streamingAssetsPath);
-            _rpgWorldDecks ??= StoryModeUI.LoadRpgDecks(Application.streamingAssetsPath);
             _observedRpgClears = RpgClears;
-            _rpgIntroOnOpen = openIntro && _observedRpgClears == 0 && !CollectionProgress.RpgIntroSeen;
-            _rpgLocation = Array.FindIndex(RpgRegions, region => region.Id == PlayerPrefs.GetString(RpgRegionPreference));
-            if (_rpgLocation < 0 || !RpgRegions[_rpgLocation].IsOpen(_observedRpgClears))
-                _rpgLocation = RegionForEpisode(_observedRpgClears + 1);
+            _rpgIntroOnOpen = !IsGxCampaign && openIntro && _observedRpgClears == 0 && !CollectionProgress.RpgIntroSeen;
+            _rpgLocation = Array.FindIndex(CampaignRegions, region => region.Id == PlayerPrefs.GetString(RpgRegionPreference));
+            if (_rpgLocation < 0 || !CampaignRegions[_rpgLocation].IsOpen(_observedRpgClears))
+                _rpgLocation = CampaignRegionForEpisode(_observedRpgClears + 1);
             if (_rpgIntroOnOpen) _rpgLocation = RpgGarage;
             _rpgAnnounceArrival = openIntro;
             _position = RpgArrival;
             _resident = null;
             _rpgQuestResident = null;
             _rpgLastPlayedSceneId = null;
+            return true;
         }
 
         internal bool CanStartRpgEpisode(int index) =>
-            _rpgField && CanWalk && _rpgCampaign?.episodes != null && index >= 0 &&
-            index == RpgClears && index < _rpgCampaign.episodes.Length && RegionForEpisode(index + 1) == _rpgLocation;
+            _rpgField && _rpgCampaign?.episodes != null && index >= 0 && index == RpgClears &&
+            index < _rpgCampaign.episodes.Length && CampaignRegionForEpisode(index + 1) == _rpgLocation &&
+            (CanWalk || AutomaticRpgScenePending && _rpgPendingRegion < 0 && _rpgDialogueCast == null);
 
         private RectTransform BuildRpgNavigation(Transform parent)
         {
@@ -195,8 +208,8 @@ namespace YGOPortable.UI
         {
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(page is not (Page.Field or Page.ResortWardrobe or Page.SummerEpilogue));
-            _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
-            DuelAudio.PlayRpgFieldMusic(MusicForRpgRegion(_rpgLocation));
+            _header.text = $"{(IsGxCampaign ? "GX" : "5D's")} RPG 월드 · {CampaignRegions[_rpgLocation].Name}";
+            DuelAudio.PlayRpgFieldMusic(IsGxCampaign ? GxFieldMusic(CampaignFieldTheme) : MusicForRpgRegion(_rpgLocation));
             switch (page)
             {
                 case Page.Map: BuildRpgMap(); break;
@@ -219,7 +232,8 @@ namespace YGOPortable.UI
             }
 
             int clears = RpgClears;
-            string opened = NewlyUnlockedRegions(_observedRpgClears, clears);
+            string opened = string.Join(" · ", CampaignRegions.Where(region =>
+                !region.IsOpen(_observedRpgClears) && region.IsOpen(clears)).Select(region => region.Name));
             _observedRpgClears = clears;
             if (opened.Length > 0)
             {
@@ -239,6 +253,14 @@ namespace YGOPortable.UI
             _ => RpgFieldMusic.Outskirts,
         };
 
+        private static RpgFieldMusic GxFieldMusic(string theme) => theme switch
+        {
+            "arena" => RpgFieldMusic.Circuit,
+            "dark" or "volcano" => RpgFieldMusic.Crisis,
+            "forest" or "shore" => RpgFieldMusic.Outskirts,
+            _ => RpgFieldMusic.Home,
+        };
+
         private void BuildRpgMenuBackdrop()
         {
             var backdrop = DuelUiKit.FillRect("Scenery", _body);
@@ -249,8 +271,8 @@ namespace YGOPortable.UI
 
         private bool TravelRpgRegion(int index, Vector2 arrival)
         {
-            if (!_rpgField || _rpgDialogueCast != null || index < 0 || index >= RpgRegions.Length ||
-                !RpgRegions[index].IsOpen(RpgClears))
+            if (!_rpgField || _rpgDialogueCast != null || index < 0 || index >= CampaignRegions.Length ||
+                !CampaignRegions[index].IsOpen(RpgClears))
                 return false;
             if (index != _rpgLocation)
             {
@@ -258,31 +280,31 @@ namespace YGOPortable.UI
                 _rpgAnnounceArrival = true;
             }
             _rpgLocation = index;
-            PlayerPrefs.SetString(RpgRegionPreference, RpgRegions[index].Id);
+            PlayerPrefs.SetString(RpgRegionPreference, CampaignRegions[index].Id);
             PlayerPrefs.Save();
             Show(Page.Field);
             return true;
         }
 
         private Sprite GetRpgFieldArt(RpgRegion region) =>
-            (LightingForEpisode(region, RpgClears + 1) is string lighting ? _images.Get(RpgArt + lighting) : null) ??
+            (!IsGxCampaign && LightingForEpisode(region, RpgClears + 1) is string lighting ? _images.Get(RpgArt + lighting) : null) ??
             _images.Get(region.FieldBackground) ?? _images.Get(region.Background);
 
-        private string FieldOutfit(int id) => RpgWardrobe.ForField(id, _rpgLocation, RpgClears + 1);
+        private string FieldOutfit(int id) => IsGxCampaign ? null : RpgWardrobe.ForField(id, _rpgLocation, RpgClears + 1);
 
         private void BuildRpgField()
         {
-            var floor = BuildRpgCamera(GetRpgFieldArt(RpgRegions[_rpgLocation]));
+            var floor = BuildRpgCamera(GetRpgFieldArt(CampaignRegions[_rpgLocation]));
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
             var episodes = _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>();
             int cleared = RpgClears;
             bool complete = cleared == episodes.Length;
-            int targetRegion = RegionForEpisode(cleared + 1);
+            int targetRegion = CampaignRegionForEpisode(cleared + 1);
 
-            StoryEpisodeData questNpc = !complete && _rpgLocation == targetRegion ? episodes[cleared] : null;
-            var sideQuest = RpgSideQuest.All.FirstOrDefault(item => item.Region == RpgRegions[_rpgLocation].Id);
+            StoryEpisodeData questNpc = !complete && _rpgLocation == targetRegion && !episodes[cleared].isCutsceneOnly ? episodes[cleared] : null;
+            var sideQuest = IsGxCampaign ? null : RpgSideQuest.All.FirstOrDefault(item => item.Region == CampaignRegions[_rpgLocation].Id);
             if (_page == Page.Field)
             {
                 BuildRpgExploration(cleared);
@@ -306,7 +328,7 @@ namespace YGOPortable.UI
             AddRpgShopkeeper();
             BuildRpgCompanion();
             _player = Anchor(_rpgSceneSpace, "Player", _position, RpgFieldActorSize);
-            _playerSprite = WalkerSprite(_player, RpgArt + "Characters_SD/sd_protagonist.png", "카이");
+            _playerSprite = WalkerSprite(_player, CampaignSdPath(RpgPlayerId), RpgPlayerName);
             PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false);
             OrderRpgFieldActors();
             BuildRpgFieldHud(cleared, targetRegion, episodes, sideObjective);
@@ -314,7 +336,7 @@ namespace YGOPortable.UI
 
         private IEnumerable<StoryEpisodeData> RpgLocalResidents(StoryEpisodeData[] episodes, int region, int cleared,
             StoryEpisodeData questNpc, RpgSideQuest sideQuest) =>
-            episodes.Where((episode, i) => i < cleared && RegionForEpisode(i + 1) == region)
+            IsGxCampaign ? GxResidents(region, cleared, questNpc).Take(2) : episodes.Where((episode, i) => i < cleared && CampaignRegionForEpisode(i + 1) == region)
                 .Concat(episodes.Take(cleared)).Concat(episodes.Take(2))
                 .Where(episode => RpgResidentIdentity(episode.charId) != RpgResidentIdentity(questNpc?.charId) &&
                     RpgResidentIdentity(episode.charId) != RpgResidentIdentity(sideQuest?.Giver) &&
@@ -336,7 +358,7 @@ namespace YGOPortable.UI
         }
 
         private void AddRpgResident(StoryEpisodeData resident, Vector2 spot, bool story, Action interact) =>
-            AddRpgResident(resident.charId, resident.opponentName,
+            AddRpgResident(story ? StageOpponentId(resident) : resident.charId, resident.opponentName,
                 story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot,
                 story ? RpgResidentRole.Story : RpgResidentRole.Conversation, interact, patrol: !story);
 
@@ -347,7 +369,7 @@ namespace YGOPortable.UI
             _rpgResidents[id] = actor;
             var art = DuelUiKit.FillRect("SD", actor);
             var outfit = FieldOutfit(id);
-            var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{RpgArtKey(id)}.png", name,
+            var profile = BuildRpgActorArt(art, CampaignSdPath(id), name,
                 outfit == null ? null : RpgWardrobe.WalkAtlas(id, outfit));
             PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact, actor);
@@ -397,8 +419,8 @@ namespace YGOPortable.UI
                 ("TalkDaily", "일상 대화", () => StartTypingDialogue(conversation, quest != null
                     ? RpgQuestDialogue(quest) : RpgResidentLine(speaker, daily: true))),
             };
-            if (quest == null) actions.Add(("Practice", "연습 듀얼", () => Show(Page.Duel)));
-            else AppendRpgQuestActions(quest, actions);
+            if (quest == null && _rpgWorldDecks.ContainsKey(_resident.deckId)) actions.Add(("Practice", "연습 듀얼", () => Show(Page.Duel)));
+            else if (quest != null) AppendRpgQuestActions(quest, actions);
             actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));
             AddRpgConversationActions(panel, actions);
         }
@@ -423,7 +445,7 @@ namespace YGOPortable.UI
                 var speaker = FaceRpgConversationSpeaker(id);
                 var outfit = FieldOutfit(id);
                 var bust = (outfit == null ? null : _images.Get(RpgArt + RpgWardrobe.Preview(id, outfit))) ??
-                    _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgArtKey(id)}.png");
+                    _images.GetBust(CampaignBustPath(id));
                 if (bust == null && id != RpgShopkeeperId)
                     bust = DuelProfileArt.Opponent(DeckRepository.GetCharacter(id));
                 if (bust != null && bust != DuelProfileArt.MissingOpponent)
@@ -521,7 +543,7 @@ namespace YGOPortable.UI
                 var persona = new TagForcePersona { personaId = $"rpg_{_resident.charId}", baseCharId = _resident.charId,
                     displayName = _resident.opponentName };
                 var form = new TagForceForm { formCharId = _resident.charId, formName = _resident.opponentName };
-                _app.StartTagForceDuel(new TagForceDuel(RpgPracticeId, persona, form, null, rival, 1,
+                _app.StartTagForceDuel(new TagForceDuel(IsGxCampaign ? GxRpgPracticeId : RpgPracticeId, persona, form, null, rival, 1,
                     null, null, false, 0), selected);
             }, primary: true);
             start.interactable = selected != null;

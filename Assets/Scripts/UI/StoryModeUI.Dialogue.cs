@@ -50,7 +50,8 @@ namespace YGOPortable.UI
             private readonly Image _stage;
             private readonly CanvasGroup _portraitGroup;
             private readonly CanvasGroup _cutsceneOverlay;
-            private readonly Image _cutsceneImage;
+            private readonly Image _cutsceneImage, _cutscenePrevious;
+            private float _cutsceneBlend;
             private readonly AspectRatioFitter _cutsceneAspect;
             private readonly StoryDialogueFx _fx;
             private readonly Image _dialoguePanel;
@@ -101,9 +102,10 @@ namespace YGOPortable.UI
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
             private bool _rpg;
-            private int _rpgEpisode;
+            private int _rpgEpisode, _playAsCharacterId;
+            private string _rpgAssetFolder;
             private bool _showCutscene;
-            private bool _akiSpeaking;
+            private bool _speakerUsesPaintedExpression;
             private readonly Image _heroPrevious, _opponentPrevious;
             private readonly Text _heroReaction, _opponentReaction;
             private float _heroFade, _opponentFade, _heroSlide, _opponentSlide;
@@ -144,6 +146,8 @@ namespace YGOPortable.UI
                 cutscene.gameObject.AddComponent<RectMask2D>();
                 _cutsceneOverlay = cutscene.gameObject.AddComponent<CanvasGroup>();
                 _cutsceneOverlay.blocksRaycasts = _cutsceneOverlay.interactable = false;
+                _cutscenePrevious = DuelUiKit.AddImage(DuelUiKit.FillRect("PreviousCG", cutscene).gameObject,
+                    null, Color.white, true, false);
                 _cutsceneImage = DuelUiKit.AddImage(DuelUiKit.FillRect("CG", cutscene).gameObject, null, Color.white, false, false);
                 _cutsceneAspect = _cutsceneImage.gameObject.AddComponent<AspectRatioFitter>();
                 _cutsceneAspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
@@ -252,7 +256,8 @@ namespace YGOPortable.UI
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
                 Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
                 string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
-                string preferredRpgBackdrop = null, int rpgEpisode = 0, bool compactRpgDialogue = false)
+                string preferredRpgBackdrop = null, int rpgEpisode = 0, bool compactRpgDialogue = false,
+                int playAsCharacterId = 0, bool autoPlay = false, string rpgAssetFolder = null)
             {
                 Close();
                 _field = field;
@@ -269,7 +274,10 @@ namespace YGOPortable.UI
                 _sceneOpponent = opponent;
                 _rpg = rpg;
                 _rpgEpisode = rpgEpisode;
+                _rpgAssetFolder = rpgAssetFolder ?? field?.RpgAssetFolder ?? "5DS";
+                _playAsCharacterId = playAsCharacterId;
                 ApplyDialogueStyle(rpg);
+                if (autoPlay) ToggleAuto();
                 _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, onField ? .267f : .309f) : new Vector2(.07f, .26f);
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .859f) : new Vector2(.493f, .855f);
                 _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, onField ? .267f : .309f) : new Vector2(.508f, .26f);
@@ -310,6 +318,9 @@ namespace YGOPortable.UI
                 _cutsceneOverlay.alpha = 0f;
                 _portraitGroup.alpha = 1f;
                 SetSprite(_cutsceneImage, null);
+                SetSprite(_cutscenePrevious, null);
+                _cutsceneBlend = 1f;
+                _cutsceneImage.color = Color.white;
                 SetSprite(_stage, null);
                 SetSprite(_hero, null);
                 SetSprite(_opponent, null);
@@ -356,6 +367,12 @@ namespace YGOPortable.UI
                 RefreshStageCaption();
                 _poseTime += delta;
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
+                if (_cutsceneBlend < 1f)
+                {
+                    _cutsceneBlend = Mathf.MoveTowards(_cutsceneBlend, 1f, delta / .35f);
+                    _cutsceneImage.color = new Color(1f, 1f, 1f, _cutsceneBlend);
+                    if (_cutsceneBlend >= 1f) SetSprite(_cutscenePrevious, null);
+                }
                 float sceneAlpha = 1f - _cutsceneOverlay.alpha;
                 float portraitAlpha = _field?.RpgStageRunning == true ? sceneAlpha * .16f : sceneAlpha;
                 _portraitGroup.alpha = Mathf.MoveTowards(_portraitGroup.alpha, portraitAlpha, delta * 8f);
@@ -363,10 +380,11 @@ namespace YGOPortable.UI
                 _headingPlate.canvasRenderer.SetAlpha(sceneAlpha);
                 _heroIdentity.canvasRenderer.SetAlpha(sceneAlpha);
                 AnimatePortrait(_hero, _heroPrevious, _heroReaction, _heroSpeaking, delta,
-                    _heroSpeaking ? _emotion : null, _poseTime, -1f, ref _heroFade, ref _heroSlide);
+                    _heroSpeaking ? _emotion : null, _poseTime, -1f, ref _heroFade, ref _heroSlide,
+                    usePaintedExpression: _rpgAssetFolder == "GX");
                 AnimatePortrait(_opponent, _opponentPrevious, _opponentReaction, _opponentSpeaking, delta,
                     _opponentSpeaking ? _emotion : null, _poseTime, 1f, ref _opponentFade, ref _opponentSlide,
-                    usePaintedExpression: _akiSpeaking);
+                    usePaintedExpression: _speakerUsesPaintedExpression);
                 RefreshCaret();
                 if (_stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
                     _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
@@ -461,26 +479,31 @@ namespace YGOPortable.UI
                 _speaker.text = narration ? "" : line.speaker;
                 bool heroPreviouslySpeaking = _heroSpeaking;
                 bool opponentPreviouslySpeaking = _opponentSpeaking;
-                _heroSpeaking = !narration && (line.speaker == _protagonist ||
-                    line.speaker.StartsWith("주인공", StringComparison.Ordinal) ||
+                bool originalHero = !narration && (line.speaker.StartsWith("주인공", StringComparison.Ordinal) ||
                     line.speaker.StartsWith("여주인공", StringComparison.Ordinal));
+                bool previousHeroSpeaking = _playAsCharacterId > 0 && originalHero;
+                _heroSpeaking = !narration && (line.speaker == _protagonist ||
+                    (_playAsCharacterId > 0 ? line.speaker is "아스카" or "텐죠인 아스카" : originalHero));
                 var speaker = !narration && !_heroSpeaking && _rpg
                     ? FindSpeaker(line.speaker) : null;
-                _opponentSpeaking = !narration && !_heroSpeaking && (!_rpg || speaker != null);
+                _opponentSpeaking = !narration && !_heroSpeaking && (!_rpg || speaker != null || previousHeroSpeaking);
                 _speaker.color = _heroSpeaking ? HeroColor : _rpg ? RpgUiStyle.SpeakerColor(speaker?.name ?? line.speaker) : OpponentColor;
                 _speakerPlate.color = _rpg ? Color.white : new Color(.028f, .063f, .13f, .94f);
                 _speakerStripe.color = _speaker.color;
                 _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
-                _akiSpeaking = speaker?.id == 1;
+                _speakerUsesPaintedExpression = speaker?.id == 1 || (_rpgAssetFolder == "GX" && speaker?.id is 107 or 119);
                 _opponentReaction.enabled = false;
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
                 if (_rpg)
                 {
                     if (_heroSpeaking || _hero.sprite == null)
                         ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
-                    if ((speaker ?? (_opponent.sprite == null ? _sceneOpponent : null)) is { } actor)
+                    if (previousHeroSpeaking)
+                        ShowBust(_opponent, _opponentPrevious, LoadBust("Standing/full_campaign_protagonist", _emotion),
+                            ref _opponentFade, ref _opponentSlide);
+                    else if ((speaker ?? (_opponent.sprite == null ? _sceneOpponent : null)) is { } actor)
                     {
                         var bust = LoadActorBust(actor.id, speaker != null ? _emotion : null);
                         ShowBust(_opponent, _opponentPrevious, bust ?? DuelProfileArt.Opponent(actor), ref _opponentFade, ref _opponentSlide);
@@ -851,10 +874,15 @@ namespace YGOPortable.UI
             }
 
             private Sprite LoadHeroBust(string emotion) =>
-                LoadBust("Characters_Standing/full_protagonist", emotion) ?? DuelProfileArt.Player;
+                (_playAsCharacterId > 0 ? LoadActorBust(_playAsCharacterId, emotion) :
+                    LoadBust(_rpgAssetFolder == "GX" ? "Standing/full_campaign_protagonist" : "Characters_Standing/full_protagonist", emotion))
+                ?? DuelProfileArt.Player;
 
             private Sprite LoadActorBust(int id, string emotion)
             {
+                if (_rpgAssetFolder == "GX")
+                    return LoadBust($"Standing/full_{id}", emotion) ??
+                        (id == 104 ? LoadBust("TagForce/DM/Characters_Standing/full_104", emotion) : null);
                 string outfit = RpgWardrobe.ForStory(id, _rpgEpisode);
                 string stem = RpgWardrobe.PortraitStem(id, outfit);
                 if (!RpgWardrobe.UsesBasePortrait(outfit))
@@ -872,7 +900,7 @@ namespace YGOPortable.UI
             }
 
             private Sprite LoadExpression(string stem, string emotion) =>
-                emotion is "smile" or "blush" or "sad" or "determined" or "shock" or "hurt"
+                emotion is "smile" or "blush" or "sad" or "determined" or "shock" or "hurt" or "angry"
                     ? LoadRpgSprite($"{stem}_{emotion}.png") : null;
 
             private void BindCutscene(string id)
@@ -880,11 +908,23 @@ namespace YGOPortable.UI
                 bool continuing = _showCutscene;
                 _showCutscene = false;
                 if (string.IsNullOrEmpty(id) || id.Any(c => !char.IsLetterOrDigit(c) && c != '_' && c != '-')) return;
-                var picture = LoadRpgSprite($"Cutscenes/{id}.jpg");
+                var picture = LoadRpgSprite($"Cutscenes/{id}.{(_rpgAssetFolder == "GX" ? "png" : "jpg")}");
                 if (picture == null) return;
                 if (_cutsceneImage.sprite != picture)
                 {
-                    if (!continuing) _cutsceneOverlay.alpha = 0f;
+                    if (continuing && _cutsceneImage.sprite != null)
+                    {
+                        SetSprite(_cutscenePrevious, _cutsceneImage.sprite);
+                        _cutsceneBlend = 0f;
+                        _cutsceneImage.color = new Color(1f, 1f, 1f, 0f);
+                    }
+                    else
+                    {
+                        _cutsceneOverlay.alpha = 0f;
+                        _cutsceneBlend = 1f;
+                        _cutsceneImage.color = Color.white;
+                        SetSprite(_cutscenePrevious, null);
+                    }
                     SetSprite(_cutsceneImage, picture);
                     _cutsceneAspect.aspectRatio = picture.rect.width / picture.rect.height;
                 }
@@ -893,7 +933,9 @@ namespace YGOPortable.UI
 
             private Sprite LoadRpgSprite(string name, bool waistUp = false)
             {
-                string path = Path.Combine(Application.streamingAssetsPath, "TagForce/5DS", name);
+                string path = name.StartsWith("TagForce/", StringComparison.Ordinal)
+                    ? Path.Combine(Application.streamingAssetsPath, name)
+                    : Path.Combine(Application.streamingAssetsPath, $"TagForce/{_rpgAssetFolder}", name);
                 if (_rpgSprites.TryGetValue(path, out var loaded)) return loaded;
 
                 Sprite sprite = null;
@@ -956,6 +998,7 @@ namespace YGOPortable.UI
                     "shock" => new Vector2(0f, 14f * Mathf.Sin(elapsed * 18f) * settle),
                     "hurt" => new Vector2(11f * Mathf.Sin(elapsed * 31f) * settle, -4f * settle),
                     "sad" => new Vector2(0f, -5f),
+                    "angry" => new Vector2(-8f * side * settle, 2f * settle),
                     "determined" => new Vector2(3f * settle, 0f),
                     _ => Vector2.zero,
                 };
@@ -990,6 +1033,7 @@ namespace YGOPortable.UI
                     "determined" => ("✧", new Color(1f, .72f, .31f)),
                     "smile" => ("✦", new Color(1f, .91f, .55f)),
                     "sad" => ("…", new Color(.68f, .85f, .99f)),
+                    "angry" => ("!", new Color(1f, .48f, .41f)),
                     "hurt" => ("✷", new Color(1f, .43f, .45f)),
                     "blush" => ("♥", new Color(1f, .48f, .69f)),
                     _ => ("", Color.clear),
@@ -1040,7 +1084,7 @@ namespace YGOPortable.UI
         internal void Play(string name)
         {
             ResetEffect();
-            if (Application.isPlaying && name is ("shake" or "flash" or "heartbeat"))
+            if (Application.isPlaying && name is ("shake" or "flash" or "heartbeat" or "fade"))
                 _effectAnimation = StartCoroutine(Animate(name));
         }
 
@@ -1065,7 +1109,7 @@ namespace YGOPortable.UI
 
         private IEnumerator Animate(string name)
         {
-            float duration = name == "heartbeat" ? .72f : .36f;
+            float duration = name switch { "heartbeat" => .72f, "fade" => .62f, _ => .36f };
             for (float time = 0f; time < duration; time += Time.unscaledDeltaTime)
             {
                 DrawFrame(name, time / duration);
@@ -1082,6 +1126,8 @@ namespace YGOPortable.UI
                 _dialogue.anchoredPosition = _restingPosition + Vector2.right * (Mathf.Sin(progress * 31.32f) * (1f - progress) * 13f);
             else if (name == "flash")
                 _overlay.color = new Color(1f, 1f, 1f, .6f * (1f - progress));
+            else if (name == "fade")
+                _overlay.color = new Color(.018f, .032f, .064f, .75f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(progress)));
             else if (name == "heartbeat")
                 _overlay.color = new Color(1f, .36f, .63f, .33f *
                     Mathf.Pow(Mathf.Max(0f, Mathf.Sin(progress * Mathf.PI * 4f)), 2f) * (1f - progress));

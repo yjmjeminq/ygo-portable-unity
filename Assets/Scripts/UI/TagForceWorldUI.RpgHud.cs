@@ -108,7 +108,9 @@ namespace YGOPortable.UI
             var accent = new Color(.44f, .89f, .93f);
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
 
-            var (timeName, timeIcon) = RpgTimeOfDay(_rpgLocation, cleared + 1);
+            var (timeName, timeIcon) = IsGxCampaign
+                ? (CampaignFieldTheme == "dark" ? ("밤", "☾") : ("낮", "☀"))
+                : RpgTimeOfDay(_rpgLocation, cleared + 1);
             var clock = Area(_rpgFieldHud, "TimeOfDay", .024f, .929f, .109f, .982f);
             RpgUiStyle.Panel(clock, gold: true);
             HudLabel(Area(clock, "TimeText", .08f, .08f, .91f, .94f), $"{timeIcon}  {timeName}", 17, RpgUiStyle.Gold,
@@ -116,28 +118,47 @@ namespace YGOPortable.UI
             var locationRibbon = Area(_rpgFieldHud, "CurrentRegion", .113f, .929f, .322f, .982f);
             RpgUiStyle.Panel(locationRibbon, accent: true);
             RpgUiStyle.Display(HudLabel(Area(locationRibbon, "RegionName", .105f, .08f, .95f, .93f),
-                RpgRegions[_rpgLocation].Name, 26, Color.white));
+                CampaignRegions[_rpgLocation].Name, 26, Color.white));
 
             var deckName = DeckRepository.UserDecks.Find(deck => deck.id == (_deckId ?? CollectionProgress.LastDuelDeckId))?.name ??
                 DeckRepository.UserDecks.Find(deck => GameAppController.CanStartWithDeck(deck, out _))?.name ?? "덱 없음";
+            var episode = cleared < episodes.Length ? episodes[cleared] : null;
+            if (episode?.forcedPlayerDeckId is > 0 && _rpgWorldDecks.TryGetValue(episode.forcedPlayerDeckId, out var povDeck))
+                deckName = povDeck.title;
+            if (RpgPlayerId > 0)
+            {
+                var pov = Area(_rpgFieldHud, "GxPov", .365f, .927f, .555f, .982f);
+                RpgUiStyle.Panel(pov, gold: true);
+                HudLabel(pov, "아스카 시점 (POV)", 20, RpgUiStyle.Gold, align: TextAnchor.MiddleCenter, heading: true);
+            }
             var deckPlate = Area(_rpgFieldHud, "Deck", .024f, .89f, .233f, .925f);
             RpgUiStyle.Panel(deckPlate);
             HudLabel(Area(deckPlate, "Icon", .059f, .1f, .20f, .95f), "덱", 15, accent, heading: true);
             HudLabel(Area(deckPlate, "DeckName", .198f, .03f, .94f, .97f), deckName, 16, Color.white, heading: true);
 
             bool hasEpisode = cleared < episodes.Length;
-            string location = RpgRegions[_rpgLocation].Name;
-            string caption = $"[메인] {(hasEpisode ? RpgRegions[targetRegion].Name : location)}";
+            string location = CampaignRegions[_rpgLocation].Name;
+            string caption = IsGxCampaign && episode != null
+                ? $"[제{episode.chapter}기] {CampaignRegions[targetRegion].Name}"
+                : $"[메인] {(hasEpisode ? CampaignRegions[targetRegion].Name : location)}";
             string objective = episodes.Length == 0 ? "대본을 불러오지 못했습니다." :
                 !hasEpisode ? "자유 탐험" :
-                _rpgLocation == targetRegion ? $"{episodes[cleared].opponentName}에게 다가가기" :
-                $"이동 · {RpgRegions[targetRegion].Name}";
+                episode.isCutsceneOnly ? episode.title :
+                _rpgLocation == targetRegion ? $"{episode.opponentName}에게 다가가기" :
+                $"이동 · {CampaignRegions[targetRegion].Name}";
             var quest = Area(_rpgFieldHud, "QuestTrack", .024f, .802f, .303f, .885f);
             RpgUiStyle.Panel(quest, gold: true);
             DrawRpgIcon(Area(quest, "GoalIcon", .039f, .56f, .105f, .94f), "icon_quest_main.png", "!", DuelUiKit.GoldAccent);
             HudLabel(Area(quest, "Chapter", .126f, .51f, .955f, .975f), caption, 16, DuelUiKit.GoldAccent);
             HudLabel(Area(quest, "Objective", .047f, .035f, .955f, .50f),
                 objective, 18, Color.white, heading: true);
+            if (IsGxCampaign && episode != null && _rpgWorldDecks.TryGetValue(episode.deckId, out var rival))
+            {
+                var preview = Area(_rpgFieldHud, "GxOpponentTier", .024f, .746f, .303f, .797f);
+                RpgUiStyle.Panel(preview, accent: true);
+                HudLabel(Area(preview, "Difficulty", .047f, .08f, .955f, .92f), StoryModeUI.GxDeckPreview(rival),
+                    16, accent, heading: true);
+            }
             if (sideObjective is { } side)
             {
                 var sub = Area(_rpgFieldHud, "SideQuestTrack", .024f, .684f, .303f, .792f);
@@ -162,9 +183,10 @@ namespace YGOPortable.UI
             if (rankProgress > 0f) Tint(Area(bar, "Fill", 0f, 0f, rankProgress, 1f), accent);
 
             var partner = Area(stats, "Partner", .733f, .307f, 1f, 1f);
-            string outfit = FieldOutfit(RpgPartnerId);
-            var bust = (outfit == null ? null : _images.GetBust(RpgArt + RpgWardrobe.Preview(RpgPartnerId, outfit))) ??
-                _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgPartnerId}.png");
+            int portraitId = RpgPlayerId > 0 ? RpgPlayerId : RpgPartnerId;
+            string outfit = FieldOutfit(portraitId);
+            var bust = (outfit == null ? null : _images.GetBust(RpgArt + RpgWardrobe.Preview(portraitId, outfit))) ??
+                _images.GetBust(CampaignBustPath(portraitId));
             if (bust != null)
             {
                 var frame = Area(partner, "PortraitFrame", .049f, .06f, .954f, .938f);
@@ -176,10 +198,10 @@ namespace YGOPortable.UI
                 DuelUiKit.AddImage(Area(inner, "Portrait", -.43f, -1.15f, 1.43f, 1.11f).gameObject,
                     bust, Color.white, false, false);
             }
-            else HudLabel(partner, RpgPartnerName, 16, soft, align: TextAnchor.MiddleCenter);
+            else HudLabel(partner, RpgPlayerId > 0 ? RpgPlayerName : RpgPartnerName, 16, soft, align: TextAnchor.MiddleCenter);
             var affinity = Area(stats, "Affinity", .733f, .01f, 1f, .294f);
             RpgUiStyle.Panel(affinity);
-            int hearts = Mathf.Clamp(CollectionProgress.RpgAffinity, 0, 100);
+            int hearts = Mathf.Clamp(CollectionProgress.RpgAffinityFor(RpgPartnerId), 0, 100);
             for (int i = 0; i < 5; i++)
             {
                 int level = hearts - i * CollectionProgress.RpgAffinityPerHeart;

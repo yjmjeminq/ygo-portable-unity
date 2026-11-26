@@ -23,7 +23,7 @@ namespace YGOPortable.UI
         private Button _rankedButton;
         private GameObject _championBadge;
         private Button _storyButton;
-        private Button _rpgWorldButton;
+        private Button _rpgWorldButton, _gxRpgWorldButton;
         private Button _deckEditorButton;
         private Button _shopButton;
         private Button _codexButton;
@@ -86,7 +86,7 @@ namespace YGOPortable.UI
                 AppScreen.CardShop => _shopButton,
                 AppScreen.DeckEditor => _deckEditorButton,
                 AppScreen.StoryMode => _storyButton,
-                AppScreen.TagForceWorld => _rpgWorldButton,
+                AppScreen.TagForceWorld => _app.RpgField?.IsGxCampaign == true ? _gxRpgWorldButton : _rpgWorldButton,
                 AppScreen.ArchetypeCodex => _codexButton,
                 AppScreen.Ranked => _rankedButton,
                 _ => _freeDuelButton,
@@ -127,9 +127,10 @@ namespace YGOPortable.UI
                 new Vector2(.538f, .643f));
             int row = 0;
             Button AddRow(string name, string label, Action action) =>
-                AddMenuEntry(menu, name, .840f - row++ * .112f, label, action);
+                AddMenuEntry(menu, name, .840f - row++ * .101f, label, action);
             _storyButton = AddRow("StoryMode", "스토리 모드", () => _app.OpenStoryCampaign(false));
-            _rpgWorldButton = AddRow("RpgWorld", "RPG 월드", _app.OpenRpgField);
+            _rpgWorldButton = AddRow("RpgWorld", "5D's RPG 월드", _app.OpenRpgField);
+            _gxRpgWorldButton = AddRow("GxRpgWorld", "GX RPG · 여왕의 대관식", _app.OpenGxRpgField);
             _rankedButton = AddRow("Ranked", "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
             _freeDuelButton = AddRow("FreeDuel", "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
             _deckEditorButton = AddRow("DeckEditor", "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));

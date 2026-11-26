@@ -196,12 +196,13 @@ namespace YGOPortable.Core
             }
         }
 
-        private static int ApplyRpgDuelGrowth(SavedProfile next, bool story, out RpgBondReward bondReward)
+        private static int ApplyRpgDuelGrowth(SavedProfile next, bool story, out RpgBondReward bondReward,
+            bool awardPartnerAffinity = true)
         {
             var adventure = next.rpgAdventure = next.rpgAdventure.Copy();
             int previous = RpgRankAt(adventure.xp);
             adventure.xp = Math.Min(RpgRankThreshold(RpgMaxRank), adventure.xp + (story ? 80 : 40));
-            bondReward = ApplyRpgAffinity(next, story ? 5 : 3);
+            bondReward = awardPartnerAffinity ? ApplyRpgAffinity(next, story ? 5 : 3) : default;
             int bonus = 0;
             for (int rank = previous + 1; rank <= RpgRankAt(adventure.xp); rank++)
             {

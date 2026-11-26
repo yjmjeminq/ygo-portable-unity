@@ -68,7 +68,7 @@ namespace YGOPortable.UI
         private TagForceSpot CurrentSpot => _manager.CurrentSpot;
         private TagForcePersona Selected => _data.Persona(_selectedId);
         internal GameObject Root => _screen.gameObject;
-        internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null && _rpgPendingRegion < 0;
+        internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null && _rpgPendingRegion < 0 && !AutomaticRpgScenePending;
 
         internal TagForceWorldUI(GameAppController app, Transform parent)
         {
@@ -476,7 +476,7 @@ namespace YGOPortable.UI
             UpdateConversation(delta);
             bool traveling = _rpgPendingRegion >= 0;
             if (_rpgField) UpdateRpgField(delta);
-            if (traveling || !CanWalk) return;
+            if (_rpgField && AdvanceAutomaticRpgScene() || traveling || !CanWalk) return;
             if (_rpgField && Input.GetKeyDown(KeyCode.M))
             {
                 Show(Page.Map);

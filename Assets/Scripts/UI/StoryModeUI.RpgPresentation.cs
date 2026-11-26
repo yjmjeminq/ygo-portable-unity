@@ -28,11 +28,13 @@ namespace YGOPortable.UI
             _browser.interactable = _browser.blocksRaycasts = false;
             _browser.gameObject.SetActive(false);
             _app.RpgField.Root.SetActive(false);
-            var region = TagForceWorldUI.RpgRegions[TagForceWorldUI.RegionForEpisode(index + 1)];
-            _dialogue.Open("지난 이야기 · " + TitleOf(episode), Script.protagonist,
+            var world = _app.RpgField;
+            var region = world.CampaignRegion(world.CampaignRegionForEpisode(index + 1));
+            _dialogue.Open("지난 이야기 · " + TitleOf(episode), episode.playAsCharacterId > 0 ? DeckRepository.GetCharacter(episode.playAsCharacterId)?.name ?? "아스카" : Script.protagonist,
                 DeckRepository.GetCharacter(episode.charId), lines, ReturnToEpisodes, rpg: true,
                 rpgBackdrop: region.StoryBackdrop,
-                preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1), rpgEpisode: index + 1);
+                preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1), rpgEpisode: index + 1,
+                playAsCharacterId: episode.playAsCharacterId, rpgAssetFolder: world.RpgAssetFolder);
         }
 
         private void PlayRpgFaceoff(StoryEpisodeData episode, string deckTitle, Action finish)
@@ -48,8 +50,9 @@ namespace YGOPortable.UI
             var content = Application.isMobilePlatform ? MobileSafeArea.Create(_rpgFaceoff) : _rpgFaceoff;
             _rpgChallengerBanner = Region(content, "Kai", .042f, .21f, .494f, .92f);
             _rpgBossBanner = Region(content, "Boss", .506f, .21f, .958f, .92f);
-            Portrait(_rpgChallengerBanner, _app.RpgField?.RpgStandingPortrait(0) ?? DuelProfileArt.Player, "카이");
-            Portrait(_rpgBossBanner, _app.RpgField?.RpgStandingPortrait(episode.charId, RpgWardrobe.EpisodeNumber(episode)) ??
+            Portrait(_rpgChallengerBanner, _app.RpgField?.RpgStandingPortrait(episode.playAsCharacterId) ?? DuelProfileArt.Player,
+                episode.playAsCharacterId > 0 ? DeckRepository.GetCharacter(episode.playAsCharacterId)?.name ?? "아스카" : Script.protagonist);
+            Portrait(_rpgBossBanner, _app.RpgField?.RpgStandingPortrait(TagForceWorldUI.StageOpponentId(episode), RpgWardrobe.EpisodeNumber(episode)) ??
                 DuelProfileArt.Opponent(DeckRepository.GetCharacter(episode.charId)), episode.opponentName);
             var versus = AddLabel(content, "Versus", .416f, .39f, .586f, .66f, 96, color: RpgUiStyle.Gold);
             RpgUiStyle.Display(versus);

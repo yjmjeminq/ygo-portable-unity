@@ -79,7 +79,16 @@ namespace YGOPortable.UI
 
         private void BuildRpgAtmosphere()
         {
-            _rpgAtmosphereStyle = RpgAtmospheres[_rpgLocation];
+            string theme = CampaignFieldTheme;
+            _rpgAtmosphereStyle = RpgAtmospheres[IsGxCampaign ? theme switch
+            {
+                "arena" => RpgStadium,
+                "forest" => RpgPoppo,
+                "shore" => RpgBridge,
+                "volcano" => RpgPrison,
+                "dark" => RpgMoment,
+                _ => RpgAcademia,
+            } : _rpgLocation];
             var style = _rpgAtmosphereStyle;
             var layer = DuelUiKit.FillRect("FieldAtmosphere", _rpgSceneSpace);
             var input = layer.gameObject.AddComponent<CanvasGroup>();
@@ -88,9 +97,11 @@ namespace YGOPortable.UI
             var upper = style.LightPosition + style.LightSize * .5f;
             var light = Area(layer, "Light", lower.x, lower.y, upper.x, upper.y);
             _rpgAtmosphereLight = DuelUiKit.AddImage(light.gameObject, RpgSoftLight, style.Light, false, false);
-            if (_rpgLocation is RpgMoment or RpgBridge or RpgArk)
+            bool hazeVisible = IsGxCampaign ? theme is "dark" or "volcano" or "shore" :
+                _rpgLocation is RpgMoment or RpgBridge or RpgArk;
+            if (hazeVisible)
             {
-                bool river = _rpgLocation == RpgBridge;
+                bool river = IsGxCampaign ? theme == "shore" : _rpgLocation == RpgBridge;
                 float height = river ? .67f : .23f;
                 var haze = Area(layer, "Haze", .01f, height - .075f, river ? .56f : .92f, height + .075f);
                 var tint = style.Particles;

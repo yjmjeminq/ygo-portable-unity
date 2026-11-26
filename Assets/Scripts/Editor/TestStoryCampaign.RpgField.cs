@@ -80,7 +80,7 @@ namespace YGOPortable.Editor
             var modals = new DuelPromptModals(canvas.transform, null, null);
             var panel = world.Root.transform.Find("World");
             var storyRoot = story.Root.transform.Find("StoryDialogue");
-            var loaded = (StoryScriptRoot)typeof(StoryModeUI).GetField("_rpgScript", flags).GetValue(story);
+            var loaded = story.GetRpgScript(StoryModeUI.RpgSeriesId);
             var episode6 = loaded.episodes[5];
             try
             {
@@ -226,6 +226,7 @@ namespace YGOPortable.Editor
                 VerifyRpgPartnerPolish();
                 VerifyRpgResort();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
+                VerifyGxCampaign();
             }
             finally
             {
@@ -239,6 +240,167 @@ namespace YGOPortable.Editor
                 if (hadPreference) PlayerPrefs.SetString(preference, oldPreference);
                 else PlayerPrefs.DeleteKey(preference);
                 PlayerPrefs.Save();
+            }
+
+            void VerifyGxCampaign()
+            {
+                const string gx = StoryModeUI.GxRpgSeriesId;
+                const string gxPreference = "ygo.gx-rpg.last-region";
+                string previousLocation = PlayerPrefs.GetString(gxPreference);
+                bool hadLocation = PlayerPrefs.HasKey(gxPreference);
+                string isolatedSave = Path.Combine(save, "gx-open-world");
+                var gxScript = story.GetRpgScript(gx);
+                var gxDecks = StoryModeUI.LoadRpgDecks(streaming, gx);
+                var gxMap = TagForceData.LoadRpgConfiguration(streaming, gx);
+                Require(gxScript?.episodes.Length == 53 && gxScript.episodes.Count(episode => episode.isCutsceneOnly) == 19 &&
+                    gxDecks.Count == 37 && gxMap?.spots.Length == 12 && gxMap.roster.Length == 26,
+                    "GX campaign inputs are incomplete.");
+                Require(File.Exists(Path.Combine(streaming, gxMap.assetConfig.worldMapPath)), "Missing GX world map.");
+                Require(gxMap.roster.All(actor => DeckRepository.GetCharacter(actor.charId) != null), "GX resident has no character entry.");
+                int forbiddenTypes = (int)(YgoConstants.TYPE_SYNCHRO | YgoConstants.TYPE_XYZ |
+                    YgoConstants.TYPE_PENDULUM | YgoConstants.TYPE_LINK | YgoConstants.TYPE_TOKEN);
+                Require(gxDecks.Values.All(deck => deck.main.Concat(deck.extra).Concat(deck.side)
+                    .All(code => CardDatabase.Get(code) is { } card && (card.type & (uint)forbiddenTypes) == 0 &&
+                        YgoNativeBridge.YGO_HasCard(code) != 0)), "A GX deck contains missing cards or another era's summons.");
+                var expectedCg = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
+                    .Concat(episode.postLoseDialogues)).Select(line => line.cutscene)
+                    .Where(id => !string.IsNullOrEmpty(id)).Distinct().ToArray();
+                Require(expectedCg.Length == 11 && expectedCg.All(id =>
+                    File.Exists(Path.Combine(streaming, "TagForce/GX/Cutscenes", id + ".png"))), "Missing GX event CG.");
+
+                try
+                {
+                    PlayerPrefs.DeleteKey(gxPreference);
+                    DeckRepository.Load(streaming, isolatedSave, seedDefaultDecks: false);
+                    CollectionProgress.Load(isolatedSave);
+                    Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out var startingDeck, out string error), error);
+                    DeckRepository.SaveUserDeck(startingDeck);
+                    CollectionProgress.RememberDuelDeck(startingDeck.id);
+                    app.OpenGxRpgField();
+                    Require(world.Root.activeSelf && world.RpgCampaignId == gx && !world.CanWalk, "GX prologue did not start automatically.");
+                    int scenes = 0, duels = 0, pov = 0;
+                    for (int index = 0; index < gxScript.episodes.Length; index++)
+                    {
+                        var episode = gxScript.episodes[index];
+                        Require(world.RpgClears == index, $"GX sequence skipped or stalled at {episode.id}.");
+                        int location = world.CampaignRegionForEpisode(index + 1);
+                        Require(world.CampaignRegion(location).Id == episode.regionId &&
+                            world.CampaignRegion(location).IsOpen(index), $"Unreachable GX destination for {episode.id}.");
+                        if (episode.isCutsceneOnly)
+                        {
+                            for (int frame = 0; frame < 12 && !storyRoot.gameObject.activeInHierarchy; frame++)
+                                world.Update(.18f);
+                            Require(storyRoot.gameObject.activeInHierarchy && !world.CanWalk &&
+                                FieldScene().Find("DialogueCast") != null && Get("_session") == null,
+                                $"Automatic cutscene did not lock controls at {episode.id}.");
+                            Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
+                                .text == "오토 켜짐", $"Automatic playback is off for {episode.id}.");
+                            ReadDialogue(episode.preDialogues.Length);
+                            Require(world.RpgClears == index + 1 && Get("_session") == null,
+                                $"A cutscene did not advance directly at {episode.id}.");
+                            scenes++;
+                            continue;
+                        }
+
+                        Require(world.EnterRpgRegion(location) && world.CanStartRpgEpisode(index) &&
+                            FieldScene().Find("Scenery").GetComponent<Image>().sprite != null &&
+                            panel.Find("FieldHud/GxOpponentTier/Difficulty/Label") != null,
+                            $"GX duel HUD or field was missing for {episode.id}.");
+                        bool isPov = episode.playAsCharacterId > 0;
+                        Require((panel.Find("FieldHud/GxPov") != null) == isPov, $"Wrong field point of view at {episode.id}.");
+                        app.OpenRpgFieldEpisode(index);
+                        Require(story.IsGxRpg && story.GetOpponentMatch(episode).Deck?.id == episode.deckId &&
+                            FieldScene().Find("DialogueCast") != null, $"GX episode used the wrong deck or stage at {episode.id}.");
+                        app.StartStoryDuel(episode, startingDeck, true);
+                        Require(Get("_ai") is TacticalAI { Difficulty: AIDifficulty.Master } &&
+                            Get("_activeOppDeck") is PresetDeckInfo rival && rival.id == episode.deckId,
+                            $"GX opponent setup did not use Master and its exact tier deck at {episode.id}.");
+                        if (isPov)
+                        {
+                            Require(episode.playAsCharacterId == 107 && Get("_activeMyDeck") is UserDeck forced &&
+                                forced.main.SequenceEqual(gxDecks[episode.forcedPlayerDeckId].main) &&
+                                forced.extra.SequenceEqual(gxDecks[episode.forcedPlayerDeckId].extra),
+                                $"Forced deck was not equipped at {episode.id}.");
+                            var fieldUi = Get("_duelField") as DuelFieldUI;
+                            var name = typeof(DuelFieldUI).GetField("_myNameText", flags).GetValue(fieldUi) as Text;
+                            Require(name?.text.Contains("아스카") == true, $"The duel HUD lost the POV name at {episode.id}.");
+                            pov++;
+                        }
+                        else Require(ReferenceEquals(Get("_activeMyDeck"), startingDeck), "GX POV deck was not restored.");
+                        AwardDuel(win: true);
+                        Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                        Require(world.RpgClears == index + 1 && CollectionProgress.LastDuelDeckId == startingDeck.id,
+                            $"Duel result or previous deck was lost after {episode.id}.");
+                        duels++;
+                    }
+
+                    CollectionProgress.Load(isolatedSave);
+                    Require(world.RpgClears == 53 && scenes == 19 && duels == 34 && pov == 3 &&
+                        !CollectionProgress.IsStoryEpisodeCleared("gx_ep_17") && CollectionProgress.RpgAffinity == 0,
+                        "GX progress did not survive reloading or overwrote classic GX progress.");
+                    foreach (int location in Enumerable.Range(0, gxMap.spots.Length))
+                        Require(world.EnterRpgRegion(location) && FieldScene().Find("Scenery").GetComponent<Image>().sprite != null,
+                            $"Unable to enter GX map {gxMap.spots[location].spotId}.");
+                    PressRpgNavigation("Map");
+                    Require(panel.Find(MapNodes)?.childCount == 12, "The GX world map lost pin buttons.");
+                    world.Back();
+                    VerifyGxArtwork(gxMap, expectedCg);
+                    Debug.Log("[VERIFY GX FIELD] 53 consecutive sequences, 34 Master duels, 19 automatic lockouts, all 12 maps and three temporary POV decks passed.");
+                }
+                finally
+                {
+                    if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
+                    else PlayerPrefs.DeleteKey(gxPreference);
+                    PlayerPrefs.Save();
+                }
+
+                void ReadDialogue(int lines)
+                {
+                    for (int tick = 0; tick < lines * 5 + 5 && storyRoot.gameObject.activeInHierarchy; ++tick)
+                        story.Update(4f);
+                }
+
+                void VerifyGxArtwork(TagForceData configuration, string[] cutscenes)
+                {
+                    var sprites = new TagForceWorldImages();
+                    try
+                    {
+                        foreach (string key in configuration.roster.Select(actor => actor.charId.ToString()).Prepend("protagonist"))
+                        {
+                            string standing = key == "protagonist" ? "campaign_protagonist" : key;
+                            Require(sprites.Get($"TagForce/GX/Standing/full_{standing}.png") != null &&
+                                sprites.Get($"TagForce/GX/Characters_SD/sd_{key}.png") != null &&
+                                sprites.GetSlices($"TagForce/GX/WalkCycles/sd_{key}_field.png", 3, 3, fixedCells: true)?.Length == 9,
+                                $"Standing, SD or directional art did not load: {key}.");
+                        }
+                    }
+                    finally { sprites.Clear(); }
+
+                    var view = new StoryModeUI.StoryDialogueView(canvas.transform);
+                    var example = cutscenes.Select(id => new StoryDialogueLine { speaker = "주인공", text = id, cutscene = id })
+                        .Append(new StoryDialogueLine { speaker = "주인공", text = "필드로 돌아갑니다." }).ToArray();
+                    view.Open("GX CG verification", "주인공", DeckRepository.GetCharacter(107), example, null,
+                        rpg: true, rpgBackdrop: "Maps/spot_main_academy.png", rpgAssetFolder: "GX");
+                    var viewType = typeof(StoryModeUI.StoryDialogueView);
+                    var current = (Image)viewType.GetField("_cutsceneImage", flags).GetValue(view);
+                    var previous = (Image)viewType.GetField("_cutscenePrevious", flags).GetValue(view);
+                    var alpha = (CanvasGroup)viewType.GetField("_cutsceneOverlay", flags).GetValue(view);
+                    var advance = viewType.GetMethod("Advance", flags);
+                    for (int index = 0; index < cutscenes.Length; index++)
+                    {
+                        Require(current.sprite != null, $"GX CG did not load: {cutscenes[index]}.");
+                        if (index > 0) Require(previous.sprite != null && current.color.a == 0f, "CG did not crossfade.");
+                        view.Update(.5f);
+                        Require(alpha.alpha == 1f && current.color.a == 1f && previous.sprite == null,
+                            "A CG transition did not settle.");
+                        advance.Invoke(view, null);
+                        advance.Invoke(view, null);
+                    }
+                    view.Update(.5f);
+                    Require(alpha.alpha == 0f, "CG did not fade back to the field.");
+                    view.Close();
+                    Debug.Log("[VERIFY GX ART] All 27 sets of standing and directional character assets and all 11 CG transition paths passed.");
+                }
             }
 
             void VerifyAtmosphere(int region)

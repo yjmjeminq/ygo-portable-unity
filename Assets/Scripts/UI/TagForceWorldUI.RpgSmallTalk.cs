@@ -42,7 +42,7 @@ namespace YGOPortable.UI
             id = id switch { 220 or 221 or 230 => 9, 3200 => 19, _ => id };
             if (!RpgSmallTalk.TryGetValue(id, out var lines))
             {
-                string place = RpgRegions[_rpgLocation].Name;
+                string place = CampaignRegions[_rpgLocation].Name;
                 return daily ? $"{place}에선 듀얼 전에 주변을 한 바퀴 걸어. 카드만 들여다볼 때는 놓치는 게 있거든." :
                     $"{place}까지 잘 찾아왔네. 이쪽에 서 있으면 지나가는 듀얼리스트들이 보여.";
             }

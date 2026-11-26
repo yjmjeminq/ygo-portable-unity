@@ -9,11 +9,11 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private static int RpgPartnerId => CollectionProgress.ActiveRpgPartner.Id;
+        private int RpgPartnerId => IsGxCampaign ? RpgPlayerId == 107 ? 119 : 107 : CollectionProgress.ActiveRpgPartner.Id;
         private const int RpgShopkeeperId = -1;
         private const string RpgShopkeeperName = "카드 매점 직원";
         private static string RpgArtKey(int id) => id == RpgShopkeeperId ? "shopkeeper" : id.ToString();
-        private static string RpgPartnerName => CollectionProgress.ActiveRpgPartner.Name;
+        private string RpgPartnerName => IsGxCampaign ? DeckRepository.GetCharacter(RpgPartnerId)?.name ?? "동료" : CollectionProgress.ActiveRpgPartner.Name;
         private static readonly string[] RpgPartnerLines =
         {
             "아카데미아 실습장부터 둘러보자. 교정에 오늘의 대진표가 있어.",
@@ -58,11 +58,11 @@ namespace YGOPortable.UI
         private bool _rpgIntroOnOpen, _rpgAnnounceArrival, _rpgWorkbenchServices, _rpgChoosingCompanion;
         private int? _rpgServiceSpeaker;
 
-        private string RpgPartnerComment => RpgPartnerAreaLines.GetValueOrDefault(RpgPartnerId, RpgPartnerLines)[_rpgLocation];
+        private string RpgPartnerComment => IsGxCampaign ? CampaignLandmark(_rpgLocation).Description : RpgPartnerAreaLines.GetValueOrDefault(RpgPartnerId, RpgPartnerLines)[_rpgLocation];
 
         internal Sprite RpgStandingPortrait(int id, int episode = 0)
         {
-            if (id == 0) return _images.Get(RpgArt + "Characters_Standing/full_protagonist.png");
+            if (id == 0 || IsGxCampaign) return _images.Get(CampaignBustPath(id));
             string outfit = RpgWardrobe.ForStory(id, episode);
             return (outfit == null ? null : _images.Get(RpgArt + RpgWardrobe.Preview(id, outfit))) ??
                 _images.Get(RpgArt + RpgWardrobe.PortraitStem(id, null) + ".png");
@@ -73,7 +73,7 @@ namespace YGOPortable.UI
             if (guide) BeginRpgTalkBackdrop();
             else
             {
-                Backdrop(RpgRegions[RpgGarage].Background, new Color(.055f, .091f, .135f));
+                Backdrop(CampaignRegions[RpgGarage].Background, new Color(.055f, .091f, .135f));
                 _rpgNavigation.gameObject.SetActive(false);
             }
             _rpgIntroDialogue = new StoryModeUI.StoryDialogueView(_body);
@@ -98,14 +98,15 @@ namespace YGOPortable.UI
             bool saved = CollectionProgress.TrySaveRpgCheckpoint(true, out var error);
             _rpgIntroOnOpen = false;
             _rpgAnnounceArrival = true;
-            if (!TravelRpgRegion(RegionForEpisode(RpgClears + 1), RpgArrival)) Show(Page.Field);
+            if (!TravelRpgRegion(CampaignRegionForEpisode(RpgClears + 1), RpgArrival)) Show(Page.Field);
             if (!saved) ShowStatus(error);
         }
 
         private void BuildRpgCache()
         {
+            if (IsGxCampaign) { BuildGxPickups(); return; }
             int region = _rpgLocation;
-            int saveSlot = RpgRegions[region].AdventureSlot;
+            int saveSlot = CampaignRegions[region].AdventureSlot;
             if (CollectionProgress.RpgCacheFound(saveSlot)) return;
             var point = RpgCachePoints[region];
             var cache = Anchor(_rpgFieldObjects, "HiddenCache", point, new Vector2(56f, 52f));
@@ -146,7 +147,7 @@ namespace YGOPortable.UI
             _rpgCompanion = Anchor(_rpgSceneSpace, "RpgCompanion", _rpgCompanionPoint, RpgFieldActorSize);
             int id = RpgPartnerId;
             string outfit = FieldOutfit(id);
-            _rpgCompanionArt = WalkerSprite(_rpgCompanion, RpgArt + $"Characters_SD/sd_{id}.png", RpgPartnerName,
+            _rpgCompanionArt = WalkerSprite(_rpgCompanion, CampaignSdPath(id), RpgPartnerName,
                 outfit == null ? null : RpgWardrobe.WalkAtlas(id, outfit));
             if (_page != Page.Field) return;
             void Speak() => OpenRpgService(RpgPartnerId);
@@ -164,7 +165,7 @@ namespace YGOPortable.UI
             PoseRpgWalker(_rpgCompanion, _rpgCompanionArt, _rpgCompanionPoint, step, step.sqrMagnitude > .000001f, gap);
         }
 
-        private static bool HasRpgMerchant(int region, int clears) => region == RpgGarage || region == RpgPoppo && clears >= 27;
+        private bool HasRpgMerchant(int region, int clears) => IsGxCampaign ? region == 0 : region == RpgGarage || region == RpgPoppo && clears >= 27;
 
         private void AddRpgShopkeeper()
         {
@@ -178,7 +179,7 @@ namespace YGOPortable.UI
             if (!CanWalk) return;
             _rpgServiceSpeaker = speaker;
             string error = "";
-            if (speaker == RpgPartnerId && CollectionProgress.TryTalkToRpgPartner(RpgRegions[_rpgLocation].AdventureSlot, out error))
+            if (!IsGxCampaign && speaker == RpgPartnerId && CollectionProgress.TryTalkToRpgPartner(CampaignRegions[_rpgLocation].AdventureSlot, out error))
                 DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm, .6f);
             Show(Page.Talk);
             if (!string.IsNullOrEmpty(error)) ShowStatus(error);
@@ -194,10 +195,10 @@ namespace YGOPortable.UI
             if (!partner)
             {
                 actions.Add(("OpenCardShop", "카드 팩 보기", _app.OpenRpgCardShop));
-                actions.Add(("ResortShop", "여름 리조트 의상", () => OpenRpgResortWardrobe(fromShop: true)));
+                if (!IsGxCampaign) actions.Add(("ResortShop", "여름 리조트 의상", () => OpenRpgResortWardrobe(fromShop: true)));
             }
             int hearts = CollectionProgress.RpgAffinity / CollectionProgress.RpgAffinityPerHeart;
-            if (partner && hearts > 0)
+            if (!IsGxCampaign && partner && hearts > 0)
                 actions.Add(("BondTalk", "특별 대화", () => StartTypingDialogue(conversation, RpgBondLines[speaker][hearts - 1])));
             actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));
             AddRpgConversationActions(panel, actions);
@@ -218,7 +219,7 @@ namespace YGOPortable.UI
                     bool saved = CollectionProgress.TrySaveRpgCheckpoint(false, out string result);
                     if (saved)
                     {
-                        PlayerPrefs.SetString(RpgRegionPreference, RpgRegions[_rpgLocation].Id);
+                        PlayerPrefs.SetString(RpgRegionPreference, CampaignRegions[_rpgLocation].Id);
                         PlayerPrefs.Save();
                     }
                     StartTypingDialogue(text, saved ? "현재 진행을 저장했습니다." : result);
@@ -265,7 +266,7 @@ namespace YGOPortable.UI
                 DuelUiKit.WhiteSprite, new Color(.012f, .023f, .040f, 1f), false, false);
             _rpgTravelBanner = Area(_body, "RegionBanner", .27f, .108f, .73f, .201f);
             RpgUiStyle.Panel(_rpgTravelBanner, accent: true);
-            HudLabel(_rpgTravelBanner, RpgRegions[_rpgLocation].Name, 27, DuelUiKit.GoldAccent,
+            HudLabel(_rpgTravelBanner, CampaignRegions[_rpgLocation].Name, 27, DuelUiKit.GoldAccent,
                 align: TextAnchor.MiddleCenter, heading: true);
             BuildRpgPartnerGreeting();
         }
@@ -297,7 +298,7 @@ namespace YGOPortable.UI
 
         private void BeginRpgTravel(int region, Vector2 arrival)
         {
-            if (_rpgPendingRegion >= 0 || !RpgRegions[region].IsOpen(RpgClears)) return;
+            if (_rpgPendingRegion >= 0 || !CampaignRegions[region].IsOpen(RpgClears)) return;
             _rpgPendingRegion = region;
             _rpgPendingArrival = arrival;
             _rpgTravelTime = 0f;

@@ -82,8 +82,7 @@ namespace YGOPortable.Editor
                 Require(rows.childCount == 50 && rows.Find("Episode_50").gameObject.activeInHierarchy,
                     "Episode 50 was missing from the RPG selection.");
 
-                var loaded = (StoryScriptRoot)typeof(StoryModeUI).GetField("_rpgScript",
-                    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(story);
+                var loaded = story.GetRpgScript(StoryModeUI.RpgSeriesId);
                 for (int i = 0; i < loaded.episodes.Length; i++)
                 {
                     var episode = loaded.episodes[i];

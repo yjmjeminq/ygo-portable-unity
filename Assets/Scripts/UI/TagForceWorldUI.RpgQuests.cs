@@ -168,6 +168,7 @@ namespace YGOPortable.UI
 
         private void BuildRpgQuestJournal()
         {
+            if (IsGxCampaign) { BuildGxStoryJournal(); return; }
             const int perPage = 4;
             BuildRpgMenuBackdrop();
             int clears = RpgClears;

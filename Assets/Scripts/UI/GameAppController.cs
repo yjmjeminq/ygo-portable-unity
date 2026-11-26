@@ -352,16 +352,20 @@ namespace YGOPortable.UI
             ShowScreen(AppScreen.StoryMode);
         }
 
-        internal void OpenRpgField()
+        internal void OpenRpgField() => OpenRpgField(StoryModeUI.RpgSeriesId);
+
+        internal void OpenGxRpgField() => OpenRpgField(StoryModeUI.GxRpgSeriesId);
+
+        private void OpenRpgField(string seriesId)
         {
-            _tagForceWorld.PrepareRpgField(openIntro: true);
+            if (!_tagForceWorld.PrepareRpgField(openIntro: true, seriesId: seriesId)) return;
             ShowScreen(AppScreen.TagForceWorld);
         }
 
         internal void OpenRpgFieldEpisode(int index)
         {
             if (_screen != AppScreen.TagForceWorld || !_tagForceWorld.CanStartRpgEpisode(index)) return;
-            _storyMode.UseRpgCampaign(true, fromField: true);
+            _storyMode.UseRpgCampaign(true, fromField: true, seriesId: _tagForceWorld.RpgCampaignId);
             ShowScreen(AppScreen.StoryMode);
             _storyMode.OpenFieldEpisode(index);
         }
@@ -388,7 +392,7 @@ namespace YGOPortable.UI
         {
             if (_screen != AppScreen.TagForceWorld || _tagForceWorld.RpgClears == 0) return;
             int episode = _tagForceWorld.RpgClears - 1;
-            _storyMode.UseRpgCampaign(true, fromField: true);
+            _storyMode.UseRpgCampaign(true, fromField: true, seriesId: _tagForceWorld.RpgCampaignId);
             ShowScreen(AppScreen.StoryMode);
             _storyMode.OpenFieldRecap(episode);
         }
@@ -550,7 +554,12 @@ namespace YGOPortable.UI
 
         internal void StartStoryDuel(StoryEpisodeData episode, UserDeck myDeck, bool playerGoesFirst, StoryBattlePlan plan = default)
         {
-            if (_screen != AppScreen.StoryMode || !_storyMode.CanPlay(episode)) return;
+            if (_screen != AppScreen.StoryMode || !_storyMode.CanPlay(episode) || episode.isCutsceneOnly) return;
+            if (episode.forcedPlayerDeckId != 0)
+            {
+                myDeck = _storyMode.ForcedDeckFor(episode);
+                if (myDeck == null) { _storyMode.ShowStatus("시점 전용 덱을 불러오지 못했습니다."); return; }
+            }
             if (!CollectionProgress.CanEquipRaidSupports(plan.Supports, _storyMode.GetRaid(episode).HasValue))
             {
                 _storyMode.ShowStatus("장착한 아이템을 확인하세요.");
@@ -561,11 +570,13 @@ namespace YGOPortable.UI
             var opponent = DeckRepository.GetCharacter(episode.charId);
             var (deck, level, levelCount) = _storyMode.GetOpponentMatch(episode);
             float deckStrength = levelCount > 1 ? (level - 1f) / (levelCount - 1f) : (episode.chapter - 1f) / 4f;
+            bool gxRpg = _storyMode.IsGxRpg;
+            if (gxRpg) deckStrength = (Mathf.Clamp(deck?.difficultyTier ?? 1, 1, 4) - 1f) / 3f;
             bool elite = levelCount > 0 && level >= Math.Min(9, levelCount);
             float planningScale = elite || _storyMode.GetRaid(episode) != null ? ComboSearch.MaxPlanningScale :
                 Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, deckStrength);
             StartDuelMatch(opponent, deck, myDeck, playerGoesFirst, isStoryDuel: true, planningScale: planningScale,
-                opponentDifficulty: elite ? AIDifficulty.Master : AiDifficulty);
+                opponentDifficulty: gxRpg || elite ? AIDifficulty.Master : AiDifficulty);
         }
 
         internal void StartTournamentDuel(DimensionTournament run, UserDeck myDeck)
@@ -608,7 +619,7 @@ namespace YGOPortable.UI
             bool isTagForceDuel = false, AIDifficulty? opponentDifficulty = null)
         {
             bool rpgOpponent = (isStoryDuel && _storyMode.IsRpgCampaign) ||
-                (isTagForceDuel && _activeTagForce?.SeriesId == TagForceWorldUI.RpgPracticeId);
+                (isTagForceDuel && TagForceWorldUI.IsRpgPractice(_activeTagForce?.SeriesId));
             AIDifficulty duelDifficulty = rpgOpponent ? AIDifficulty.Master : opponentDifficulty ?? AiDifficulty;
             if (rpgOpponent) planningScale = ComboSearch.MaxPlanningScale;
             bool isCampaignMatch = isStoryDuel || isTournamentDuel || isRankedDuel || isTagForceDuel;
@@ -630,10 +641,13 @@ namespace YGOPortable.UI
                 oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
             }
             var duelDeck = myDeck;
-            string reason;
-            bool deckReady = CollectionProgress.Initialized
-                ? CollectionProgress.TryPrepareDeckForDuel(myDeck, out duelDeck, out reason)
-                : CanStartWithDeck(myDeck, out reason);
+            bool forcedStoryDeck = isStoryDuel && _storyMode.IsGxRpg && _activeStoryEpisode.forcedPlayerDeckId != 0;
+            string reason = "시점 전용 덱의 카드 구성을 확인하세요.";
+            bool deckReady = forcedStoryDeck ? myDeck?.IsPlayable == true &&
+                    myDeck.main.Concat(myDeck.extra).All(code => CardDatabase.Get(code) != null)
+                : CollectionProgress.Initialized
+                    ? CollectionProgress.TryPrepareDeckForDuel(myDeck, out duelDeck, out reason)
+                    : CanStartWithDeck(myDeck, out reason);
             if (!deckReady)
             {
                 ShowDuelStartFailure(isStoryDuel, reason, isTournamentDuel, isRankedDuel, isTagForceDuel);
@@ -679,6 +693,15 @@ namespace YGOPortable.UI
             _session.PreparePlayerIndices(playerGoesFirst);
             _session.OnCardsShuffled += DuelAudio.PlayShuffle;
             _duelField.BindSession(_session, oppChar, oppDeck);
+            if (isStoryDuel && _storyMode.IsGxRpg)
+            {
+                int character = _activeStoryEpisode.playAsCharacterId;
+                _duelField.SetStoryPlayer(character > 0 ? DeckRepository.GetCharacter(character)?.name : _tagForceWorld.RpgHeroName,
+                    _tagForceWorld.RpgDuelPortrait(character));
+                _duelField.SetStoryOpponent(_activeStoryEpisode.opponentName,
+                    _tagForceWorld.RpgDuelPortrait(TagForceWorldUI.StageOpponentId(_activeStoryEpisode)));
+            }
+            else _duelField.SetStoryPlayer(null, null);
             _duelField.RefreshChainConfirmation(ChainConfirmation);
             if (!_session.StartNewDuel(
                 duelDeck.main, duelDeck.extra,
@@ -696,7 +719,7 @@ namespace YGOPortable.UI
                 ShowDuelStartFailure(isStoryDuel, error);
                 return;
             }
-            CollectionProgress.RememberDuelDeck(myDeck.id);
+            if (!forcedStoryDeck) CollectionProgress.RememberDuelDeck(myDeck.id);
             _duelField.Refresh();
         }
 
@@ -829,10 +852,11 @@ namespace YGOPortable.UI
                         string result = "듀얼 결과가 기록되지 않았습니다.";
                         int previousRank = CollectionProgress.RpgRank;
                         bool rewarded = _session.Winner >= 0 &&
-                            (worldDuel.SeriesId == TagForceWorldUI.RpgPracticeId
-                                ? CollectionProgress.TryAwardRpgPractice(worldDuel.Deck, won, draw, out result)
+                            (TagForceWorldUI.IsRpgPractice(worldDuel.SeriesId)
+                                ? CollectionProgress.TryAwardRpgPractice(worldDuel.Deck, won, draw, out result,
+                                    awardPartnerAffinity: worldDuel.SeriesId == TagForceWorldUI.RpgPracticeId)
                                 : TagForceManager.TryFinishDuel(worldDuel, won, draw, out result));
-                        if (rewarded && worldDuel.SeriesId == TagForceWorldUI.RpgPracticeId)
+                        if (rewarded && TagForceWorldUI.IsRpgPractice(worldDuel.SeriesId))
                             _tagForceWorld.QueueRpgRankNotice(previousRank);
                         ShowScreen(AppScreen.TagForceWorld);
                         _tagForceWorld.ShowResult(worldDuel, won, result, rewarded);
@@ -868,8 +892,8 @@ namespace YGOPortable.UI
                         {
                             int previousRank = CollectionProgress.RpgRank;
                             int previousXp = CollectionProgress.RpgExperience;
-                            if (!CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, opponentDeck, plan,
-                                out var prize, out string error, rpgField: fromField)) return error;
+                            if (!CollectionProgress.TryAwardStoryDuel(_storyMode.ProgressIdFor(episode), won, raid, opponentDeck, plan,
+                                out var prize, out string error, rpgField: fromField, awardPartnerAffinity: !_storyMode.IsGxRpg)) return error;
                             if (fromField) _tagForceWorld.QueueRpgRankNotice(previousRank);
                             int gained = CollectionProgress.RpgExperience - previousXp;
                             return FormatStoryPrize(prize) + (gained > 0 ? $" · +{gained} EXP" : "");

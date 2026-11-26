@@ -59,14 +59,14 @@ namespace YGOPortable.UI
         private void BuildRpgExploration(int cleared)
         {
             _rpgFieldObjects = DuelUiKit.FillRect("Exploration", _rpgSceneSpace);
-            foreach (var (from, exit, to, entrance) in RpgPaths)
+            foreach (var (from, exit, to, entrance) in CampaignRoutes)
             {
                 if (_rpgLocation == from) AddExit(exit, to, entrance);
                 if (_rpgLocation == to) AddExit(entrance, from, exit);
             }
             UpdateRpgExitSigns();
 
-            var landmark = RpgLandmarks[_rpgLocation];
+            var landmark = CampaignLandmark(_rpgLocation);
             var marker = Anchor(_rpgFieldObjects, "Landmark", landmark.Position, new Vector2(146f, 31f));
             void Inspect() => MoveTo(landmark.Position, OpenRpgLandmark);
             RpgButton(marker, landmark.Name, Inspect, 16);
@@ -75,19 +75,19 @@ namespace YGOPortable.UI
 
             void AddExit(int slot, int destination, int entry)
             {
-                bool open = RpgRegions[destination].IsOpen(cleared);
+                bool open = CampaignRegions[destination].IsOpen(cleared);
                 var gate = Anchor(_rpgFieldObjects, $"Exit_{destination}",
                     RpgExitPoints[slot] + new Vector2(0f, .047f), new Vector2(196f, 32f));
                 _rpgExitSigns.Add(gate);
                 string arrow = slot switch { 0 => "‹", 1 => "›", _ => "↑" };
                 void Go() => MoveTo(RpgExitPoints[slot], () => FollowRpgExit(destination, entry));
-                var button = RpgButton(gate, open ? $"{arrow}  {RpgRegions[destination].Name}" :
-                    $"{RpgRegions[destination].Name} · 이야기 진행 시 개방", Go, 15);
+                var button = RpgButton(gate, open ? $"{arrow}  {CampaignRegions[destination].Name}" :
+                    $"{CampaignRegions[destination].Name} · 이야기 진행 시 개방", Go, 15);
                 button.interactable = open;
                 if (!open) return;
                 _rpgExits.Add((slot, destination, entry));
                 var target = Anchor(_rpgFieldObjects, $"ExitTarget_{destination}", RpgExitPoints[slot], Vector2.zero);
-                RegisterRpgInteraction(target, $"{RpgRegions[destination].Name} · 이동", Go, RpgActionPriority.Exit);
+                RegisterRpgInteraction(target, $"{CampaignRegions[destination].Name} · 이동", Go, RpgActionPriority.Exit);
             }
         }
 
@@ -134,7 +134,7 @@ namespace YGOPortable.UI
         }
 
         private bool RpgLandmarkIsNear =>
-            RpgArtDirection(RpgLandmarks[_rpgLocation].Position - _position).sqrMagnitude <= .085f * .085f;
+            RpgArtDirection(CampaignLandmark(_rpgLocation).Position - _position).sqrMagnitude <= .085f * .085f;
 
         private void OpenRpgLandmark()
         {
@@ -146,10 +146,10 @@ namespace YGOPortable.UI
         private void BuildRpgLandmarkTalk()
         {
             BeginRpgTalkBackdrop();
-            var landmark = RpgLandmarks[_rpgLocation];
+            var landmark = CampaignLandmark(_rpgLocation);
             var state = RpgCouplerState;
             var quest = RpgCouplerQuest;
-            bool garage = _rpgLocation == RpgGarage, bridge = _rpgLocation == RpgBridge;
+            bool garage = !IsGxCampaign && _rpgLocation == RpgGarage, bridge = !IsGxCampaign && _rpgLocation == RpgBridge;
             string line = landmark.Description;
             var actions = new List<(string Id, string Label, Action Select)>();
             if (garage && IsRpgQuestOpen(quest, RpgClears))
@@ -212,7 +212,7 @@ namespace YGOPortable.UI
         {
             if (_rpgLandmarkLabel != null)
             {
-                var name = RpgLandmarks[_rpgLocation].Name;
+                var name = CampaignLandmark(_rpgLocation).Name;
                 string caption = CanWalk && RpgLandmarkIsNear ? $"조사 · {name}" : name;
                 if (_rpgLandmarkLabel.text != caption) _rpgLandmarkLabel.text = caption;
             }

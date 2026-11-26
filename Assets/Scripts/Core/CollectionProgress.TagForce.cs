@@ -84,14 +84,15 @@ namespace YGOPortable.Core
             return Write(next, owned, out error, special);
         }
 
-        internal static bool TryAwardRpgPractice(PresetDeckInfo deck, bool won, bool draw, out string result)
+        internal static bool TryAwardRpgPractice(PresetDeckInfo deck, bool won, bool draw, out string result,
+            bool awardPartnerAffinity = true)
         {
             if (!CanTransact(out result)) return false;
             int dp = Math.Min(int.MaxValue - Balance, won ? 300 : draw ? 160 : 130);
             var next = WithBalance(Balance + dp);
             int previousXp = RpgExperience;
             RpgBondReward bondReward = default;
-            if (won) dp += ApplyRpgDuelGrowth(next, story: false, out bondReward);
+            if (won) dp += ApplyRpgDuelGrowth(next, story: false, out bondReward, awardPartnerAffinity);
             var owned = _owned;
             uint reward = 0;
             if (won)

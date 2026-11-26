@@ -76,6 +76,12 @@ namespace YGOPortable.Core
             return null;
         }
 
+        internal static TagForceData LoadRpgConfiguration(string directory, string seriesId)
+        {
+            var data = Read(directory, $"tagforce_{seriesId}.json");
+            return data?.seriesId == seriesId && data.HasSpots() ? data : null;
+        }
+
         private static TagForceData ReadScenario(string directory, string name) =>
             Read(Path.Combine(directory, "TagForce"), name) ?? Read(directory, name);
 
@@ -230,12 +236,22 @@ namespace YGOPortable.Core
     {
         public int charId;
         public string spotId;
+        public int unlockAfter;
+        public TagForceVisitMove[] storyMoves;
+    }
+
+    [Serializable] internal sealed class TagForceVisitMove
+    {
+        public int after;
+        public string spotId;
     }
 
     [Serializable] internal sealed class TagForceSpot
     {
-        public string spotId, name, subtitle, mapPath;
-        public string[] defaultPickups;
+        public string spotId, name, subtitle, mapPath, fieldTheme;
+        public float worldX, worldY;
+        public int unlockAfter;
+        public string[] defaultPickups, routes;
     }
 
     [Serializable] internal sealed class TagForcePaths

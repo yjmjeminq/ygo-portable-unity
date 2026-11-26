@@ -41,6 +41,10 @@ namespace YGOPortable.UI
         public int charId;
         public string opponentName;
         public int deckId;
+        public string regionId;
+        public bool isCutsceneOnly;
+        public int playAsCharacterId;
+        public int forcedPlayerDeckId;
         public StoryDialogueLine[] preDialogues;
         public StoryDialogueLine[] postWinDialogues;
         public StoryDialogueLine[] postLoseDialogues;
@@ -67,7 +71,9 @@ namespace YGOPortable.UI
     {
         internal const int TotalStoryEpisodes = StoryCampaign.EpisodeCount;
         private const int ActCount = 5;
-        private const string RpgSeriesId = "5ds";
+        internal const string RpgSeriesId = "5ds";
+        internal const string GxRpgSeriesId = "gx";
+        private const int GxRpgEpisodeCount = 53;
         private const string RpgMachine = "스트라이크 팽";
         private const float EpisodeRowHeight = 52f;
         private static readonly (string Id, string Label)[] Series =
@@ -80,10 +86,10 @@ namespace YGOPortable.UI
         private readonly System.Random _turnOrderRandom;
         private readonly (string Id, Button Button, StoryScriptRoot Script)[] _seriesTabs;
         private readonly List<UserDeck> _playableDecks = new();
-        private readonly Button[] _episodeButtons = new Button[StoryCampaign.LegacyEpisodeCount];
+        private readonly Button[] _episodeButtons = new Button[GxRpgEpisodeCount];
         private readonly RectTransform _episodeRows;
-        private readonly StoryScriptRoot _rpgScript;
-        private readonly Dictionary<int, PresetDeckInfo> _rpgDecks;
+        private readonly Dictionary<string, (StoryScriptRoot Script, Dictionary<int, PresetDeckInfo> Decks)> _rpgCampaigns;
+        private string _rpgSeriesId = RpgSeriesId;
         private readonly ScrollRect _episodeScroll;
         private readonly CanvasGroup _browser;
         private readonly Image _backdrop;
@@ -116,13 +122,15 @@ namespace YGOPortable.UI
         internal GameObject Root { get; }
         internal GameObject ActiveRoot => _rpgFaceoff != null ? _rpgFaceoff.gameObject : _dialogue.IsOpen ? _dialogue.ActiveRoot : Root;
 
-        private StoryScriptRoot Script => _rpgWorld ? _rpgScript : _seriesTabs[_selectedSeries].Script;
+        private StoryScriptRoot Script => _rpgWorld ? GetRpgScript(_rpgSeriesId) : _seriesTabs[_selectedSeries].Script;
+
+        internal StoryScriptRoot GetRpgScript(string seriesId) => _rpgCampaigns[seriesId].Script;
         internal StoryModeUI(GameAppController app, Transform parent, System.Random turnOrderRandom = null)
         {
             _app = app;
             _turnOrderRandom = turnOrderRandom ?? new System.Random();
-            _rpgScript = LoadRpgScript(Application.streamingAssetsPath);
-            _rpgDecks = LoadRpgDecks(Application.streamingAssetsPath);
+            _rpgCampaigns = new[] { RpgSeriesId, GxRpgSeriesId }.ToDictionary(id => id,
+                id => (LoadRpgScript(Application.streamingAssetsPath, id), LoadRpgDecks(Application.streamingAssetsPath, id)));
             var root = DuelUiKit.FillRect("Screen_StoryMode", parent);
             Root = root.gameObject;
             _backdrop = DuelUiKit.AddImage(root.gameObject, DuelUiChrome.Backdrop, Color.white, false, false);
@@ -190,9 +198,32 @@ namespace YGOPortable.UI
         private Action _finishFieldResult;
         internal bool FromRpgField { get; private set; }
         internal bool IsRpgCampaign => _rpgWorld;
+        internal bool IsGxRpg => _rpgWorld && _rpgSeriesId == GxRpgSeriesId;
 
-        internal void UseRpgCampaign(bool enabled, bool fromField = false)
+        internal static string RpgProgressId(StoryEpisodeData episode, string seriesId) =>
+            seriesId == GxRpgSeriesId ? "gx_rpg/" + episode.id : episode.id;
+
+        internal string ProgressIdFor(StoryEpisodeData episode) => _rpgWorld ? RpgProgressId(episode, _rpgSeriesId) : episode.id;
+
+        internal UserDeck ForcedDeckFor(StoryEpisodeData episode)
         {
+            if (!IsGxRpg || episode.forcedPlayerDeckId == 0 ||
+                !_rpgCampaigns[_rpgSeriesId].Decks.TryGetValue(episode.forcedPlayerDeckId, out var deck) ||
+                deck.charId != episode.playAsCharacterId)
+                return null;
+            return new UserDeck
+            {
+                id = $"gx-rpg-pov-{deck.id}", name = deck.title,
+                main = deck.main.ToList(), extra = deck.extra.ToList(), side = deck.side.ToList(),
+            };
+        }
+
+        private bool HasEpisodeDeck(StoryEpisodeData episode) =>
+            episode.forcedPlayerDeckId != 0 ? ForcedDeckFor(episode) != null : _playableDecks.Count > 0;
+
+        internal void UseRpgCampaign(bool enabled, bool fromField = false, string seriesId = RpgSeriesId)
+        {
+            _rpgSeriesId = seriesId;
             _rpgWorld = enabled;
             FromRpgField = fromField;
         }
@@ -345,7 +376,7 @@ namespace YGOPortable.UI
         {
             int episodeIndex = IndexOf(episode);
             if (episodeIndex < 0) return default;
-            if (_rpgWorld) return (_rpgDecks.GetValueOrDefault(episode.deckId), 0, 0);
+            if (_rpgWorld) return (_rpgCampaigns[_rpgSeriesId].Decks.GetValueOrDefault(episode.deckId), 0, 0);
 
             var decks = OpponentDeckLevels.GetDecks(episode.charId);
             if (decks.Count == 0) decks = DeckRepository.GetDecksForCharacter(episode.charId);
@@ -413,8 +444,8 @@ namespace YGOPortable.UI
 
         internal static StoryScriptRoot LoadScript(string streamingAssets, string seriesId)
         {
-            string path = Path.Combine(streamingAssets, seriesId == RpgSeriesId
-                ? "story_5ds_classic_script.json" : $"story_{seriesId}_script.json");
+            string path = Path.Combine(streamingAssets, seriesId is RpgSeriesId or GxRpgSeriesId
+                ? $"story_{seriesId}_classic_script.json" : $"story_{seriesId}_script.json");
             try
             {
                 var script = JsonUtility.FromJson<StoryScriptRoot>(File.ReadAllText(path));
@@ -465,24 +496,36 @@ namespace YGOPortable.UI
             }
         }
 
-        internal static StoryScriptRoot LoadRpgScript(string streamingAssets)
+        internal static StoryScriptRoot LoadRpgScript(string streamingAssets, string seriesId = RpgSeriesId)
         {
             try
             {
                 var script = JsonUtility.FromJson<StoryScriptRoot>(
-                    File.ReadAllText(Path.Combine(streamingAssets, "story_5ds_script.json")));
-                if (script?.seriesId?.Equals(RpgSeriesId, StringComparison.OrdinalIgnoreCase) != true ||
-                    script.episodes?.Length != StoryCampaign.LegacyEpisodeCount)
-                    throw new InvalidDataException("Expected the 50-episode RPG script.");
+                    File.ReadAllText(Path.Combine(streamingAssets, $"story_{seriesId}_script.json")));
+                bool gx = seriesId == GxRpgSeriesId;
+                if (script?.seriesId?.Equals(seriesId, StringComparison.OrdinalIgnoreCase) != true ||
+                    script.episodes?.Length != (gx ? GxRpgEpisodeCount : StoryCampaign.LegacyEpisodeCount))
+                    throw new InvalidDataException($"Incomplete {seriesId} RPG script.");
+                int duel = 0;
                 for (int i = 0; i < script.episodes.Length; i++)
                 {
                     var episode = script.episodes[i];
-                    if (episode == null || episode.deckId != 59001 + i || string.IsNullOrWhiteSpace(episode.title) ||
-                        !HasDialogue(episode.preDialogues) || !HasDialogue(episode.postWinDialogues) || !HasDialogue(episode.postLoseDialogues))
-                        throw new InvalidDataException($"Invalid RPG episode {i + 1}.");
-                    episode.id = $"5ds_rpg_ep_{i + 1:00}";
-                    if (episode.gimmick == "none") episode.gimmick = null;
+                    if (episode == null || string.IsNullOrWhiteSpace(episode.title) || !HasDialogue(episode.preDialogues) ||
+                        (gx && (string.IsNullOrWhiteSpace(episode.id) || string.IsNullOrWhiteSpace(episode.regionId))))
+                        throw new InvalidDataException($"Invalid {seriesId} RPG episode {i + 1}.");
+                    if (gx && episode.isCutsceneOnly)
+                    {
+                        if (episode.deckId != 0) throw new InvalidDataException($"Unexpected deck in {episode.id}.");
+                        continue;
+                    }
+                    if (episode.deckId != (gx ? 69001 : 59001) + duel++ ||
+                        !HasDialogue(episode.postWinDialogues) || !HasDialogue(episode.postLoseDialogues))
+                        throw new InvalidDataException($"Invalid {seriesId} RPG duel at episode {i + 1}.");
+                    if (!gx) episode.id = $"5ds_rpg_ep_{i + 1:00}";
+                    if (episode.gimmick == "none" || string.IsNullOrWhiteSpace(episode.gimmick)) episode.gimmick = null;
                 }
+                if (gx && (duel != 34 || script.episodes.Select(episode => episode.id).Distinct().Count() != GxRpgEpisodeCount))
+                    throw new InvalidDataException("Expected 34 duels and 19 unique GX cutscenes.");
                 return script;
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException || error is ArgumentException ||
@@ -493,18 +536,22 @@ namespace YGOPortable.UI
             }
         }
 
-        internal static Dictionary<int, PresetDeckInfo> LoadRpgDecks(string streamingAssets)
+        internal static Dictionary<int, PresetDeckInfo> LoadRpgDecks(string streamingAssets, string seriesId = RpgSeriesId)
         {
             var decks = new Dictionary<int, PresetDeckInfo>();
             try
             {
                 var data = JsonUtility.FromJson<OpponentsDbWrapper>(
-                    File.ReadAllText(Path.Combine(streamingAssets, "story_5ds_rpg_decks.json")));
+                    File.ReadAllText(Path.Combine(streamingAssets, $"story_{seriesId}_rpg_decks.json")));
                 foreach (var deck in data?.decks ?? Array.Empty<PresetDeckInfo>())
                 {
-                    if (deck?.id is >= 59001 and <= 59050 && deck.main?.Length is >= 40 and <= 60 &&
-                        deck.extra?.Length <= 15 && deck.side?.Length <= 15)
-                        decks.TryAdd(deck.id, deck);
+                    if (deck == null || deck.main?.Length is not (>= 40 and <= 60) ||
+                        deck.extra?.Length is not (>= 0 and <= 15) || deck.side?.Length is not (>= 0 and <= 15))
+                        continue;
+                    bool validId = seriesId == GxRpgSeriesId
+                        ? deck.id is >= 69001 and <= 69034 or >= 69101 and <= 69103
+                        : deck.id is >= 59001 and <= 59050;
+                    if (validId) decks.TryAdd(deck.id, deck);
                 }
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException || error is ArgumentException)
@@ -533,7 +580,7 @@ namespace YGOPortable.UI
             if (Script == null) _unlockedIndex = 0;
             else
             {
-                int nextEpisode = Array.FindIndex(Script.episodes, episode => !CollectionProgress.IsStoryEpisodeCleared(episode.id));
+                int nextEpisode = Array.FindIndex(Script.episodes, episode => !CollectionProgress.IsStoryEpisodeCleared(ProgressIdFor(episode)));
                 _unlockedIndex = nextEpisode >= 0 ? nextEpisode : Script.episodes.Length - 1;
             }
             SelectEpisode(_unlockedIndex);
@@ -558,7 +605,7 @@ namespace YGOPortable.UI
                 int episodeIndex = row;
                 var episode = Script.episodes[episodeIndex];
                 _episodeButtons[row].interactable = true;
-                bool cleared = CollectionProgress.IsStoryEpisodeCleared(episode.id);
+                bool cleared = CollectionProgress.IsStoryEpisodeCleared(ProgressIdFor(episode));
                 bool locked = episodeIndex > _unlockedIndex;
                 string state = cleared ? "클리어" : locked ? "잠김" : "도전 가능";
                 var label = _episodeButtons[row].GetComponentInChildren<Text>();
@@ -578,16 +625,21 @@ namespace YGOPortable.UI
             _portrait.sprite = DuelUiKit.LoadOpponentPortrait(opponent);
             _portrait.enabled = _portrait.sprite != null;
             var (deck, level, levelCount) = GetOpponentMatch(current);
-            _opponentDeck.text = deck == null ? "" : levelCount == 0 ? deck.title : $"Lv. {level}/{levelCount}  ·  {deck.title}";
-            bool ready = opponent != null && deck != null;
+            _opponentDeck.text = deck == null ? "" : IsGxRpg ? $"{GxDeckPreview(deck)}\n{deck.title}" :
+                levelCount == 0 ? deck.title : $"Lv. {level}/{levelCount}  ·  {deck.title}";
+            bool ready = current.isCutsceneOnly || (opponent != null && deck != null);
+            _deckPicker.interactable = current.forcedPlayerDeckId == 0 && !current.isCutsceneOnly && _playableDecks.Count > 0;
             _start.interactable = CanPlay(current) && ready;
             string status = !CanPlay(current) ? "이전 에피소드를 클리어하면 열립니다." :
                 !ready ? "상대 덱을 불러오지 못했습니다." :
-                _playableDecks.Count == 0 ? DuelDeckAvailability.ExplainEmptyList(_deckId) : "";
+                !current.isCutsceneOnly && !HasEpisodeDeck(current) ? DuelDeckAvailability.ExplainEmptyList(_deckId) : "";
             ShowStatus(GetRaid(current) is { } raidInfo
                 ? string.IsNullOrEmpty(status) ? raidInfo.Summary : $"{raidInfo.Summary}\n{status}"
                 : status);
         }
+
+        internal static string GxDeckPreview(PresetDeckInfo deck) =>
+            deck == null ? "" : $"★{deck.difficultyTier} · {deck.subtitle}";
 
         private void LoadDeckChoices()
         {
@@ -617,6 +669,11 @@ namespace YGOPortable.UI
         {
             SelectEpisode(index);
             var episode = Script.episodes[index];
+            if (episode.isCutsceneOnly)
+            {
+                PlayDialogue(episode, episode.preDialogues, TitleOf(episode), CompleteScene);
+                return;
+            }
             var raid = GetRaid(episode);
             _stance = StoryStance.Neutral;
             _supports = RaidSupport.None;
@@ -634,16 +691,26 @@ namespace YGOPortable.UI
                         _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
                     })).ToArray()));
 
+            void CompleteScene()
+            {
+                if (CollectionProgress.TryClearStoryScene(ProgressIdFor(episode), out string error))
+                    _app.ReturnToRpgField();
+                else _dialogue.ShowChoices(() => error, new StoryChoice("진행도 다시 저장", CompleteScene));
+            }
+
             void ShowPreparation()
             {
-                _dialogue.ShowChoices(() => PreparationSummary(episode, raid, deck),
-                    new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => _playableDecks.Count > 0),
-                    new("내 덱 변경", PickDeck),
-                    new("대화 다시 보기", () => OpenEpisode(index)),
-                    new(FromRpgField ? "필드로 돌아가기" : "에피소드 목록으로", ReturnToEpisodes),
-                    new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)),
-                    new("상대 시작 조건 변경", () => PickOpponentOpening(episode, ShowPreparation)));
-                if (_rpgWorld && !pickedInitialDeck)
+                var actions = new List<StoryChoice>
+                {
+                    new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => HasEpisodeDeck(episode)),
+                };
+                if (episode.forcedPlayerDeckId == 0) actions.Add(new("내 덱 변경", PickDeck));
+                actions.Add(new("대화 다시 보기", () => OpenEpisode(index)));
+                actions.Add(new(FromRpgField ? "필드로 돌아가기" : "에피소드 목록으로", ReturnToEpisodes));
+                actions.Add(new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)));
+                actions.Add(new("상대 시작 조건 변경", () => PickOpponentOpening(episode, ShowPreparation)));
+                _dialogue.ShowChoices(() => PreparationSummary(episode, raid, deck), actions.ToArray());
+                if (_rpgWorld && episode.forcedPlayerDeckId == 0 && !pickedInitialDeck)
                 {
                     pickedInitialDeck = true;
                     PickDeck();
@@ -664,7 +731,9 @@ namespace YGOPortable.UI
                 .Select(item => item.Name));
             string supports = equipped.Length > 0 ? $"\n장착 · {equipped}" : "";
             string machine = RidingMachineFor(episode) is { } ridingMachine ? $"\n카이 · D-휠 《{ridingMachine}》" : "";
-            return $"{SelectedStoryDeckLabel()}{machine}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 시작 패 {opponent.Hand}장{field}{supports}";
+            string loadout = ForcedDeckFor(episode) is { } pov ? $"아스카 시점 · {pov.name}" : SelectedStoryDeckLabel();
+            string difficulty = IsGxRpg && deck != null ? $"\n상대 · {GxDeckPreview(deck)}" : "";
+            return $"{loadout}{machine}{difficulty}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 시작 패 {opponent.Hand}장{field}{supports}";
         }
 
         private void PickOpponentOpening(StoryEpisodeData episode, Action restore)
@@ -718,8 +787,8 @@ namespace YGOPortable.UI
 
         private void ChooseTurnOrder(StoryEpisodeData episode, Action restore)
         {
-            if (_playableDecks.Count == 0 || _returnFromTurnOrder != null) return;
-            var myDeck = _playableDecks[_deckPicker.value];
+            if (!HasEpisodeDeck(episode) || _returnFromTurnOrder != null) return;
+            var myDeck = ForcedDeckFor(episode) ?? _playableDecks[_deckPicker.value];
             var rivalDeck = GetOpponentMatch(episode).Deck;
             if (rivalDeck == null) return;
             var plan = CurrentBattlePlan;
@@ -783,16 +852,19 @@ namespace YGOPortable.UI
             _browser.interactable = false;
             _browser.blocksRaycasts = false;
             var field = FromRpgField ? _app.RpgField : null;
+            string hero = episode.playAsCharacterId > 0 ? DeckRepository.GetCharacter(episode.playAsCharacterId)?.name ?? "아스카" :
+                Script.protagonist;
             if (field != null)
             {
                 if (field.Root.transform.GetSiblingIndex() > Root.transform.GetSiblingIndex())
                     field.Root.transform.SetSiblingIndex(Root.transform.GetSiblingIndex());
-                field.BeginRpgDialogue(episode, Script.protagonist, lines);
+                field.BeginRpgDialogue(episode, hero, lines);
                 _backdrop.enabled = false;
                 _browser.gameObject.SetActive(false);
             }
-            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field,
-                rpgEpisode: RpgWardrobe.EpisodeNumber(episode));
+            _dialogue.Open(heading, hero, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field,
+                rpgEpisode: RpgWardrobe.EpisodeNumber(episode), playAsCharacterId: episode.playAsCharacterId,
+                autoPlay: episode.isCutsceneOnly);
         }
 
         private void ReturnToEpisodes()

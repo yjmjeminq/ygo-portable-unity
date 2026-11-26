@@ -23,7 +23,7 @@ namespace YGOPortable.UI
         private string _rpgHeroName;
         private int _rpgLastLine;
         private int _rpgGuestSlots;
-        private int _rpgSceneEpisode;
+        private int _rpgSceneEpisode, _rpgSceneHeroId;
         internal bool RpgStageRunning => _rpgBeatRemaining > 0f;
 
         private readonly struct RpgStagePose
@@ -58,6 +58,7 @@ namespace YGOPortable.UI
             _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
             _rpgSceneEpisode = RpgWardrobe.EpisodeNumber(episode);
             _rpgLastPlayedSceneId = episode.id;
+            _rpgSceneHeroId = episode.playAsCharacterId;
             _rpgHeroName = hero;
             _rpgLastLine = -1;
             _moving = _manualWalk = _fieldMenu = false;
@@ -70,18 +71,22 @@ namespace YGOPortable.UI
             _rpgFieldHud.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(false);
 
-            _rpgResidents.TryGetValue(episode.charId, out _rpgDialogueOpponent);
-            if (_rpgDialogueOpponent == null || FieldOutfit(episode.charId) != RpgWardrobe.ForStory(episode.charId, _rpgSceneEpisode))
+            var entrances = new HashSet<int>(lines.SelectMany(line => line.stage ?? Array.Empty<StoryStageAction>())
+                .Where(action => action?.action == "enter").Select(action => action.actor));
+            int opponentId = StageOpponentId(episode);
+            _rpgResidents.TryGetValue(opponentId, out _rpgDialogueOpponent);
+            if (_rpgDialogueOpponent == null || !IsGxCampaign && FieldOutfit(opponentId) != RpgWardrobe.ForStory(opponentId, _rpgSceneEpisode))
             {
                 var mark = _rpgDialogueOpponent != null ? _rpgDialogueOpponent.anchorMin : RpgNpcSlots[0];
                 _rpgDialogueOpponent = Anchor(_rpgDialogueCast, "Opponent", mark, new Vector2(91f, 100f));
-                CreateStageWalker(_rpgDialogueOpponent, episode.charId, episode.opponentName);
+                CreateStageWalker(_rpgDialogueOpponent, opponentId, episode.opponentName);
             }
-            RegisterRpgActor(0, _player, _playerSprite, _position, true, false);
+            RegisterRpgActor(_rpgSceneHeroId, _player, _playerSprite, _position, true, false);
             var opponentArt = (_rpgDialogueOpponent.Find("SD") ?? _rpgDialogueOpponent.Find("Sprite")) as RectTransform;
-            var opponent = RegisterRpgActor(episode.charId, _rpgDialogueOpponent, opponentArt,
-                _rpgDialogueOpponent.anchorMin, true, false);
+            var opponent = RegisterRpgActor(opponentId, _rpgDialogueOpponent, opponentArt,
+                _rpgDialogueOpponent.anchorMin, !IsGxCampaign || !entrances.Contains(opponentId), false);
             _rpgStageSpeakers[episode.opponentName] = opponent;
+            if (opponentId == 0) _rpgStageSpeakers["주인공"] = opponent;
 
             foreach (var resident in _rpgResidentMotion)
                 resident.Marker.gameObject.SetActive(false);
@@ -92,15 +97,14 @@ namespace YGOPortable.UI
             _rpgTravelFade?.gameObject.SetActive(false);
             _rpgRankBanner?.gameObject.SetActive(false);
 
-            var entrances = new HashSet<int>(lines.SelectMany(line => line.stage ?? Array.Empty<StoryStageAction>())
-                .Where(action => action?.action == "enter").Select(action => action.actor));
             foreach (var line in lines)
             {
                 string name = line.speaker;
                 if (!string.IsNullOrWhiteSpace(name) && name is not ("설명" or "내레이션" or "나레이션") &&
                     !IsRpgHero(name) && !_rpgStageSpeakers.ContainsKey(name))
                 {
-                    int? id = _rpgCampaign?.episodes.FirstOrDefault(item => item.opponentName == name)?.charId ??
+                    int? id = _rpgSceneHeroId != 0 && IsOriginalRpgHero(name) ? 0 :
+                        _rpgCampaign?.episodes.FirstOrDefault(item => item.opponentName == name)?.charId ??
                         DeckRepository.Characters.FirstOrDefault(character => character.name == name ||
                             character.aliases?.Contains(name) == true)?.id;
                     _rpgStageSpeakers[name] = GetRpgStageGuest(name, id, id.HasValue && entrances.Contains(id.Value));
@@ -165,8 +169,8 @@ namespace YGOPortable.UI
         private RectTransform CreateStageWalker(RectTransform actor, int? id, string name)
         {
             if (id is not int character) return WalkerSprite(actor, null, name);
-            string outfit = RpgWardrobe.ForStory(character, _rpgSceneEpisode);
-            return WalkerSprite(actor, RpgArt + $"Characters_SD/sd_{id}.png", name,
+            string outfit = IsGxCampaign ? null : RpgWardrobe.ForStory(character, _rpgSceneEpisode);
+            return WalkerSprite(actor, CampaignSdPath(character), name,
                 outfit == null ? null : RpgWardrobe.WalkAtlas(character, outfit));
         }
 
@@ -188,7 +192,7 @@ namespace YGOPortable.UI
 
         private RpgStageActor RpgSpeaker(string name)
         {
-            if (IsRpgHero(name)) return _rpgStageIds[0];
+            if (IsRpgHero(name)) return _rpgStageIds.GetValueOrDefault(_rpgSceneHeroId);
             return name != null && _rpgStageSpeakers.TryGetValue(name, out var actor) ? actor : null;
         }
 
@@ -373,7 +377,10 @@ namespace YGOPortable.UI
             }
         }
 
-        private bool IsRpgHero(string name) => name == _rpgHeroName || name?.StartsWith("주인공", StringComparison.Ordinal) == true ||
+        private bool IsRpgHero(string name) => name == _rpgHeroName || (_rpgSceneHeroId > 0
+            ? name is "아스카" or "텐죠인 아스카" : IsOriginalRpgHero(name));
+
+        private static bool IsOriginalRpgHero(string name) => name?.StartsWith("주인공", StringComparison.Ordinal) == true ||
             name?.StartsWith("여주인공", StringComparison.Ordinal) == true;
 
         private void ClearRpgDialogue()

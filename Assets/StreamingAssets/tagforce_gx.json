@@ -1,4 +1,610 @@
 {
   "seriesId": "gx",
-  "useLegacyGx": true
+  "assetConfig": {
+    "worldMapPath": "TagForce/GX/Maps/world_map.png"
+  },
+  "spots": [
+    {
+      "spotId": "spot_main_academy",
+      "name": "듀얼 아카데미아 본관",
+      "subtitle": "강의실과 중앙 홀을 잇는 캠퍼스",
+      "mapPath": "TagForce/GX/Maps/spot_main_academy.png",
+      "worldX": 0.814,
+      "worldY": 0.678,
+      "unlockAfter": 0,
+      "defaultPickups": [
+        "dp_small",
+        "blue_queen_tea"
+      ],
+      "routes": [
+        "spot_blue_arena",
+        "spot_library",
+        "spot_infirmary",
+        "spot_harbor_beach"
+      ],
+      "fieldTheme": "campus"
+    },
+    {
+      "spotId": "spot_blue_arena",
+      "name": "오벨리스크 블루 아레나",
+      "subtitle": "상급생들이 실력을 겨루는 섬의 경기장",
+      "mapPath": "TagForce/GX/Maps/spot_blue_arena.png",
+      "worldX": 0.532,
+      "worldY": 0.509,
+      "unlockAfter": 19,
+      "defaultPickups": [
+        "dp_small"
+      ],
+      "routes": [
+        "spot_forest_duel_ground",
+        "spot_vending_bench",
+        "spot_volcano_arena"
+      ],
+      "fieldTheme": "arena"
+    },
+    {
+      "spotId": "spot_red_dorm",
+      "name": "오시리스 레드 기숙사",
+      "subtitle": "해안에 자리한 붉은 지붕의 기숙사",
+      "mapPath": "TagForce/GX/Maps/spot_red_dorm.png",
+      "worldX": 0.422,
+      "worldY": 0.266,
+      "unlockAfter": 3,
+      "defaultPickups": [
+        "dp_small",
+        "golden_egg_bread"
+      ],
+      "routes": [
+        "spot_vending_bench",
+        "spot_harbor_beach"
+      ],
+      "fieldTheme": "campus"
+    },
+    {
+      "spotId": "spot_forest_duel_ground",
+      "name": "숲속 듀얼장",
+      "subtitle": "별빛 아래 숨겨진 야외 듀얼 코트",
+      "mapPath": "TagForce/GX/Maps/spot_forest_duel_ground.png",
+      "worldX": 0.371,
+      "worldY": 0.649,
+      "unlockAfter": 4,
+      "defaultPickups": [
+        "dp_small",
+        "blue_queen_tea"
+      ],
+      "routes": [
+        "spot_abandoned_dorm",
+        "spot_darkness_altar"
+      ],
+      "fieldTheme": "forest"
+    },
+    {
+      "spotId": "spot_vending_bench",
+      "name": "자판기 벤치",
+      "subtitle": "기숙사 오솔길의 조용한 쉼터",
+      "mapPath": "TagForce/GX/Maps/spot_vending_bench.png",
+      "worldX": 0.529,
+      "worldY": 0.318,
+      "unlockAfter": 6,
+      "defaultPickups": [
+        "dp_small",
+        "golden_egg_bread"
+      ],
+      "routes": [],
+      "fieldTheme": "campus"
+    },
+    {
+      "spotId": "spot_library",
+      "name": "도서관",
+      "subtitle": "오래된 듀얼 연구 자료와 덱 노트를 보관하는 곳",
+      "mapPath": "TagForce/GX/Maps/spot_library.png",
+      "worldX": 0.903,
+      "worldY": 0.734,
+      "unlockAfter": 8,
+      "defaultPickups": [
+        "dp_small",
+        "blue_queen_tea"
+      ],
+      "routes": [],
+      "fieldTheme": "campus"
+    },
+    {
+      "spotId": "spot_abandoned_dorm",
+      "name": "폐기숙사",
+      "subtitle": "폐허가 된 옛 기숙사와 금지된 듀얼의 흔적",
+      "mapPath": "TagForce/GX/Maps/spot_abandoned_dorm.png",
+      "worldX": 0.213,
+      "worldY": 0.491,
+      "unlockAfter": 9,
+      "defaultPickups": [
+        "dp_small"
+      ],
+      "routes": [
+        "spot_dark_dimension"
+      ],
+      "fieldTheme": "dark"
+    },
+    {
+      "spotId": "spot_volcano_arena",
+      "name": "화산 결투장",
+      "subtitle": "용암과 증기가 솟는 위험한 암반 경기장",
+      "mapPath": "TagForce/GX/Maps/spot_volcano_arena.png",
+      "worldX": 0.577,
+      "worldY": 0.829,
+      "unlockAfter": 24,
+      "defaultPickups": [
+        "dp_small"
+      ],
+      "routes": [],
+      "fieldTheme": "volcano"
+    },
+    {
+      "spotId": "spot_harbor_beach",
+      "name": "항구와 해변",
+      "subtitle": "학생들을 실은 배가 드나드는 아카데미아의 관문",
+      "mapPath": "TagForce/GX/Maps/spot_harbor_beach.png",
+      "worldX": 0.786,
+      "worldY": 0.251,
+      "unlockAfter": 0,
+      "defaultPickups": [
+        "dp_small",
+        "golden_egg_bread"
+      ],
+      "routes": [],
+      "fieldTheme": "shore"
+    },
+    {
+      "spotId": "spot_infirmary",
+      "name": "의무실",
+      "subtitle": "파도가 보이는 조용한 회복 공간",
+      "mapPath": "TagForce/GX/Maps/spot_infirmary.png",
+      "worldX": 0.755,
+      "worldY": 0.585,
+      "unlockAfter": 22,
+      "defaultPickups": [
+        "dp_small",
+        "blue_queen_tea"
+      ],
+      "routes": [],
+      "fieldTheme": "campus"
+    },
+    {
+      "spotId": "spot_dark_dimension",
+      "name": "이차원 황야",
+      "subtitle": "포털 너머 탐험가가 길을 잃기 쉬운 황야",
+      "mapPath": "TagForce/GX/Maps/spot_dark_dimension.png",
+      "worldX": 0.132,
+      "worldY": 0.79,
+      "unlockAfter": 31,
+      "defaultPickups": [
+        "dp_small"
+      ],
+      "routes": [],
+      "fieldTheme": "dark"
+    },
+    {
+      "spotId": "spot_darkness_altar",
+      "name": "다크니스 제단",
+      "subtitle": "한밤중 검은 기운이 모여드는 외딴 제단",
+      "mapPath": "TagForce/GX/Maps/spot_darkness_altar.png",
+      "worldX": 0.27,
+      "worldY": 0.631,
+      "unlockAfter": 46,
+      "defaultPickups": [
+        "dp_small"
+      ],
+      "routes": [],
+      "fieldTheme": "dark"
+    }
+  ],
+  "roster": [
+    {
+      "charId": 107,
+      "spotId": "spot_main_academy",
+      "storyMoves": [
+        {
+          "after": 0,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 1,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 4,
+          "spotId": "spot_forest_duel_ground"
+        },
+        {
+          "after": 6,
+          "spotId": "spot_vending_bench"
+        },
+        {
+          "after": 9,
+          "spotId": "spot_abandoned_dorm"
+        },
+        {
+          "after": 10,
+          "spotId": "spot_vending_bench"
+        },
+        {
+          "after": 11,
+          "spotId": "spot_abandoned_dorm"
+        },
+        {
+          "after": 13,
+          "spotId": "spot_forest_duel_ground"
+        },
+        {
+          "after": 14,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 17,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 18,
+          "spotId": "spot_forest_duel_ground"
+        },
+        {
+          "after": 23,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 25,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 26,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 28,
+          "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 29,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 31,
+          "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 41,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 43,
+          "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 44,
+          "spotId": "spot_vending_bench"
+        },
+        {
+          "after": 46,
+          "spotId": "spot_darkness_altar"
+        },
+        {
+          "after": 49,
+          "spotId": "spot_red_dorm"
+        },
+        {
+          "after": 50,
+          "spotId": "spot_forest_duel_ground"
+        }
+      ]
+    },
+    {
+      "charId": 199,
+      "spotId": "spot_blue_arena",
+      "unlockAfter": 19
+    },
+    {
+      "charId": 119,
+      "spotId": "spot_red_dorm",
+      "storyMoves": [
+        {
+          "after": 0,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 1,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 3,
+          "spotId": "spot_red_dorm"
+        },
+        {
+          "after": 7,
+          "spotId": "spot_vending_bench"
+        },
+        {
+          "after": 12,
+          "spotId": "spot_abandoned_dorm"
+        },
+        {
+          "after": 17,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 29,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 31,
+          "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 41,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 43,
+          "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 48,
+          "spotId": "spot_darkness_altar"
+        }
+      ]
+    },
+    {
+      "charId": 214,
+      "spotId": "spot_dark_dimension",
+      "unlockAfter": 37
+    },
+    {
+      "charId": 137,
+      "spotId": "spot_blue_arena",
+      "storyMoves": [
+        {
+          "after": 1,
+          "spotId": "spot_main_academy"
+        }
+      ]
+    },
+    {
+      "charId": 207,
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 24,
+      "storyMoves": [
+        {
+          "after": 24,
+          "spotId": "spot_volcano_arena"
+        }
+      ]
+    },
+    {
+      "charId": 117,
+      "spotId": "spot_main_academy",
+      "storyMoves": [
+        {
+          "after": 5,
+          "spotId": "spot_forest_duel_ground"
+        },
+        {
+          "after": 43,
+          "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 45,
+          "spotId": "spot_harbor_beach"
+        }
+      ]
+    },
+    {
+      "charId": 3100,
+      "spotId": "spot_blue_arena",
+      "unlockAfter": 19
+    },
+    {
+      "charId": 111,
+      "spotId": "spot_forest_duel_ground",
+      "storyMoves": [
+        {
+          "after": 11,
+          "spotId": "spot_abandoned_dorm"
+        },
+        {
+          "after": 17,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 22,
+          "spotId": "spot_infirmary"
+        },
+        {
+          "after": 25,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 43,
+          "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 46,
+          "spotId": "spot_darkness_altar"
+        }
+      ]
+    },
+    {
+      "charId": 110,
+      "spotId": "spot_abandoned_dorm",
+      "unlockAfter": 11
+    },
+    {
+      "charId": 113,
+      "spotId": "spot_library"
+    },
+    {
+      "charId": 131,
+      "spotId": "spot_abandoned_dorm",
+      "unlockAfter": 9
+    },
+    {
+      "charId": 122,
+      "spotId": "spot_volcano_arena",
+      "unlockAfter": 12,
+      "storyMoves": [
+        {
+          "after": 12,
+          "spotId": "spot_abandoned_dorm"
+        }
+      ]
+    },
+    {
+      "charId": 109,
+      "spotId": "spot_blue_arena",
+      "unlockAfter": 15,
+      "storyMoves": [
+        {
+          "after": 15,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 28,
+          "spotId": "spot_blue_arena"
+        }
+      ]
+    },
+    {
+      "charId": 126,
+      "spotId": "spot_blue_arena",
+      "unlockAfter": 15,
+      "storyMoves": [
+        {
+          "after": 15,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 19,
+          "spotId": "spot_blue_arena"
+        }
+      ]
+    },
+    {
+      "charId": 213,
+      "spotId": "spot_blue_arena",
+      "unlockAfter": 15,
+      "storyMoves": [
+        {
+          "after": 15,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 18,
+          "spotId": "spot_forest_duel_ground"
+        },
+        {
+          "after": 25,
+          "spotId": "spot_main_academy"
+        }
+      ]
+    },
+    {
+      "charId": 120,
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 29,
+      "storyMoves": [
+        {
+          "after": 38,
+          "spotId": "spot_dark_dimension"
+        }
+      ]
+    },
+    {
+      "charId": 112,
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 29,
+      "storyMoves": [
+        {
+          "after": 32,
+          "spotId": "spot_dark_dimension"
+        }
+      ]
+    },
+    {
+      "charId": 121,
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 29,
+      "storyMoves": [
+        {
+          "after": 33,
+          "spotId": "spot_dark_dimension"
+        }
+      ]
+    },
+    {
+      "charId": 106,
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 29,
+      "storyMoves": [
+        {
+          "after": 35,
+          "spotId": "spot_dark_dimension"
+        }
+      ]
+    },
+    {
+      "charId": 136,
+      "spotId": "spot_dark_dimension",
+      "unlockAfter": 31
+    },
+    {
+      "charId": 133,
+      "spotId": "spot_main_academy",
+      "storyMoves": [
+        {
+          "after": 0,
+          "spotId": "spot_harbor_beach"
+        },
+        {
+          "after": 42,
+          "spotId": "spot_main_academy"
+        }
+      ]
+    },
+    {
+      "charId": 114,
+      "spotId": "spot_red_dorm",
+      "storyMoves": [
+        {
+          "after": 7,
+          "spotId": "spot_vending_bench"
+        },
+        {
+          "after": 17,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 43,
+          "spotId": "spot_blue_arena"
+        }
+      ]
+    },
+    {
+      "charId": 225,
+      "spotId": "spot_main_academy",
+      "unlockAfter": 46,
+      "storyMoves": [
+        {
+          "after": 46,
+          "spotId": "spot_darkness_altar"
+        }
+      ]
+    },
+    {
+      "charId": 124,
+      "spotId": "spot_darkness_altar",
+      "unlockAfter": 48
+    },
+    {
+      "charId": 104,
+      "spotId": "spot_forest_duel_ground",
+      "unlockAfter": 51
+    }
+  ]
 }

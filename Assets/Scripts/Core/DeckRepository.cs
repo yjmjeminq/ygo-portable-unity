@@ -28,6 +28,7 @@ namespace YGOPortable.Core
         public int seriesIdx;
         public string title;
         public string subtitle;
+        public int difficultyTier;
         public uint sigCard;
         public bool isMeta2026;
         public bool featured;
