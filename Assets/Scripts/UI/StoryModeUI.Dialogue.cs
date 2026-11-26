@@ -287,6 +287,16 @@ namespace YGOPortable.UI
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .859f) : new Vector2(.493f, .855f);
                 _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, onField ? .267f : .309f) : new Vector2(.508f, .26f);
                 _opponent.rectTransform.anchorMax = rpg ? new Vector2(.975f, .859f) : new Vector2(.93f, .855f);
+                bool gxPortraits = rpg && _rpgAssetFolder == "GX";
+                _hero.rectTransform.pivot = _opponent.rectTransform.pivot = new Vector2(.5f, gxPortraits ? 0f : .5f);
+                if (gxPortraits)
+                {
+                    float baseline = dialogueTop - .036f;
+                    _hero.rectTransform.anchorMin = new Vector2(.066f, baseline);
+                    _hero.rectTransform.anchorMax = new Vector2(.314f, .853f);
+                    _opponent.rectTransform.anchorMin = new Vector2(.686f, baseline);
+                    _opponent.rectTransform.anchorMax = new Vector2(.934f, .853f);
+                }
                 if (rpg && !onField)
                 {
                     var preferred = preferredRpgBackdrop == null ? null : LoadRpgSprite(preferredRpgBackdrop);
@@ -507,7 +517,7 @@ namespace YGOPortable.UI
                     if (_heroSpeaking || _hero.sprite == null)
                         ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
                     if (previousHeroSpeaking)
-                        ShowBust(_opponent, _opponentPrevious, LoadBust("Standing/full_campaign_protagonist", _emotion),
+                        ShowBust(_opponent, _opponentPrevious, LoadOriginalHeroBust(_emotion),
                             ref _opponentFade, ref _opponentSlide);
                     else if ((speaker ?? (_opponent.sprite == null ? _sceneOpponent : null)) is { } actor)
                     {
@@ -881,14 +891,17 @@ namespace YGOPortable.UI
             }
 
             private Sprite LoadHeroBust(string emotion) =>
-                (_playAsCharacterId > 0 ? LoadActorBust(_playAsCharacterId, emotion) :
-                    LoadBust(_rpgAssetFolder == "GX" ? "Standing/full_campaign_protagonist" : "Characters_Standing/full_protagonist", emotion))
+                (_playAsCharacterId > 0 ? LoadActorBust(_playAsCharacterId, emotion) : LoadOriginalHeroBust(emotion))
                 ?? DuelProfileArt.Player;
+
+            private Sprite LoadOriginalHeroBust(string emotion) => _rpgAssetFolder == "GX"
+                ? LoadGxBust("campaign_protagonist", emotion)
+                : LoadBust("Characters_Standing/full_protagonist", emotion);
 
             private Sprite LoadActorBust(int id, string emotion)
             {
                 if (_rpgAssetFolder == "GX")
-                    return LoadBust($"Standing/full_{id}", emotion) ??
+                    return LoadGxBust(id.ToString(), emotion) ??
                         (id == 104 ? LoadBust("TagForce/DM/Characters_Standing/full_104", emotion) : null);
                 string outfit = RpgWardrobe.ForStory(id, _rpgEpisode);
                 string stem = RpgWardrobe.PortraitStem(id, outfit);
@@ -899,6 +912,13 @@ namespace YGOPortable.UI
                     stem = RpgWardrobe.PortraitStem(id, null);
                 }
                 return LoadBust(stem, emotion);
+            }
+
+            private Sprite LoadGxBust(string key, string emotion)
+            {
+                string stem = $"DialoguePortraits/bust_{key}";
+                return LoadExpression(stem, emotion) ?? LoadRpgSprite(stem + ".png") ??
+                    LoadBust($"Standing/full_{key}", emotion);
             }
 
             private Sprite LoadBust(string stem, string emotion)
@@ -1022,9 +1042,13 @@ namespace YGOPortable.UI
                 var tint = Color.Lerp(image.color, speaking ? mood : Listening, mix);
                 tint.a = 1f - outgoing;
                 image.color = tint;
-                float scale = speaking ? 1.05f : _rpg ? .96f : 1f;
-                if (emotion == "determined") scale += settle * .025f;
-                if (_rpg) scale += .015f * Mathf.Sin((1f - outgoing) * Mathf.PI);
+                float scale = 1f;
+                if (!_rpg || _rpgAssetFolder != "GX")
+                {
+                    scale = speaking ? 1.05f : _rpg ? .96f : 1f;
+                    if (emotion == "determined") scale += settle * .025f;
+                    if (_rpg) scale += .015f * Mathf.Sin((1f - outgoing) * Mathf.PI);
+                }
                 image.rectTransform.localScale = Vector3.Lerp(image.rectTransform.localScale, Vector3.one * scale, mix);
                 if (_rpg)
                 {

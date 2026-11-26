@@ -435,6 +435,9 @@ namespace YGOPortable.Editor
                                 sprites.Get($"TagForce/GX/Characters_SD/sd_{key}.png") != null &&
                                 sprites.GetSlices($"TagForce/GX/WalkCycles/sd_{key}_field.png", 3, 3, fixedCells: true)?.Length == 9,
                                 $"Standing, SD or directional art did not load: {key}.");
+                            var bust = sprites.Get($"TagForce/GX/DialoguePortraits/bust_{standing}.png");
+                            Require(bust != null && bust.rect.width == bust.rect.height,
+                                $"The GX conversation portrait is missing or has the wrong aspect ratio: {key}.");
                         }
                     }
                     finally { sprites.Clear(); }
@@ -445,6 +448,13 @@ namespace YGOPortable.Editor
                     view.Open("GX CG verification", "주인공", DeckRepository.GetCharacter(107), example, null,
                         rpg: true, rpgBackdrop: "Maps/spot_main_academy.png", rpgAssetFolder: "GX");
                     var viewType = typeof(StoryModeUI.StoryDialogueView);
+                    var hero = (Image)viewType.GetField("_hero", flags).GetValue(view);
+                    var opponent = (Image)viewType.GetField("_opponent", flags).GetValue(view);
+                    Require(hero.sprite != null && opponent.sprite != null && hero.sprite.rect.width == hero.sprite.rect.height &&
+                        opponent.sprite.rect.width == opponent.sprite.rect.height &&
+                        hero.rectTransform.anchorMin.y == opponent.rectTransform.anchorMin.y &&
+                        hero.rectTransform.pivot.y == 0f && opponent.rectTransform.pivot.y == 0f,
+                        "GX conversation portraits did not share a square frame and bottom edge.");
                     var current = (Image)viewType.GetField("_cutsceneImage", flags).GetValue(view);
                     var previous = (Image)viewType.GetField("_cutscenePrevious", flags).GetValue(view);
                     var alpha = (CanvasGroup)viewType.GetField("_cutsceneOverlay", flags).GetValue(view);
