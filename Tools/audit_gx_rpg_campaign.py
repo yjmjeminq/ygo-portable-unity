@@ -155,6 +155,10 @@ def main():
             require(position_valid and pre[choice - 1].get("speaker") and
                     not any(re.search(r"듀얼[!！.]", line["text"]) for line in pre[:choice]),
                     f"{chapter}: dialogue choice must come before the duel call.")
+            options = episode.get("choices") or []
+            require(len(options) == 3 and {option.get("stance") for option in options} == {"Challenge", "Calm", "Bond"} and
+                    all(option.get("text", "").strip() and option.get("response", "").strip() for option in options),
+                    f"{chapter}: provide an authored reply and response for each duel stance.")
         portrait = episode.get("playAsCharacterId", 0)
         require(portrait == 0 or (portrait == 107 and episode.get("forcedPlayerDeckId") == pov.get(chapter)),
                 f"{chapter}: invalid forced player portrait/deck.")
@@ -175,6 +179,11 @@ def main():
                 require(not line.get("emotion") or line["emotion"] in EMOTIONS, f"{label}: unknown expression.")
                 require(not line.get("fx") or line["fx"] in {"shake", "flash", "heartbeat", "fade"},
                         f"{label}: unknown dialogue effect.")
+                if "sceneTime" in line:
+                    stamp = line["sceneTime"]
+                    require(isinstance(stamp, str) and 0 < len(stamp.strip()) <= 29 and "\n" not in stamp
+                            and speaker in {"", "설명", "내레이션", "나레이션"} and line.get("fx") == "fade",
+                            f"{label}: a time transition requires a short caption and a narration fade.")
                 if line.get("sceneMap"):
                     require(line["sceneMap"] in scenes or line["sceneMap"] in regions, f"{label}: invalid scenery reference.")
                 if line.get("cutscene"):

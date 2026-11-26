@@ -554,6 +554,7 @@ namespace YGOPortable.Editor
                             $"The duel HUD lost the current player name at {episode.id}.");
                         AwardDuel(win: true);
                         VerifyDialogueStart(episode.postWinDialogues, episode.id);
+                        if (episode.id == "gx_ep_09") VerifyGxRecoveryScenery(episode.postWinDialogues);
                         int memoryIndex = Array.FindIndex(episode.postWinDialogues, line => !string.IsNullOrEmpty(line.memoryTitle));
                         if (memoryIndex >= 0)
                         {
@@ -652,6 +653,22 @@ namespace YGOPortable.Editor
                     Require(CurrentLine() == shortLine, "GX autoplay advanced before the short line could be read.");
                     story.Update(1.5f);
                     Require(CurrentLine() == shortLine + 1, "GX autoplay stopped advancing after the reading pause.");
+
+                    int arrival = Array.FindIndex(episode.preDialogues, line => !string.IsNullOrEmpty(line.sceneTime));
+                    Require(arrival >= 0, "The prologue lost its scripted time jump.");
+                    var arrivalLine = episode.preDialogues[arrival];
+                    bind.Invoke(dialogue, new object[] { arrival, false });
+                    VerifyDisplayedText(arrivalLine);
+                    var timeBadge = storyRoot.Find("Scene/SceneTime");
+                    Require(timeBadge.gameObject.activeInHierarchy &&
+                        timeBadge.GetComponentInChildren<Text>().text == arrivalLine.sceneTime,
+                        "The GX arrival did not show its time caption.");
+                    float reading = Mathf.Max(1.65f, arrivalLine.text.Length * .055f);
+                    story.Update(reading + .5f);
+                    Require(CurrentLine() == arrival, "GX autoplay cut away before the time transition could be read.");
+                    story.Update(.75f);
+                    Require(CurrentLine() == arrival + 1 && !timeBadge.gameObject.activeSelf,
+                        "The time caption persisted beyond its transition line.");
                     bind.Invoke(dialogue, new object[] { 0, false });
                 }
 
@@ -1257,6 +1274,29 @@ namespace YGOPortable.Editor
                         ReferenceEquals(dialogueType.GetField("_dialogue", flags).GetValue(dialogue), lines),
                         $"The wrong dialogue branch opened at {episodeId}.");
                     VerifyDisplayedText(lines[0]);
+                    var timeBadge = storyRoot.Find("Scene/SceneTime");
+                    bool hasTime = !string.IsNullOrEmpty(lines[0].sceneTime);
+                    Require(timeBadge.gameObject.activeSelf == hasTime &&
+                        (!hasTime || timeBadge.GetComponentInChildren<Text>().text == lines[0].sceneTime),
+                        $"The opening time caption did not match the active dialogue at {episodeId}.");
+                }
+
+                void VerifyGxRecoveryScenery(StoryDialogueLine[] lines)
+                {
+                    int infirmary = Array.FindIndex(lines, line => line.sceneMap == "spot_infirmary");
+                    int harbor = Array.FindIndex(lines, line => line.sceneMap == "spot_harbor_beach");
+                    Require(infirmary > 0 && harbor > infirmary, "The recovery scenes did not follow the seal in order.");
+                    var bind = dialogueType.GetMethod("BindLine", flags);
+                    var scenery = FieldScene().Find("Scenery").GetComponent<Image>();
+                    var ruins = scenery.sprite;
+                    bind.Invoke(dialogue, new object[] { infirmary, false });
+                    var recovery = scenery.sprite;
+                    bind.Invoke(dialogue, new object[] { harbor, false });
+                    Require(recovery != null && recovery != ruins && scenery.sprite != null &&
+                        scenery.sprite != recovery && scenery.sprite != ruins,
+                        "The recovery and harbor scenes reused the ruins backdrop.");
+                    bind.Invoke(dialogue, new object[] { 0, false });
+                    Require(scenery.sprite == ruins, "Reading backward from the follow-up did not restore the ruins.");
                 }
 
                 void VerifySpeaker(StoryDialogueLine[] lines, string speaker, bool player)

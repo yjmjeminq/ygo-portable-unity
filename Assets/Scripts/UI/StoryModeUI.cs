@@ -16,6 +16,7 @@ namespace YGOPortable.UI
         public string text;
         public string cutscene;
         public string sceneMap;
+        public string sceneTime;
         public string memoryTitle;
         public string emotion;
         public string fx;

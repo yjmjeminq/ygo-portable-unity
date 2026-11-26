@@ -45,6 +45,8 @@ namespace YGOPortable.UI
             private readonly Button _advanceSurface;
             private readonly Text _heading;
             private readonly Text _heroIdentity;
+            private readonly Text _sceneTime;
+            private readonly CanvasGroup _sceneTimeBadge;
             private readonly Image _hero;
             private readonly Image _opponent;
             private readonly Image _stage;
@@ -164,6 +166,13 @@ namespace YGOPortable.UI
                 _heading = AddLabel(content, "Episode", .06f, .88f, .94f, .965f, 29, color: DuelUiKit.GoldAccent);
                 _headingPlate = DuelUiKit.AddImage(_heading.transform.parent.gameObject, null, Color.white, false, false);
                 _heroIdentity = AddLabel(content, "ProtagonistIdentity", .065f, .837f, .495f, .884f, 17, color: HeroColor);
+                var sceneTime = Region(content, "SceneTime", .416f, .916f, .672f, .973f);
+                RpgUiStyle.Glass(sceneTime);
+                _sceneTimeBadge = sceneTime.gameObject.AddComponent<CanvasGroup>();
+                _sceneTimeBadge.blocksRaycasts = _sceneTimeBadge.interactable = false;
+                _sceneTime = AddLabel(sceneTime, "Caption", .055f, .07f, .945f, .93f, 22, color: Color.white);
+                RpgUiStyle.Display(_sceneTime);
+                sceneTime.gameObject.SetActive(false);
                 var portraits = DuelUiKit.FillRect("Portraits", content);
                 _portraitGroup = portraits.gameObject.AddComponent<CanvasGroup>();
                 _portraitGroup.blocksRaycasts = _portraitGroup.interactable = false;
@@ -335,6 +344,7 @@ namespace YGOPortable.UI
             internal void Close()
             {
                 _fx.ResetEffect();
+                _sceneTimeBadge.gameObject.SetActive(false);
                 _showCutscene = false;
                 _field = null;
                 RefreshStageCaption();
@@ -394,6 +404,8 @@ namespace YGOPortable.UI
                 _field?.UpdateRpgDialogue(delta);
                 RefreshStageCaption();
                 _poseTime += delta;
+                if (_sceneTimeBadge.gameObject.activeSelf)
+                    _sceneTimeBadge.alpha = Mathf.Clamp01(_poseTime / .24f);
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
                 if (_cutsceneBlend < 1f)
                 {
@@ -426,6 +438,7 @@ namespace YGOPortable.UI
                     _readTime += delta * _autoSpeed;
                     float readDuration = IsGxDialogue ? Mathf.Max(1.65f, _characters.Length * .055f) :
                         Mathf.Max(1.05f, _characters.Length * .037f);
+                    if (_sceneTimeBadge.gameObject.activeSelf) readDuration += 1.15f * _autoSpeed;
                     if (_readTime >= readDuration) Advance();
                 }
             }
@@ -434,6 +447,7 @@ namespace YGOPortable.UI
             {
                 _dialoguePanel.gameObject.SetActive(false);
                 _rpgTools.gameObject.SetActive(false);
+                _sceneTimeBadge.gameObject.SetActive(false);
                 _advanceSurface.interactable = false;
             }
 
@@ -519,6 +533,10 @@ namespace YGOPortable.UI
                 _index = index;
                 _readThrough = Math.Max(_readThrough, index);
                 var line = _dialogue[index];
+                bool showSceneTime = IsGxDialogue && !string.IsNullOrWhiteSpace(line.sceneTime);
+                _sceneTimeBadge.gameObject.SetActive(showSceneTime);
+                _sceneTime.text = showSceneTime ? line.sceneTime : string.Empty;
+                if (showSceneTime) _sceneTimeBadge.alpha = Application.isPlaying ? 0f : 1f;
                 bool narration = IsNarration(line.speaker);
                 _speakerBadge.SetActive(!narration);
                 _speaker.text = narration ? "" : line.speaker;
@@ -560,7 +578,7 @@ namespace YGOPortable.UI
                     if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
                 }
                 BindCutscene(_rpg ? line.cutscene : null);
-                _fx.Play(_rpg ? line.fx : null);
+                _fx.Play(showSceneTime ? "time-skip" : _rpg ? line.fx : null);
                 _formatting = _rpg ? DialogueTag.Matches(line.text).Cast<Match>().ToArray() : Array.Empty<Match>();
                 _characters = StringInfo.ParseCombiningCharacters(line.text);
                 if (_formatting.Length > 0)
@@ -870,6 +888,7 @@ namespace YGOPortable.UI
                 for (int i = 0; i <= _readThrough; i++)
                 {
                     var line = _dialogue[i];
+                    if (IsGxDialogue && !string.IsNullOrWhiteSpace(line.sceneTime)) history.AppendLine(line.sceneTime);
                     if (!IsNarration(line.speaker)) history.AppendLine(line.speaker);
                     string text = i == _index && !_finished ? _text.text : line.text;
                     history.AppendLine(_rpg ? DialogueTag.Replace(text, "") : text);
@@ -1180,7 +1199,7 @@ namespace YGOPortable.UI
         internal void Play(string name)
         {
             ResetEffect();
-            if (Application.isPlaying && name is ("shake" or "flash" or "heartbeat" or "fade"))
+            if (Application.isPlaying && name is ("shake" or "flash" or "heartbeat" or "fade" or "time-skip"))
                 _effectAnimation = StartCoroutine(Animate(name));
         }
 
@@ -1205,7 +1224,7 @@ namespace YGOPortable.UI
 
         private IEnumerator Animate(string name)
         {
-            float duration = name switch { "heartbeat" => .72f, "fade" => .62f, _ => .36f };
+            float duration = name switch { "heartbeat" or "time-skip" => .72f, "fade" => .62f, _ => .36f };
             for (float time = 0f; time < duration; time += Time.unscaledDeltaTime)
             {
                 DrawFrame(name, time / duration);
@@ -1224,6 +1243,8 @@ namespace YGOPortable.UI
                 _overlay.color = new Color(1f, 1f, 1f, .6f * (1f - progress));
             else if (name == "fade")
                 _overlay.color = new Color(.018f, .032f, .064f, .75f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(progress)));
+            else if (name == "time-skip")
+                _overlay.color = new Color(.018f, .032f, .064f, .92f * (1f - Mathf.SmoothStep(0f, 1f, progress)));
             else if (name == "heartbeat")
                 _overlay.color = new Color(1f, .36f, .63f, .33f *
                     Mathf.Pow(Mathf.Max(0f, Mathf.Sin(progress * Mathf.PI * 4f)), 2f) * (1f - progress));
