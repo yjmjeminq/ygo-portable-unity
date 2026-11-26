@@ -191,7 +191,11 @@ namespace YGOPortable.UI
             var panel = BuildRpgConversation(partner ? RpgPartnerName : RpgShopkeeperName,
                 partner ? RpgPartnerComment : "시내까지 갈 필요 없어. 여기서도 DP로 팩을 살 수 있어.", out var conversation, speaker);
             var actions = new List<(string Id, string Label, Action Select)>();
-            if (!partner) actions.Add(("OpenCardShop", "카드 팩 보기", _app.OpenRpgCardShop));
+            if (!partner)
+            {
+                actions.Add(("OpenCardShop", "카드 팩 보기", _app.OpenRpgCardShop));
+                actions.Add(("ResortShop", "여름 리조트 의상", () => OpenRpgResortWardrobe(fromShop: true)));
+            }
             int hearts = CollectionProgress.RpgAffinity / CollectionProgress.RpgAffinityPerHeart;
             if (partner && hearts > 0)
                 actions.Add(("BondTalk", "특별 대화", () => StartTypingDialogue(conversation, RpgBondLines[speaker][hearts - 1])));
@@ -208,6 +212,7 @@ namespace YGOPortable.UI
             {
                 ("EditDeck", "덱 편집", _app.OpenTagForceDeckEditor),
                 ("ChangePartner", "동행 파트너", () => { _rpgChoosingCompanion = true; Show(Page.Talk); }),
+                ("ChangeWardrobe", "의상 변경", () => OpenRpgResortWardrobe(fromShop: false)),
                 ("SaveRpg", "진행 저장", () =>
                 {
                     bool saved = CollectionProgress.TrySaveRpgCheckpoint(false, out string result);
@@ -220,6 +225,8 @@ namespace YGOPortable.UI
                 }),
             };
             if (RpgClears > 0) actions.Add(("Recall", "지난 이야기", _app.OpenRpgRecap));
+            if (CollectionProgress.RpgEndingCleared)
+                actions.Add(("SummerEpilogue", "네오 도미노의 여름", () => Show(Page.SummerEpilogue)));
             actions.Add(("CloseWorkbench", "작업대 보기", () => { _rpgWorkbenchServices = false; Show(Page.Talk); }));
             AddRpgConversationActions(panel, actions);
         }
@@ -382,6 +389,13 @@ namespace YGOPortable.UI
         {
             _rpgIntroDialogue?.Close();
             _rpgIntroDialogue = null;
+            if (_rpgSummerScene != null)
+            {
+                _rpgSummerScene.gameObject.SetActive(false);
+                if (Application.isPlaying) UnityEngine.Object.Destroy(_rpgSummerScene.gameObject);
+                else UnityEngine.Object.DestroyImmediate(_rpgSummerScene.gameObject);
+                _rpgSummerScene = null;
+            }
             _rpgCompanion = _rpgCompanionArt = _rpgGreeting = _rpgTravelBanner = _rpgRankBanner = _rpgBondBanner = null;
             _rpgTravelFade = null;
             _rpgPendingRegion = -1;

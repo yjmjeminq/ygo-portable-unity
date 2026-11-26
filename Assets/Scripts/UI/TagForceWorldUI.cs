@@ -12,7 +12,7 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond, Prologue, Guide }
+        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond, Prologue, Guide, ResortWardrobe, SummerEpilogue }
 
         private readonly GameAppController _app;
         private readonly TagForceWorldImages _images = new();
@@ -125,6 +125,15 @@ namespace YGOPortable.UI
                 if (_page is Page.Prologue or Page.Guide)
                 {
                     if (_rpgIntroDialogue?.ClosePopup() != true) FinishRpgIntro();
+                }
+                else if (_page == Page.SummerEpilogue)
+                {
+                    if (_rpgIntroDialogue?.ClosePopup() != true) Show(Page.Talk);
+                }
+                else if (_page == Page.ResortWardrobe)
+                {
+                    ShowStatus("");
+                    Show(Page.Talk);
                 }
                 else if (_page == Page.Talk && _rpgChoosingCompanion)
                 {

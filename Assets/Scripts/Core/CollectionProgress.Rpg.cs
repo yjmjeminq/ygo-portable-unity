@@ -31,12 +31,21 @@ namespace YGOPortable.Core
     }
 
     [Serializable]
+    internal sealed class RpgResortOutfit
+    {
+        public int character;
+        public bool purchased;
+        public string equipped;
+    }
+
+    [Serializable]
     internal sealed class RpgAdventureSave
     {
         public bool introSeen;
         public int xp, affinity, partnerId;
         public List<int> caches = new(), conversations = new();
         public List<RpgPartnerBond> partnerBonds = new();
+        public List<RpgResortOutfit> resortOutfits = new();
 
         internal RpgAdventureSave Copy() => new()
         {
@@ -47,6 +56,7 @@ namespace YGOPortable.Core
             caches = new List<int>(caches),
             conversations = new List<int>(conversations),
             partnerBonds = partnerBonds.Select(bond => bond.Copy()).ToList(),
+            resortOutfits = new List<RpgResortOutfit>(resortOutfits),
         };
     }
 
@@ -56,6 +66,10 @@ namespace YGOPortable.Core
         private const int RpgMaxAffinity = 100;
         internal const int RpgGuidePartnerId = 35;
         internal const int RpgAffinityPerHeart = 20;
+        internal const string RpgAutoOutfit = "auto", RpgResortSkin = "resort";
+        internal const int RpgResortPrice = 3000;
+        internal static IReadOnlyList<(int Id, string Name)> RpgResortCharacters { get; } = Array.AsReadOnly(
+            new (int, string)[] { (1, "이자요이 아키"), (32, "셰리 르블랑"), (220, "칼리 나기사"), (218, "미스티 로라"), (24, "루카") });
         internal static IReadOnlyList<RpgPartner> RpgPartners { get; } = Array.AsReadOnly(new RpgPartner[]
         {
             new(RpgGuidePartnerId, "후도 유세이", 0), new(1, "이자요이 아키", 3),
@@ -78,6 +92,45 @@ namespace YGOPortable.Core
         internal static bool IsRpgPartnerUnlocked(RpgPartner partner) => partner.UnlockEpisode == 0 ||
             IsStoryEpisodeCleared($"5ds_rpg_ep_{partner.UnlockEpisode:00}");
         internal static bool TryReadRpgBondNotice(out RpgBondReward reward) => RpgBondNotices.TryDequeue(out reward);
+
+        internal static bool RpgEndingCleared => IsStoryEpisodeCleared("5ds_rpg_ep_50");
+        internal static bool RpgResortUnlocked(int id) => RpgResortCharacters.Any(entry => entry.Id == id) &&
+            (RpgEndingCleared || RpgResortRecord(id)?.purchased == true);
+        internal static string RpgEquippedOutfit(int id) => RpgResortUnlocked(id) && RpgResortRecord(id)?.equipped == RpgResortSkin
+            ? RpgResortSkin : RpgAutoOutfit;
+
+        private static RpgResortOutfit RpgResortRecord(int id) => _profile?.rpgAdventure?.resortOutfits.Find(entry => entry.character == id);
+
+        internal static bool TryBuyRpgResort(int id, out string error)
+        {
+            if (!CanTransact(out error)) return false;
+            if (!RpgResortCharacters.Any(entry => entry.Id == id)) { error = "구매할 수 없는 의상입니다."; return false; }
+            if (RpgResortUnlocked(id)) return true;
+            if (Balance < RpgResortPrice) { error = "DP가 부족합니다."; return false; }
+            return WriteRpgResort(id, true, RpgAutoOutfit, Balance - RpgResortPrice, out error);
+        }
+
+        internal static bool TryEquipRpgOutfit(int id, string outfit, out string error)
+        {
+            if (!CanTransact(out error)) return false;
+            if (!RpgResortCharacters.Any(entry => entry.Id == id) || outfit is not (RpgAutoOutfit or RpgResortSkin))
+            {
+                error = "선택할 수 없는 의상입니다.";
+                return false;
+            }
+            if (outfit == RpgResortSkin && !RpgResortUnlocked(id)) { error = "아직 잠긴 의상입니다."; return false; }
+            return outfit == RpgEquippedOutfit(id) ||
+                WriteRpgResort(id, RpgResortRecord(id)?.purchased == true, outfit, Balance, out error);
+        }
+
+        private static bool WriteRpgResort(int id, bool purchased, string equipped, int balance, out string error)
+        {
+            var next = WithBalance(balance);
+            next.rpgAdventure = next.rpgAdventure.Copy();
+            next.rpgAdventure.resortOutfits.RemoveAll(entry => entry.character == id);
+            next.rpgAdventure.resortOutfits.Add(new RpgResortOutfit { character = id, purchased = purchased, equipped = equipped });
+            return Write(next, _owned, out error);
+        }
 
         private static int PartnerAffinity(RpgAdventureSave adventure, int id) => id == RpgGuidePartnerId ? adventure?.affinity ?? 0 :
             adventure?.partnerBonds.Find(bond => bond.id == id)?.affinity ?? 0;
@@ -120,6 +173,14 @@ namespace YGOPortable.Core
                     id = group.Key,
                     affinity = Math.Clamp(group.Max(bond => bond.affinity), 0, RpgMaxAffinity),
                     conversations = Normalize(group.SelectMany(bond => bond.conversations ?? Enumerable.Empty<int>()).ToList()),
+                }).ToList();
+            adventure.resortOutfits = (adventure.resortOutfits ?? new List<RpgResortOutfit>())
+                .Where(entry => entry != null && RpgResortCharacters.Any(character => character.Id == entry.character))
+                .GroupBy(entry => entry.character).Select(group => new RpgResortOutfit
+                {
+                    character = group.Key,
+                    purchased = group.Any(entry => entry.purchased),
+                    equipped = group.Last().equipped == RpgResortSkin ? RpgResortSkin : RpgAutoOutfit,
                 }).ToList();
 
             static List<int> Normalize(List<int> entries) =>

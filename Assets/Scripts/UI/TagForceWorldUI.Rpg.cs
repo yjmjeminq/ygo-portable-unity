@@ -194,7 +194,7 @@ namespace YGOPortable.UI
         private void ShowRpgPage(Page page)
         {
             _navigation.gameObject.SetActive(false);
-            _rpgNavigation.gameObject.SetActive(page != Page.Field);
+            _rpgNavigation.gameObject.SetActive(page is not (Page.Field or Page.ResortWardrobe or Page.SummerEpilogue));
             _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
             DuelAudio.PlayRpgFieldMusic(MusicForRpgRegion(_rpgLocation));
             switch (page)
@@ -214,6 +214,8 @@ namespace YGOPortable.UI
                 case Page.Talk: BuildRpgTalk(); break;
                 case Page.Duel: BuildRpgPractice(); break;
                 case Page.Ledger: BuildRpgQuestJournal(); break;
+                case Page.ResortWardrobe: BuildRpgResortWardrobe(); break;
+                case Page.SummerEpilogue: BuildRpgSummerEpilogue(); break;
             }
 
             int clears = RpgClears;

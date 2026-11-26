@@ -224,6 +224,7 @@ namespace YGOPortable.Editor
                 VerifyRpgAdventure();
                 VerifyReturningEpisodes();
                 VerifyRpgPartnerPolish();
+                VerifyRpgResort();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
             }
             finally
@@ -1371,6 +1372,145 @@ namespace YGOPortable.Editor
                 Press(storyRoot, "Scene/DialogueTools/Skip/Button");
                 Require(world.CanWalk && world.RpgClears == 35, "The VS match did not return to the field on defeat.");
                 Debug.Log("[VERIFY 5DS POLISH] Master settings, four regional themes, dialogue controls, timed faceoff and saved partner rewards passed.");
+            }
+
+            void VerifyRpgResort()
+            {
+                const string art = "TagForce/5DS/";
+                const string resort = CollectionProgress.RpgResortSkin;
+                const string automatic = CollectionProgress.RpgAutoOutfit;
+                string resortSave = Path.Combine(save, "rpg-resort");
+                DeckRepository.Load(streaming, resortSave, seedDefaultDecks: false);
+                CollectionProgress.Load(resortSave);
+                Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out string error), error);
+                Require(!CollectionProgress.RpgEndingCleared &&
+                    CollectionProgress.RpgResortCharacters.All(entry => !CollectionProgress.RpgResortUnlocked(entry.Id)) &&
+                    !CollectionProgress.TryEquipRpgOutfit(1, resort, out _), "Resort outfits were usable before unlock.");
+
+                var images = new TagForceWorldImages();
+                try
+                {
+                    foreach (var entry in CollectionProgress.RpgResortCharacters)
+                    {
+                        string[] expressions = entry.Id == 1
+                            ? new[] { "determined", "smile", "blush", "sad", "shock", "hurt" }
+                            : new[] { "determined", "smile", "sad", "shock" };
+                        var stem = art + RpgWardrobe.PortraitStem(entry.Id, resort);
+                        foreach (var emotion in expressions)
+                            Require(images.GetBust($"{stem}_{emotion}.png") is { } bust &&
+                                bust.rect.size == new Vector2(448, 576), $"Resort portrait {entry.Id}/{emotion} is missing or cropped.");
+                        var frames = images.GetSlices(art + RpgWardrobe.WalkAtlas(entry.Id, resort), 3, 3, fixedCells: true);
+                        Require(frames is { Length: 9 } && frames.All(frame => frame.rect.size == new Vector2(256, 256)),
+                            $"Resort field frames are missing for {entry.Id}.");
+                    }
+                }
+                finally { images.Clear(); }
+
+                world.PrepareRpgField();
+                world.Open();
+                Require(world.EnterRpgRegion(RpgGarage), "Could not reach the resort merchant.");
+                Press(FieldScene(), "RpgCardMerchant/SD");
+                world.Update(4f);
+                Press(panel, "ResidentChoices/ResortShop");
+                int balance = CollectionProgress.Balance;
+                Press(panel, "Resort/Action");
+                Require(CollectionProgress.RpgResortUnlocked(1) && CollectionProgress.RpgEquippedOutfit(1) == automatic &&
+                    CollectionProgress.Balance == balance - CollectionProgress.RpgResortPrice &&
+                    !CollectionProgress.RpgResortUnlocked(32), "The merchant did not charge for exactly one outfit.");
+                Require(CollectionProgress.TryBuyRpgResort(1, out error) &&
+                    CollectionProgress.Balance == balance - CollectionProgress.RpgResortPrice, "An outfit could charge twice.");
+                world.Back();
+                world.Back();
+                ClearUntil(3);
+                Require(CollectionProgress.TrySwitchRpgPartner(1, out error), error);
+                Require(world.EnterRpgRegion(RpgGarage), "Could not reach the resort workbench.");
+                OpenWorkbench();
+                Require(panel.Find("ResidentChoices/SummerEpilogue") == null, "The bonus epilogue opened before the main ending.");
+                Press(panel, "ResidentChoices/ChangeWardrobe");
+                Press(panel, "Resort/Action");
+                Require(RpgWardrobe.ForStory(1, 3) == resort && RpgWardrobe.ForField(1, RpgAcademia, 3) == resort &&
+                    panel.Find("Resort/Portrait").GetComponent<Image>().sprite.rect.size == new Vector2(448, 576),
+                    "The selected skin did not override both regular outfits or preview correctly.");
+                world.Back();
+                world.Back();
+                var worldImages = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
+                var resortArt = worldImages.GetSlices(art + RpgWardrobe.WalkAtlas(1, resort), 3, 3, fixedCells: true);
+                Require(FieldScene().Find("RpgCompanion/Sprite").GetComponent<Image>().sprite.texture == resortArt[0].texture,
+                    "Aki's following sprite did not change into the equipped outfit.");
+                world.HandleFieldInput(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Alternate));
+                Require(panel.Find("ConversationPortrait").GetComponent<Image>().sprite ==
+                    worldImages.Get(art + RpgWardrobe.Preview(1, resort)), "Partner conversation did not refresh the portrait.");
+                world.Back();
+                CollectionProgress.Load(resortSave);
+                Require(CollectionProgress.RpgEquippedOutfit(1) == resort && CollectionProgress.RpgResortUnlocked(1),
+                    "Purchased and equipped outfit state were lost after reload.");
+                OpenWorkbench();
+                Press(panel, "ResidentChoices/ChangeWardrobe");
+                Press(panel, "Auto/Equip");
+                Require(RpgWardrobe.ForStory(1, 3) == "school" && CollectionProgress.RpgResortUnlocked(1),
+                    "Returning to automatic costumes removed the unlock or ignored the story outfit.");
+                world.Back();
+                world.Back();
+
+                ClearUntil(50);
+                Require(CollectionProgress.RpgEndingCleared &&
+                    CollectionProgress.RpgResortCharacters.All(entry => CollectionProgress.RpgResortUnlocked(entry.Id)),
+                    "The main ending did not unlock every resort outfit.");
+                world.EnterRpgRegion(RpgGarage);
+                OpenWorkbench();
+                Press(panel, "ResidentChoices/ChangeWardrobe");
+                foreach (var entry in CollectionProgress.RpgResortCharacters)
+                {
+                    Press(panel, $"WardrobeCharacters/Character_{entry.Id}");
+                    Press(panel, "Resort/Action");
+                    Require(RpgWardrobe.ForStory(entry.Id, 50) == resort &&
+                        RpgWardrobe.ForField(entry.Id, RpgGarage, 50) == resort &&
+                        panel.Find("Resort/FieldPreview").GetComponent<Image>().sprite.rect.size == new Vector2(256, 256),
+                        $"The workbench could not apply and preview the resort outfit for {entry.Id}.");
+                }
+                CollectionProgress.Load(resortSave);
+                Require(CollectionProgress.RpgResortCharacters.All(entry => CollectionProgress.RpgEquippedOutfit(entry.Id) == resort) &&
+                    RpgWardrobe.ForStory(9, 50) == resort && RpgWardrobe.ForField(25, RpgGarage, 50) == resort,
+                    "An owned outfit or the normal story/field variant mapping was lost after reload.");
+                world.Back();
+                Press(panel, "ResidentChoices/SummerEpilogue");
+                var scene = world.Root.transform.Find("SummerEpilogue/StoryDialogue/Scene");
+                var view = (StoryModeUI.StoryDialogueView)typeof(TagForceWorldUI).GetField("_rpgIntroDialogue", flags).GetValue(world);
+                var artwork = (Dictionary<string, Sprite>)typeof(StoryModeUI.StoryDialogueView).GetField("_rpgSprites", flags).GetValue(view);
+                string[] cg = { "cg_summer_beach_aki", "cg_summer_beach_resort_group", "cg_summer_beach_group" };
+                for (int index = 0; index < cg.Length; index++)
+                {
+                    typeof(StoryModeUI.StoryDialogueView).GetMethod("BindLine", flags).Invoke(view, new object[] { index * 2, false });
+                    world.Update(.5f);
+                    string key = Path.Combine(streaming, art.TrimEnd('/'), $"Cutscenes/{cg[index]}.jpg");
+                    // The story loader uses TagForce/5DS without a trailing separator for the cache key.
+                    Require(artwork.TryGetValue(key, out var picture) && picture != null &&
+                        scene.Find("CutsceneOverlay/CG").GetComponent<Image>().sprite == picture &&
+                        Mathf.Approximately(picture.rect.width / picture.rect.height, 16f / 9f) &&
+                        scene.Find("CutsceneOverlay").GetComponent<CanvasGroup>().alpha == 1f,
+                        $"Summer CG {cg[index]} did not load as a full-screen story illustration.");
+                }
+                Press(scene, "DialogueTools/Skip/Button");
+                Require(world.Root.transform.Find("SummerEpilogue") == null && panel.Find("ResidentChoices/ChangeWardrobe") != null,
+                    "Skipping the summer story did not return to the workbench.");
+                Debug.Log("[VERIFY 5DS RESORT] 22 expression portraits, 45 walk frames, early shop purchase, save persistence, live wardrobe and 3 epilogue CGs passed.");
+
+                void ClearUntil(int count)
+                {
+                    for (int index = world.RpgClears; index < count; index++)
+                    {
+                        var episode = script.episodes[index];
+                        Require(CollectionProgress.TryAwardStoryDuel(episode.id, true, null, decks[episode.deckId],
+                            default, out _, out error), error);
+                    }
+                }
+
+                void OpenWorkbench()
+                {
+                    Press(FieldScene(), "Exploration/Landmark");
+                    world.Update(4f);
+                    Press(panel, "ResidentChoices/WorkbenchMenu");
+                }
             }
 
             void VerifyStageExit()

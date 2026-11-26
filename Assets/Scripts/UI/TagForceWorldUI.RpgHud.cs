@@ -16,8 +16,12 @@ namespace YGOPortable.UI
         private readonly List<(RectTransform Icon, RectTransform Actor)> _rpgRadarMarkers = new();
         private static readonly Color32 ExitGreen = new(135, 250, 175, 255);
 
-        internal GameObject RpgFieldMenuScope => _rpgField && _fieldMenu && _rpgNavigation.gameObject.activeInHierarchy
-            ? _rpgNavigation.gameObject : Root;
+        internal GameObject RpgFieldMenuScope => _page switch
+        {
+            Page.SummerEpilogue => _rpgIntroDialogue?.ActiveRoot ?? Root,
+            Page.ResortWardrobe => _body.gameObject,
+            _ => _rpgField && _fieldMenu && _rpgNavigation.gameObject.activeInHierarchy ? _rpgNavigation.gameObject : Root,
+        };
 
         private enum RpgActionPriority { Exit, Conversation, Service, Request, Story }
 
