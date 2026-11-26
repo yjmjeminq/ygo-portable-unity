@@ -379,6 +379,8 @@ namespace YGOPortable.Editor
                             {
                                 CollectionProgress.Load(isolatedSave);
                                 Require(world.RpgClears == 1, "The GX prologue was not saved when it finished.");
+                                Require(FieldScene().Find("Resident_133") == null,
+                                    "Crowler stayed as a free-roam resident at the harbor after the prologue.");
                             }
                             scenes++;
                             continue;
@@ -444,7 +446,11 @@ namespace YGOPortable.Editor
                             FieldScene().Find("DialogueCast") != null, $"GX episode used the wrong deck or stage at {episode.id}.");
                         VerifyGxWalkerSizes();
                         VerifyDialogueStart(episode.preDialogues, episode.id);
-                        if (episode.id == "gx_ep_01") VerifySpeaker(episode.preDialogues, "윤", player: true);
+                        if (episode.id == "gx_ep_01")
+                        {
+                            VerifyGxGuestArt(episode.preDialogues, "크로노스 데 메디치", 133);
+                            VerifySpeaker(episode.preDialogues, "윤", player: true);
+                        }
                         if (isPov)
                         {
                             VerifySpeaker(episode.preDialogues, "텐죠인 아스카", player: true);
@@ -1038,6 +1044,24 @@ namespace YGOPortable.Editor
                     var harbor = scenery.sprite;
                     Require(backstage != null && harbor != null && backstage != tournament &&
                         harbor != backstage && harbor != tournament, "The GX opening did not switch all three stage backgrounds.");
+                    int teacherEntrance = Array.FindIndex(lines, harborIndex, line =>
+                        line.stage?.Any(action => action.actor == 133 && action.action == "enter") == true);
+                    var teacher = (Transform)typeof(TagForceWorldUI).GetField("_rpgDialogueOpponent", flags).GetValue(world);
+                    Require(teacherEntrance > harborIndex && teacher != null && !teacher.gameObject.activeSelf,
+                        "Crowler appeared before his scripted harbor entrance.");
+                    bind.Invoke(dialogue, new object[] { teacherEntrance, false });
+                    Require(teacher.gameObject.activeSelf, "Crowler did not arrive in the scripted harbor greeting.");
+                    int greeting = Array.FindIndex(lines, teacherEntrance + 1, line => line.speaker == "크로노스 데 메디치");
+                    Require(greeting > teacherEntrance && greeting + 1 < lines.Length && lines[greeting + 1].speaker == "윤",
+                        "Crowler's scripted greeting did not receive Yun's reply.");
+                    bind.Invoke(dialogue, new object[] { greeting, false });
+                    VerifyDisplayedText(lines[greeting]);
+                    Require((bool)dialogueType.GetField("_opponentSpeaking", flags).GetValue(dialogue),
+                        "Crowler's greeting was not attributed to him.");
+                    bind.Invoke(dialogue, new object[] { greeting + 1, false });
+                    VerifyDisplayedText(lines[greeting + 1]);
+                    Require((bool)dialogueType.GetField("_heroSpeaking", flags).GetValue(dialogue),
+                        "Yun's scripted response did not switch to the player speaker.");
                     int castEntrance = Array.FindIndex(lines, harborIndex, line => line.stage?.Length > 1 &&
                         line.stage.Any(action => action.actor == 119));
                     bind.Invoke(dialogue, new object[] { harborIndex, false });
