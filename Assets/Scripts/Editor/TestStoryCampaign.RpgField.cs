@@ -1102,19 +1102,33 @@ namespace YGOPortable.Editor
                     var teacher = (Transform)typeof(TagForceWorldUI).GetField("_rpgDialogueOpponent", flags).GetValue(world);
                     Require(teacherEntrance > harborIndex && teacher != null && !teacher.gameObject.activeSelf,
                         "Crowler appeared before his scripted harbor entrance.");
-                    bind.Invoke(dialogue, new object[] { teacherEntrance, false });
-                    Require(teacher.gameObject.activeSelf, "Crowler did not arrive in the scripted harbor greeting.");
+                    var stage = FieldScene().Find("DialogueCast");
+                    var hero = (Image)dialogueType.GetField("_hero", flags).GetValue(dialogue);
+                    var opponent = (Image)dialogueType.GetField("_opponent", flags).GetValue(dialogue);
+                    bind.Invoke(dialogue, new object[] { teacherEntrance, true });
+                    story.Update(.20f);
+                    Require(!stage.gameObject.activeInHierarchy && !hero.enabled && !opponent.enabled,
+                        "An actor appeared during the narrated GX harbor entrance.");
+                    story.Update(.8f);
+                    Require(teacher.gameObject.activeSelf && !teacher.gameObject.activeInHierarchy,
+                        "The harbor entrance did not set the character's mark while keeping the walker hidden.");
+                    VerifyDisplayedText(lines[teacherEntrance]);
+                    CaptureGx("08-harbor-narration");
                     int greeting = Array.FindIndex(lines, teacherEntrance + 1, line => line.speaker == "크로노스 데 메디치");
                     Require(greeting > teacherEntrance && greeting + 1 < lines.Length && lines[greeting + 1].speaker == "윤",
                         "Crowler's scripted greeting did not receive Yun's reply.");
                     bind.Invoke(dialogue, new object[] { greeting, false });
                     VerifyDisplayedText(lines[greeting]);
-                    Require((bool)dialogueType.GetField("_opponentSpeaking", flags).GetValue(dialogue),
-                        "Crowler's greeting was not attributed to him.");
+                    Require(!stage.gameObject.activeInHierarchy && !hero.enabled && opponent.enabled &&
+                        (bool)dialogueType.GetField("_opponentSpeaking", flags).GetValue(dialogue),
+                        "Crowler did not appear by himself when delivering the greeting.");
+                    CaptureGx("09-crowler-speaking");
                     bind.Invoke(dialogue, new object[] { greeting + 1, false });
                     VerifyDisplayedText(lines[greeting + 1]);
-                    Require((bool)dialogueType.GetField("_heroSpeaking", flags).GetValue(dialogue),
-                        "Yun's scripted response did not switch to the player speaker.");
+                    Require(!stage.gameObject.activeInHierarchy && hero.enabled && !opponent.enabled &&
+                        (bool)dialogueType.GetField("_heroSpeaking", flags).GetValue(dialogue),
+                        "Crowler stayed visible after Yun started replying.");
+                    CaptureGx("10-yun-reply");
                     int castEntrance = Array.FindIndex(lines, harborIndex, line => line.stage?.Length > 1 &&
                         line.stage.Any(action => action.actor == 119));
                     bind.Invoke(dialogue, new object[] { harborIndex, false });
@@ -1122,7 +1136,6 @@ namespace YGOPortable.Editor
                         !FieldScene().Find("DialogueCast/Guest_119").gameObject.activeSelf,
                         "Asuka or Jaden appeared before the scripted meeting.");
                     bind.Invoke(dialogue, new object[] { castEntrance, false });
-                    var stage = FieldScene().Find("DialogueCast");
                     Require(stage.Find("Guest_107").gameObject.activeSelf && stage.Find("Guest_119").gameObject.activeSelf,
                         "Asuka or Jaden was missing at the scripted meeting.");
                     foreach (var actor in stage.Cast<RectTransform>().Where(actor => actor.gameObject.activeSelf))
@@ -1141,8 +1154,8 @@ namespace YGOPortable.Editor
                     VerifyDisplayedText(lines[asukaThought]);
                     CaptureGx("07-asuka-monologue");
                     bind.Invoke(dialogue, new object[] { greeting, false });
-                    Require(stage.gameObject.activeInHierarchy && teacher.gameObject.activeInHierarchy,
-                        "Leaving a GX monologue did not restore the scripted dialogue cast.");
+                    Require(!stage.gameObject.activeInHierarchy && !hero.enabled && opponent.enabled,
+                        "Returning from a GX monologue showed the silent cast again.");
                     bind.Invoke(dialogue, new object[] { 0, false });
 
                     void VerifySoloShot(string shown, string hidden)
@@ -1204,9 +1217,9 @@ namespace YGOPortable.Editor
                     Require(sprites.TryGetValue(path, out var expected) && expected != null && portrait.sprite == expected,
                         $"The dialogue did not display the portrait for {speaker}.");
                     var guest = FieldScene().Find($"DialogueCast/Guest_{id}");
-                    Require(guest != null && guest.gameObject.activeInHierarchy &&
+                    Require(guest != null && guest.gameObject.activeSelf && !guest.gameObject.activeInHierarchy &&
                         guest.Find("Sprite").GetComponent<Image>().sprite != null,
-                        $"The stage did not display the SD sprite for {speaker}.");
+                        $"The stage did not preserve the camera mark for {speaker} with the walker hidden.");
                 }
 
                 void VerifyDisplayedText(StoryDialogueLine line)
@@ -1493,6 +1506,8 @@ namespace YGOPortable.Editor
                             previousMap = line.SceneMapPath;
                             var terrain = CurrentTerrain();
                             var cast = FieldScene().Find("DialogueCast");
+                            if (world.IsGxCampaign)
+                                Require(!cast.gameObject.activeInHierarchy, $"GX stage walkers appeared in {episode.id} line {index + 1}.");
                             foreach (RectTransform actor in cast)
                                 Require(terrain.Contains(actor.anchorMin),
                                     $"{actor.name} was outside the floor of {terrain.Spot.spotId} at {episode.id} line {index + 1}.");

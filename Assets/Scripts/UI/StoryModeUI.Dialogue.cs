@@ -400,7 +400,7 @@ namespace YGOPortable.UI
                     if (_cutsceneBlend >= 1f) SetSprite(_cutscenePrevious, null);
                 }
                 float sceneAlpha = 1f - _cutsceneOverlay.alpha;
-                float portraitAlpha = _field?.RpgStageRunning == true ? sceneAlpha * .16f : sceneAlpha;
+                float portraitAlpha = !IsGxDialogue && _field?.RpgStageRunning == true ? sceneAlpha * .16f : sceneAlpha;
                 _portraitGroup.alpha = Mathf.MoveTowards(_portraitGroup.alpha, portraitAlpha, delta * 8f);
                 _heading.canvasRenderer.SetAlpha(sceneAlpha);
                 _headingPlate.canvasRenderer.SetAlpha(sceneAlpha);
@@ -537,10 +537,7 @@ namespace YGOPortable.UI
                 bool soloPortrait = IsGxDialogue && !narration && (internalMonologue ||
                     (string.IsNullOrEmpty(line.cutscene) && line.stage?.Length is not > 0 && _field?.RpgHasSingleSpeaker == true));
                 if (IsGxDialogue)
-                {
                     BindGxSpeakerPortraits(line.speaker, speaker, previousHeroSpeaking, soloPortrait);
-                    _field?.SetRpgSoloPortrait(soloPortrait && (_hero.enabled || _opponent.enabled));
-                }
                 else if (_rpg)
                 {
                     if (_heroSpeaking || _hero.sprite == null)
