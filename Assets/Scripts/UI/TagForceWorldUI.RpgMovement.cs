@@ -12,6 +12,7 @@ namespace YGOPortable.UI
         private const float RpgStrideDistanceScale = 1.46f;
         private const float RpgSceneryFocusY = .55f;
         private static readonly Vector2 RpgFieldActorSize = new(82f, 83f);
+        private static readonly Vector2 GxFieldActorSize = new(136f, 138f);
         private readonly List<RectTransform> _rpgDepthOrder = new();
         private RectTransform _rpgSceneSpace, _rpgViewport;
         private Vector2 _rpgCameraPan;
@@ -69,7 +70,7 @@ namespace YGOPortable.UI
                     center.x = leftCenter <= rightCenter ? Mathf.Clamp(center.x, leftCenter, rightCenter) :
                         (leftCenter + rightCenter) * .5f;
                     float lowerCenter = .425f + (position.y - min.y) * span.y;
-                    float upperCenter = .875f + (position.y - max.y) * span.y;
+                    float upperCenter = (IsGxCampaign ? .82f : .875f) + (position.y - max.y) * span.y;
                     center.y = Mathf.Clamp(center.y, lowerCenter, Mathf.Max(lowerCenter, upperCenter));
                 }
             }
@@ -161,6 +162,14 @@ namespace YGOPortable.UI
             {
                 Portrait(art, path, name);
                 return null;
+            }
+
+            if (IsGxCampaign)
+            {
+                // Grow the sprite upward from its ground position and leave room for the icon above it.
+                var actor = (RectTransform)art.parent;
+                actor.sizeDelta = GxFieldActorSize;
+                actor.pivot = new Vector2(.5f, .36f);
             }
 
             if (directions != null || sides != null || profile != null)

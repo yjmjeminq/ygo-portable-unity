@@ -296,6 +296,7 @@ namespace YGOPortable.Editor
                             Require(storyRoot.gameObject.activeInHierarchy && !world.CanWalk &&
                                 FieldScene().Find("DialogueCast") != null && Get("_session") == null,
                                 $"Automatic cutscene did not lock controls at {episode.id}.");
+                            VerifyGxWalkerSizes();
                             Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
                                 .text == "오토 켜짐", $"Automatic playback is off for {episode.id}.");
                             VerifyDialogueStart(episode.preDialogues, episode.id);
@@ -312,9 +313,11 @@ namespace YGOPortable.Editor
                             $"GX duel HUD or field was missing for {episode.id}.");
                         bool isPov = episode.playAsCharacterId > 0;
                         Require((panel.Find("FieldHud/GxPov") != null) == isPov, $"Wrong field point of view at {episode.id}.");
+                        VerifyGxWalkerSizes();
                         app.OpenRpgFieldEpisode(index);
                         Require(story.IsGxRpg && story.GetOpponentMatch(episode).Deck?.id == episode.deckId &&
                             FieldScene().Find("DialogueCast") != null, $"GX episode used the wrong deck or stage at {episode.id}.");
+                        VerifyGxWalkerSizes();
                         VerifyDialogueStart(episode.preDialogues, episode.id);
                         if (episode.id == "gx_ep_01")
                         {
@@ -387,6 +390,14 @@ namespace YGOPortable.Editor
                     if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
                     else PlayerPrefs.DeleteKey(gxPreference);
                     PlayerPrefs.Save();
+                }
+
+                void VerifyGxWalkerSizes()
+                {
+                    var walkers = FieldScene().GetComponentsInChildren<TagForceRpgWalkAnimator>(true);
+                    Require(walkers.Length > 0 && walkers.All(walker => walker.transform.parent is RectTransform actor &&
+                        actor.sizeDelta.y >= 130f && actor.pivot.y < .5f),
+                        "A GX field or staged walker is too small or grows downward from the ground point.");
                 }
 
                 void VerifyDialogueStart(StoryDialogueLine[] lines, string episodeId)
