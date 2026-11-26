@@ -24,7 +24,13 @@ namespace YGOPortable.UI
         private void BuildRpgMap()
         {
             BuildRpgMenuBackdrop();
-            _header.text = "월드맵  /  새틀라이트 · 네오 도미노 시티";
+            _header.gameObject.SetActive(false);
+            var sky = Area(_body, "Atmosphere", .26f, -.36f, 1.24f, 1.24f);
+            DuelUiKit.AddImage(sky.gameObject, RpgSoftLight, new Color(.34f, .36f, .67f, .28f), false, false);
+            RpgUiStyle.Display(HudLabel(Area(_body, "MapTitle", .013f, 1.018f, .108f, 1.127f), "월드맵", 35,
+                new Color(.93f, .97f, 1f)));
+            RpgUiStyle.Reading(HudLabel(Area(_body, "MapArea", .113f, 1.022f, .61f, 1.115f),
+                "새틀라이트 · 네오 도미노 시티", 23, new Color(.76f, .83f, .94f)));
             _rpgMapTime = 0f;
             _rpgMapPulses.Clear();
             int cleared = RpgClears;
@@ -32,7 +38,7 @@ namespace YGOPortable.UI
             int target = cleared < episodes.Length ? RegionForEpisode(cleared + 1) : -1;
             BuildRpgMapLegend();
             var mapWell = Area(_body, "Atlas", .006f, .019f, .730f, .989f);
-            RpgUiStyle.Panel(mapWell, accent: true);
+            RpgUiStyle.Glass(mapWell);
             var crop = Area(mapWell, "MapInset", .014f, .041f, .987f, .957f);
             crop.gameObject.AddComponent<RectMask2D>();
             var atlas = DuelUiKit.FillRect("MapArt", crop);
@@ -41,7 +47,7 @@ namespace YGOPortable.UI
             fit.aspectRatio = 16f / 9f;
             var art = _images.Get(RpgMapArt);
             if (art == null) Tint(atlas, new Color(.051f, .142f, .226f));
-            else DuelUiKit.AddImage(atlas.gameObject, art, new Color(.78f, .87f, .97f), false, false);
+            else DuelUiKit.AddImage(atlas.gameObject, art, new Color(.90f, .94f, 1f), false, false);
 
             var paths = DuelUiKit.FillRect("Routes", atlas).gameObject.AddComponent<RpgWorldRoutes>();
             paths.raycastTarget = false;
@@ -50,16 +56,28 @@ namespace YGOPortable.UI
                     RpgRegions[to].IsOpen(cleared));
 
             var dossier = Area(_body, "RegionPreview", .746f, .019f, .993f, .989f);
-            RpgUiStyle.Panel(dossier);
+            RpgUiStyle.Glass(dossier);
             var thumb = DuelUiKit.AddImage(Area(dossier, "Thumbnail", .066f, .639f, .934f, .928f).gameObject,
                 null, Color.white, true, false);
-            var state = HudLabel(Area(dossier, "Status", .078f, .559f, .929f, .623f), "", 17, RpgUiStyle.Cyan, heading: true);
-            var title = HudLabel(Area(dossier, "RegionName", .077f, .468f, .931f, .555f), "", 31, Color.white, heading: true);
-            Tint(Area(dossier, "Divider", .079f, .452f, .926f, .455f), new Color(.36f, .63f, .75f, .40f));
-            var main = HudLabel(Area(dossier, "StoryEvent", .08f, .376f, .93f, .438f), "", 18, RpgUiStyle.Gold, heading: true);
-            var request = HudLabel(Area(dossier, "RequestEvent", .08f, .312f, .93f, .371f), "", 17, RpgUiStyle.Cyan);
+            var tag = Area(dossier, "RegionState", .073f, .565f, .80f, .621f);
+            RpgUiStyle.Glass(tag);
+            var indicator = DuelUiKit.AddImage(Anchor(tag, "Indicator", new(.079f, .5f), Vector2.one * 13f).gameObject,
+                RpgUiStyle.Glyph(RpgUiStyle.Symbol.Dot), RpgUiStyle.Cyan, true, false);
+            var state = HudLabel(Area(tag, "Status", .16f, .04f, .96f, .96f), "", 16, RpgUiStyle.Cyan);
+            var title = HudLabel(Area(dossier, "RegionName", .073f, .461f, .937f, .555f), "", 34, Color.white);
+            RpgUiStyle.Display(title);
+            Tint(Area(dossier, "Divider", .079f, .451f, .926f, .453f), new Color(.50f, .64f, .80f, .31f));
+            var mainMark = DuelUiKit.AddImage(Area(dossier, "StoryMark", .074f, .387f, .13f, .429f).gameObject,
+                RpgUiStyle.Glyph(RpgUiStyle.Symbol.Alert), RpgUiStyle.Gold, true, false);
+            var main = HudLabel(Area(dossier, "StoryEvent", .148f, .376f, .93f, .438f), "", 19, RpgUiStyle.Gold);
+            var questMark = HudLabel(Area(dossier, "RequestMark", .074f, .312f, .13f, .371f), "?", 19, RpgUiStyle.Cyan,
+                align: TextAnchor.MiddleCenter, heading: true);
+            var request = HudLabel(Area(dossier, "RequestEvent", .148f, .312f, .93f, .371f), "", 18, RpgUiStyle.Cyan);
             var guests = HudLabel(Area(dossier, "Residents", .08f, .147f, .928f, .301f), "", 18,
                 new Color(.85f, .91f, .96f), align: TextAnchor.UpperLeft);
+            RpgUiStyle.Reading(main);
+            RpgUiStyle.Reading(request);
+            RpgUiStyle.Reading(guests);
             guests.lineSpacing = 1.18f;
             int selected = -1;
             var travel = RpgButton(Area(dossier, "Travel", .068f, .037f, .932f, .127f), "이동하기", () =>
@@ -67,9 +85,13 @@ namespace YGOPortable.UI
                 if (selected < 0 || !RpgRegions[selected].IsOpen(RpgClears) || _rpgPendingRegion >= 0) return;
                 if (selected == _rpgLocation) Show(Page.Field);
                 else BeginRpgTravel(selected, RpgArrival);
-            }, 23, primary: true);
-            RpgUiStyle.Control(travel, primary: true, beveled: true);
+            }, 23, primary: true, prominent: true);
             var travelText = travel.GetComponentInChildren<Text>();
+            travelText.alignment = TextAnchor.MiddleLeft;
+            travelText.rectTransform.anchorMin = new(.092f, .02f);
+            travelText.rectTransform.anchorMax = new(.81f, .98f);
+            var travelIcon = DuelUiKit.AddImage(Area(travel.transform, "TravelMark", .836f, .24f, .943f, .76f).gameObject,
+                RpgUiStyle.Glyph(RpgUiStyle.Symbol.Chevron), RpgUiStyle.Cyan, true, false);
 
             var selections = new Image[RpgRegions.Length];
             var pins = new Button[RpgRegions.Length];
@@ -87,7 +109,7 @@ namespace YGOPortable.UI
                 DuelUiKit.AddImage(pin.gameObject, DuelUiKit.WhiteSprite, Color.clear, false, true);
                 var pinBody = Anchor(pin, "Body", new(.5f, .5f), Vector2.one * 49f);
                 DuelUiKit.AddImage(pinBody.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Hexagon),
-                    new Color(.037f, .09f, .152f, .94f), false, false);
+                    new Color(.076f, .124f, .223f, .97f), false, false);
                 var ring = Anchor(pin, "Ring", new(.5f, .5f), Vector2.one * 42f);
                 var rim = DuelUiKit.AddImage(ring.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Ring), color, false, false);
                 var glyph = goal ? RpgUiStyle.Symbol.Alert : open ? RpgUiStyle.Symbol.Dot : RpgUiStyle.Symbol.Lock;
@@ -117,6 +139,7 @@ namespace YGOPortable.UI
                     selectedColor = new Color(1f, 1f, 1f, .67f), pressedColor = new Color(.65f, .88f, 1f),
                     disabledColor = Color.gray, colorMultiplier = 1f, fadeDuration = .12f };
                 pin.gameObject.AddComponent<TagForceCursorSound>();
+                MenuButtonMotion.Attach(button, ring, color, underline: false);
                 button.onClick.AddListener(() => Select(index));
 
                 void AddPulse(string id, Color glowColor, float phase, float size)
@@ -148,7 +171,9 @@ namespace YGOPortable.UI
                 _images.Trim();
                 title.text = region.Name;
                 state.text = !open ? "잠김 · 이야기 진행 시 개방" : current ? "현재 위치" : "이동 가능";
+                tag.anchorMax = new Vector2(open ? .415f : .86f, tag.anchorMax.y);
                 state.color = open ? RpgUiStyle.Cyan : new Color32(185, 193, 211, 255);
+                indicator.color = state.color;
                 var story = index == target ? episodes[cleared] : null;
                 var quests = RpgSideQuest.All.Where(item => item.Region == region.Id);
                 var quest = quests.FirstOrDefault();
@@ -158,10 +183,12 @@ namespace YGOPortable.UI
                     return RpgPendingDeliveries(item).Any() || IsRpgQuestOpen(item, cleared) &&
                         status != RpgQuestState.Complete && (item.Id != RpgSideQuest.GarageCouplerId || status != RpgQuestState.Available);
                 });
-                main.text = open && story != null ? $"[!] {story.opponentName}" : "[!] 메인 사건 없음";
-                request.text = open && requestHere != null ? $"[?] {requestHere.Title}" : "[?] 의뢰 없음";
+                main.text = open && story != null ? story.opponentName : "메인 사건 없음";
+                request.text = open && requestHere != null ? requestHere.Title : "의뢰 없음";
                 main.color = open && story != null ? (Color)RpgUiStyle.Gold : new Color(.59f, .66f, .75f);
                 request.color = open && requestHere != null ? (Color)RpgUiStyle.Cyan : new Color(.59f, .66f, .75f);
+                mainMark.color = main.color;
+                questMark.color = request.color;
                 var locals = RpgLocalResidents(episodes, index, cleared, story, quest).Select(actor => actor.opponentName);
                 if (quest != null && quest.Giver != story?.charId) locals = locals.Prepend(RpgQuestName(quest));
                 if (HasRpgMerchant(index, cleared)) locals = locals.Append(RpgShopkeeperName);
@@ -170,6 +197,9 @@ namespace YGOPortable.UI
                     residentNames.Length > 0 ? $"머무는 인물\n{residentNames}" : "머무는 인물 없음";
                 travel.interactable = open;
                 travelText.text = !open ? "이동 잠김" : current ? "필드로 돌아가기" : "이동하기";
+                travelIcon.sprite = RpgUiStyle.Glyph(open ? RpgUiStyle.Symbol.Chevron : RpgUiStyle.Symbol.Lock);
+                travelIcon.color = open ? RpgUiStyle.Cyan : new Color32(162, 178, 207, 255);
+                if (playSound) UiEntranceMotion.Play(dossier.gameObject, .78f, .18f);
             }
         }
 
@@ -193,7 +223,7 @@ namespace YGOPortable.UI
                 float left = index * .305f;
                 var icon = Anchor(legend, "Mark", new(left + .024f, .5f), Vector2.one * 19f);
                 DuelUiKit.AddImage(icon.gameObject, RpgUiStyle.Glyph(symbol), color, false, false);
-                HudLabel(Area(legend, "Key", left + .065f, .02f, left + .27f, .98f), text, 16, color, heading: true);
+                RpgUiStyle.Reading(HudLabel(Area(legend, "Key", left + .065f, .02f, left + .27f, .98f), text, 17, color));
             }
         }
 
@@ -230,7 +260,7 @@ namespace YGOPortable.UI
                 var b = rect.min + Vector2.Scale(end, rect.size);
                 var normal = Vector2.Perpendicular((b - a).normalized);
                 AddLine(mesh, a, b, normal * (open ? 2.4f : 1.7f), new Color32(13, 29, 54, open ? (byte)199 : (byte)142));
-                if (open) AddLine(mesh, a, b, normal, new Color32(139, 223, 239, 217));
+                if (open) AddLine(mesh, a, b, normal, new Color32(172, 220, 239, 195));
                 else for (int i = 0, n = Mathf.Max(1, Mathf.RoundToInt(Vector2.Distance(a, b) / 14f)); i < n; i++)
                     AddLine(mesh, Vector2.Lerp(a, b, (float)i / n), Vector2.Lerp(a, b, (i + .56f) / n),
                         normal * .75f, new Color32(181, 200, 225, 146));

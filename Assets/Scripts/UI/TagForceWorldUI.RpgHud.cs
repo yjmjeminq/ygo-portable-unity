@@ -111,8 +111,8 @@ namespace YGOPortable.UI
                 align: TextAnchor.MiddleCenter, heading: true);
             var locationRibbon = Area(_rpgFieldHud, "CurrentRegion", .113f, .929f, .322f, .982f);
             RpgUiStyle.Panel(locationRibbon, accent: true);
-            HudLabel(Area(locationRibbon, "RegionName", .105f, .08f, .95f, .93f), RpgRegions[_rpgLocation].Name,
-                26, Color.white, heading: true);
+            RpgUiStyle.Display(HudLabel(Area(locationRibbon, "RegionName", .105f, .08f, .95f, .93f),
+                RpgRegions[_rpgLocation].Name, 26, Color.white));
 
             var deckName = DeckRepository.UserDecks.Find(deck => deck.id == (_deckId ?? CollectionProgress.LastDuelDeckId))?.name ??
                 DeckRepository.UserDecks.Find(deck => GameAppController.CanStartWithDeck(deck, out _))?.name ?? "덱 없음";
@@ -192,13 +192,11 @@ namespace YGOPortable.UI
             map.navigation = new Navigation { mode = Navigation.Mode.None };
             HudLabel(Area(guide, "Tab", .755f, .07f, .979f, .94f), touch ? "탭으로 선택" : "TAB   메뉴", 15, soft, heading: true);
             _rpgActionButton = RpgButton(Area(_rpgFieldHud, "ContextAction", .653f, .028f, .851f, .087f),
-                "", ActivateRpgInteraction, 21, primary: true, sound: null);
-            RpgUiStyle.Control(_rpgActionButton, primary: true, beveled: true);
+                "", ActivateRpgInteraction, 21, primary: true, sound: null, prominent: true);
             _rpgActionButton.navigation = new Navigation { mode = Navigation.Mode.None };
             _rpgActionText = _rpgActionButton.GetComponentInChildren<Text>();
             var menu = RpgButton(Area(_rpgFieldHud, "MenuToggle", .873f, .028f, .981f, .088f),
                 "메뉴", () => ToggleFieldMenu(), 20, sound: null);
-            RpgUiStyle.Control(menu, beveled: true);
             menu.navigation = new Navigation { mode = Navigation.Mode.None };
             _rpgMenuCaption = menu.GetComponentInChildren<Text>();
 

@@ -303,7 +303,7 @@ namespace YGOPortable.Editor
                 var mapButton = world.Root.transform.Find("RpgNavigation/Map").GetComponent<Button>();
                 Require(((Image)mapButton.targetGraphic).type == Image.Type.Sliced &&
                     mapButton.colors.fadeDuration > 0f && mapButton.colors.selectedColor != mapButton.colors.normalColor &&
-                    mapButton.GetComponentInChildren<Text>().font == Resources.Load<Font>("StoryFonts/Pretendard-Medium"),
+                    mapButton.GetComponentInChildren<Text>().font == Resources.Load<Font>("StoryFonts/GowunDodum-Regular"),
                     "RPG navigation lost its rounded treatment or visible controller focus.");
                 var player = (RectTransform)FieldScene().Find("Player");
                 var radarPlayer = (RectTransform)hud.Find("Minimap/Radar/Points/Player");
@@ -343,6 +343,17 @@ namespace YGOPortable.Editor
                     EventSystem.current.currentSelectedGameObject == mapButton.gameObject &&
                     player.anchorMin == atLandmark && !panel.Find("FieldViewport").GetComponent<CanvasGroup>().blocksRaycasts,
                     "The field menu did not capture controller focus and suspend field interaction.");
+                var motion = mapButton.GetComponent<MenuButtonMotion>();
+                var surface = mapButton.GetComponent<ButtonSurfaceMotion>();
+                var label = mapButton.GetComponentInChildren<Text>().rectTransform;
+                var hitbox = ((RectTransform)mapButton.transform).rect;
+                motion.Advance(.14f);
+                Require(label.localScale.x > 1f && surface.Scale > 1f, "Controller focus did not animate the map button.");
+                motion.OnPointerDown(new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left });
+                motion.Advance(.12f);
+                Require(label.localScale.x < 1f && surface.Scale < 1f && ((RectTransform)mapButton.transform).rect == hitbox,
+                    "Pressing the button did not animate independently of its hitbox.");
+                motion.OnPointerUp(null);
                 var handlePad = typeof(GameAppController).GetMethod("HandleMenuInput", flags);
                 handlePad.Invoke(app, new object[] { new DeckPadFrame(Vector2Int.down, DeckPadButtons.None), false });
                 Require(EventSystem.current.currentSelectedGameObject == mapButton.transform.parent.Find("Quests").gameObject,

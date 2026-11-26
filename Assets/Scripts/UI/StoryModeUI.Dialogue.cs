@@ -557,7 +557,11 @@ namespace YGOPortable.UI
                 }
                 foreach (var label in new[] { _text, _logText, _speaker, _heading, _heroIdentity, _counter, _choiceSummary })
                 {
-                    if (rpg) RpgUiStyle.Type(label, strong: label == _speaker || label == _heading);
+                    if (rpg)
+                    {
+                        if (label == _speaker || label == _heading) RpgUiStyle.Display(label);
+                        else RpgUiStyle.Reading(label);
+                    }
                     else
                     {
                         label.font = DuelUiKit.FontKR;
@@ -575,7 +579,7 @@ namespace YGOPortable.UI
                 foreach (var popup in new[] { _logRoot, _pickerRoot })
                 {
                     var title = popup.transform.Find("Window/Title/Label").GetComponent<Text>();
-                    if (rpg) RpgUiStyle.Type(title, strong: true);
+                    if (rpg) RpgUiStyle.Display(title);
                     else
                     {
                         title.font = DuelUiKit.FontKR;
@@ -589,9 +593,10 @@ namespace YGOPortable.UI
                 {
                     if (rpg)
                     {
-                        RpgUiStyle.Control(button, primary);
+                        RpgUiStyle.Control(button, primary, animated: button != _next);
                         return;
                     }
+                    if (button.TryGetComponent<MenuButtonMotion>(out var motion)) motion.enabled = false;
                     var image = (Image)button.targetGraphic;
                     image.overrideSprite = null;
                     image.canvasRenderer.SetColor(Color.white);

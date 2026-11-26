@@ -161,10 +161,10 @@ namespace YGOPortable.UI
         }
 
         private static Button RpgButton(RectTransform area, string text, Action action, int size = 19,
-            bool primary = false, TagForceSfx? sound = TagForceSfx.Confirm)
+            bool primary = false, TagForceSfx? sound = TagForceSfx.Confirm, bool prominent = false)
         {
             var button = Btn(area, text, action, size, sound);
-            RpgUiStyle.Control(button, primary);
+            RpgUiStyle.Control(button, primary, prominent);
             return button;
         }
 
@@ -180,6 +180,7 @@ namespace YGOPortable.UI
                 return;
             }
             var image = (Image)_back.targetGraphic;
+            if (_back.TryGetComponent<MenuButtonMotion>(out var motion)) motion.enabled = false;
             image.sprite = DuelUiKit.WhiteSprite;
             image.type = Image.Type.Simple;
             image.color = new Color(.12f, .31f, .39f);
@@ -194,7 +195,6 @@ namespace YGOPortable.UI
         {
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(page != Page.Field);
-            RpgUiStyle.Control(_back, beveled: page == Page.Map);
             _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
             DuelAudio.PlayTagForceBgm(_rpgLocation is RpgPoppo or RpgStadium or RpgMoment);
             switch (page)

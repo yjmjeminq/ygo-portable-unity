@@ -60,3 +60,5 @@ OpenAI 내장 이미지 생성 도구로 여섯 장을 각각 생성한 뒤 1920
 ## 5D's 월드맵
 
 `5DS/Maps/world_map_5ds.png`는 OpenAI 내장 이미지 생성 도구로 제작한 1920×1080 배경입니다. 황혼의 새틀라이트 산업 지대와 네오 도미노 시티를 다리로 잇고, 도시 위 구름에 아크 크레이들을 배치한 조감도입니다. 지역 핀과 이동 경로는 게임이 세이브 상태에 맞춰 표시합니다.
+
+월드맵 설명과 대화 본문에는 양희류의 [고운돋움](https://github.com/yangheeryu/Gowun-Dodum)을 사용합니다. SIL Open Font License 전문은 `GowunDodum-OFL.txt`로 함께 배포합니다.

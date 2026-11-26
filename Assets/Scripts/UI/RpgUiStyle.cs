@@ -5,13 +5,13 @@ namespace YGOPortable.UI
 {
     internal static class RpgUiStyle
     {
-        private static Font _body, _strong;
-        private static Sprite _panel, _accentPanel, _goldPanel, _dialogue, _speaker, _control, _beveledControl;
-        private static readonly Color32 TextColor = new(234, 242, 247, 255);
+        private static Font _body, _strong, _reading, _display;
+        private static Sprite _panel, _accentPanel, _goldPanel, _dialogue, _speaker, _glass, _control, _action, _prominent;
+        private static readonly Color32 TextColor = new(239, 244, 252, 255);
         internal static readonly Color32 Cyan = new(111, 230, 244, 255);
         internal static readonly Color32 Gold = new(255, 205, 117, 255);
-        internal enum Symbol { Dot, Arrow, Star, Hexagon, Ring, Lock, Alert }
-        private static readonly Sprite[] Symbols = new Sprite[(int)Symbol.Alert + 1];
+        internal enum Symbol { Dot, Arrow, Star, Hexagon, Ring, Lock, Alert, Chevron }
+        private static readonly Sprite[] Symbols = new Sprite[(int)Symbol.Chevron + 1];
 
         internal static Sprite Glyph(Symbol symbol) => Symbols[(int)symbol] ??= DrawGlyph(symbol);
 
@@ -37,6 +37,7 @@ namespace YGOPortable.UI
                             Mathf.Min(new Vector2(px, py - .25f).magnitude - .29f, py - .06f))),
                     Symbol.Alert => Mathf.Max(Mathf.Min(.14f - ax, .40f - Mathf.Abs(py - .24f)),
                         .15f - new Vector2(px, py + .51f).magnitude),
+                    Symbol.Chevron => Mathf.Min(.53f - ay, .103f - Mathf.Abs(px + ay * .92f - .27f)),
                     _ => 0f,
                 };
                 pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(boundary * 22f + .5f));
@@ -46,11 +47,25 @@ namespace YGOPortable.UI
 
         internal static void Type(Text label, bool strong = false)
         {
-            label.font = (strong
+            SetFont(label, strong
                 ? _strong ??= Resources.Load<Font>("StoryFonts/Pretendard-SemiBold")
-                : _body ??= Resources.Load<Font>("StoryFonts/Pretendard-Medium")) ?? DuelUiKit.FontKR;
+                : _body ??= Resources.Load<Font>("StoryFonts/Pretendard-Medium"));
+        }
+
+        internal static void Reading(Text label) => SetFont(label,
+            _reading ??= Resources.Load<Font>("StoryFonts/GowunDodum-Regular"));
+
+        internal static void Display(Text label) => SetFont(label,
+            _display ??= Resources.Load<Font>("StoryFonts/Paperlogy-7Bold"));
+
+        private static void SetFont(Text label, Font font)
+        {
+            label.font = font ?? DuelUiKit.FontKR;
             label.fontStyle = FontStyle.Normal;
         }
+
+        internal static void Glass(RectTransform rect) => SetPanel(rect, _glass ??= Rounded("RPG soft glass",
+            new Color32(29, 43, 67, 250), new Color32(16, 22, 40, 250), new Color32(118, 153, 186, 125), 23f));
 
         internal static void Panel(RectTransform rect, bool accent = false, bool gold = false)
         {
@@ -79,42 +94,50 @@ namespace YGOPortable.UI
             image.type = Image.Type.Sliced;
         }
 
-        internal static void Control(Button button, bool primary = false, bool beveled = false)
+        internal static void Control(Button button, bool primary = false, bool prominent = false, bool animated = true)
         {
             var image = (Image)button.targetGraphic;
             image.overrideSprite = null;
             image.color = Color.white;
-            image.sprite = beveled
-                ? _beveledControl ??= Bevel("RPG action", 14, 255, Color.white, mask: true)
-                : _control ??= Rounded("RPG control",
-                    new Color32(245, 253, 255, 237), new Color32(216, 235, 249, 228), Color.white, 14f);
+            if (prominent)
+                image.sprite = _prominent ??= Rounded("RPG illuminated action", new Color32(64, 113, 127, 255),
+                    new Color32(29, 55, 87, 255), new Color32(139, 226, 228, 231), 26f);
+            else if (primary)
+                image.sprite = _action ??= Rounded("RPG primary control", new Color32(48, 89, 109, 251),
+                    new Color32(24, 49, 69, 248), new Color32(124, 204, 213, 195), 24f);
+            else
+                image.sprite = _control ??= Rounded("RPG secondary control", new Color32(42, 56, 82, 227),
+                    new Color32(20, 32, 53, 234), new Color32(146, 165, 208, 131), 23f);
             image.type = Image.Type.Sliced;
             button.transition = Selectable.Transition.ColorTint;
             button.colors = new ColorBlock
             {
-                normalColor = primary ? new Color32(34, 80, 91, 255) : new Color32(30, 50, 68, 250),
-                highlightedColor = new Color32(54, 105, 125, 255),
-                selectedColor = new Color32(64, 128, 142, 255),
-                pressedColor = new Color32(45, 92, 109, 255),
-                disabledColor = new Color32(22, 34, 47, 215),
+                normalColor = new Color32(219, 228, 239, 245),
+                highlightedColor = Color.white,
+                selectedColor = new Color32(240, 255, 255, 255),
+                pressedColor = new Color32(157, 211, 228, 255),
+                disabledColor = new Color32(113, 129, 159, 185),
                 colorMultiplier = 1f,
                 fadeDuration = .17f,
             };
             var label = button.GetComponentInChildren<Text>(true);
             if (label != null)
             {
-                Type(label, strong: primary);
+                if (primary) Type(label, strong: true);
+                else Reading(label);
                 label.color = TextColor;
             }
+            if (animated) MenuButtonMotion.Attach(button, label?.rectTransform,
+                primary ? Cyan : new Color32(192, 203, 247, 255), surface: image);
         }
 
         private static Sprite Bevel(string name, float chamfer, byte opacity, Color line,
-            Color? endLine = null, bool mask = false)
+            Color? endLine = null)
         {
             const int size = 96;
             var pixels = new Color32[size * size];
-            Color dark = mask ? new Color32(185, 209, 229, opacity) : new Color32(7, 13, 25, opacity);
-            Color upper = mask ? new Color32(222, 238, 249, opacity) : new Color32(18, 34, 53, opacity);
+            Color dark = new Color32(7, 13, 25, opacity);
+            Color upper = new Color32(18, 34, 53, opacity);
             for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
             {
@@ -141,24 +164,30 @@ namespace YGOPortable.UI
 
         private static Sprite Rounded(string name, Color top, Color bottom, Color edge, float radius)
         {
-            const int size = 64;
+            const int size = 96;
+            const int border = 28;
             const float corner = size * .5f;
             var pixels = new Color32[size * size];
+            Color center = Color.Lerp(bottom, top, .48f);
             for (int y = 0; y < size; y++)
             {
-                var fill = Color.Lerp(bottom, top, y / (size - 1f));
+                float lower = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((border - y) / (float)border));
+                float upper = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((y - (size - border - 1)) / (float)border));
+                // Keep the two sliced edges the same color when a short button collapses the center strip.
+                var fill = Color.Lerp(Color.Lerp(center, bottom, lower), top, upper);
                 float py = Mathf.Abs(y + .5f - corner) - (corner - radius - 1f);
                 for (int x = 0; x < size; x++)
                 {
                     float px = Mathf.Abs(x + .5f - corner) - (corner - radius - 1f);
                     float distance = new Vector2(Mathf.Max(px, 0f), Mathf.Max(py, 0f)).magnitude +
                         Mathf.Min(Mathf.Max(px, py), 0f) - radius;
-                    var color = Color.Lerp(fill, edge, Mathf.Clamp01(distance + 1.5f));
+                    float sheen = .10f * upper * Mathf.Exp(Mathf.Min(0f, distance + 3f) / 6f);
+                    var color = Color.Lerp(fill, edge, Mathf.Max(sheen, Mathf.Clamp01(distance + 1.5f)));
                     color.a *= Mathf.Clamp01(.5f - distance);
                     pixels[y * size + x] = color;
                 }
             }
-            var sprite = DuelUiChrome.CreateSprite(name, size, size, pixels, Vector4.one * 16f);
+            var sprite = DuelUiChrome.CreateSprite(name, size, size, pixels, Vector4.one * border);
             sprite.name = name;
             return sprite;
         }

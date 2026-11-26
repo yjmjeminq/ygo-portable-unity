@@ -183,13 +183,13 @@ namespace YGOPortable.Editor
                             scene.Find("ProtagonistSD") == null && scene.Find("OpponentSD") == null,
                             "Narration lost the two stage portraits or displayed an SD character inside the panel.");
                         Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.28f) &&
-                            body.font == Resources.Load<Font>("StoryFonts/Pretendard-Medium") &&
+                            body.font == Resources.Load<Font>("StoryFonts/GowunDodum-Regular") &&
                             scene.Find("DialogueBox").GetComponent<Image>() is { type: Image.Type.Sliced } panel &&
                             panel.sprite.name == "RPG dialogue glass" &&
                             scene.Find("DialogueTools").GetComponentsInChildren<Button>().Length == 4 &&
                             ((Image)next.targetGraphic).color.a == 0f &&
                             string.IsNullOrEmpty(next.GetComponentInChildren<Text>().text) &&
-                            badge.GetComponentInChildren<Text>(true).font == Resources.Load<Font>("StoryFonts/Pretendard-SemiBold") &&
+                            badge.GetComponentInChildren<Text>(true).font == Resources.Load<Font>("StoryFonts/Paperlogy-7Bold") &&
                             body.GetComponent<Shadow>().effectDistance == new Vector2(1.5f, -1.5f) &&
                             body.color == new Color(.92f, .93f, .96f) && !caret.enabled &&
                             cg.GetComponent<AspectRatioFitter>().aspectMode == AspectRatioFitter.AspectMode.FitInParent,
