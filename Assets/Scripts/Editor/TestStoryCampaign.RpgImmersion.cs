@@ -9,14 +9,15 @@ namespace YGOPortable.Editor
 {
     internal static partial class TestStoryCampaign
     {
-        private static void VerifyRpgTerrainData(string streaming)
+        private static void VerifyRpgTerrainData(string streaming, bool gxOnly = false)
         {
             var gx = TagForceData.LoadRpgConfiguration(streaming, StoryModeUI.GxRpgSeriesId);
-            var fiveDs = TagForceData.LoadRpgConfiguration(streaming, StoryModeUI.RpgSeriesId);
-            Require(gx.spots.Length == 12 && fiveDs.fieldSpots.Length == 11 &&
+            var fiveDs = gxOnly ? Array.Empty<TagForceSpot>() :
+                TagForceData.LoadRpgConfiguration(streaming, StoryModeUI.RpgSeriesId).fieldSpots;
+            Require(gx.spots.Length == 12 && (gxOnly || fiveDs.Length == 11) &&
                 gx.fieldScenes.Length == 2, "A campaign or prologue background omitted its terrain data.");
             var path = new List<Vector2>(24);
-            foreach (var spot in gx.spots.Concat(fiveDs.fieldSpots).Concat(gx.fieldScenes))
+            foreach (var spot in gx.spots.Concat(fiveDs).Concat(gx.fieldScenes))
             {
                 var terrain = new RpgFieldTerrain(spot);
                 Require(spot.walkPolygon.All(terrain.Contains) &&
@@ -35,6 +36,8 @@ namespace YGOPortable.Editor
                 {
                     var target = terrain.Ground(new Vector2(x * .20f, y * .20f));
                     Require(terrain.Contains(target), $"Ground projection left the floor of {spot.spotId}.");
+                    Require(terrain.Contains(terrain.Slide(from, new Vector2(x * .20f, y * .20f))),
+                        $"Manual sliding left the floor of {spot.spotId}.");
                     terrain.BuildPath(from, target, path);
                     var step = from;
                     foreach (var point in path)
@@ -76,7 +79,7 @@ namespace YGOPortable.Editor
             Require(footsteps.Select(surface => DuelAudio.GetRpgFootstep(surface, -1)).Distinct().Count() == 6 &&
                 footsteps.All(surface => DuelAudio.GetRpgFootstep(surface, -1) != DuelAudio.GetRpgFootstep(surface, 1)),
                 "Floor materials or alternating feet shared the same footstep sound.");
-            Debug.Log("[VERIFY 2.5D TERRAIN] 23 fields and 2 prologue stages, monotonic perspective, reachable floor, obstacle routes, wall slide, allocation-free geometry and six step materials passed.");
+            Debug.Log($"[{(gxOnly ? "VERIFY GX TERRAIN" : "VERIFY 2.5D TERRAIN")}] {12 + fiveDs.Length} fields and 2 prologue stages, perspective, obstacle routes, wall slide, allocation-free geometry and six step materials passed.");
         }
     }
 }

@@ -12,7 +12,7 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond, Prologue, Guide, ResortWardrobe, SummerEpilogue }
+        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond, Prologue, Guide, ResortWardrobe, SummerEpilogue, GxDecks }
 
         private readonly GameAppController _app;
         private readonly TagForceWorldImages _images = new();
@@ -140,7 +140,7 @@ namespace YGOPortable.UI
                     _rpgChoosingCompanion = false;
                     Show(Page.Talk);
                 }
-                else if (_page is Page.Map or Page.Talk or Page.Ledger) Show(Page.Field);
+                else if (_page is Page.Map or Page.Talk or Page.Ledger or Page.GxDecks) Show(Page.Field);
                 else if (_page == Page.Duel) Show(Page.Talk);
                 else Show(Page.Map);
                 return;
@@ -209,8 +209,9 @@ namespace YGOPortable.UI
         private void Show(Page page)
         {
             bool openConversation = page == Page.Talk && _page == Page.Field;
-            _preserveRpgCamera = _rpgField && _rpgSceneSpace != null && !_rpgAnnounceArrival &&
-                (openConversation || _page == Page.Talk && page is (Page.Talk or Page.Field));
+            _preserveRpgCamera = (_rpgField && _rpgSceneSpace != null && !_rpgAnnounceArrival &&
+                (openConversation || _page == Page.Talk && page is (Page.Talk or Page.Field))) ||
+                (_page == Page.GxDecks && page == Page.Field);
             _page = page;
             UpdateRpgWorldChrome();
             ClearBody();
@@ -533,18 +534,18 @@ namespace YGOPortable.UI
                 _manualWalk = _moving = false;
             }
             float time = Time.unscaledTime;
-            AdvanceWalk(delta, time);
+            AdvanceWalk(delta, time, IsGxCampaign && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
             if (CanWalk) AdvanceVisitors(time);
             if (_rpgField) RefreshRpgFieldPrompt(delta);
         }
 
-        private void AdvanceWalk(float delta, float time)
+        private void AdvanceWalk(float delta, float time, bool running)
         {
             Vector2 previous = _position;
             bool arrived = false;
             if (_moving)
             {
-                _position = _rpgField ? AdvanceRpgWalk(delta) : Vector2.MoveTowards(_position, _destination, delta * .40f);
+                _position = _rpgField ? AdvanceRpgWalk(delta, running) : Vector2.MoveTowards(_position, _destination, delta * .40f);
                 arrived = _position == _destination;
                 _moving = !arrived;
             }
@@ -1284,17 +1285,18 @@ namespace YGOPortable.UI
             return result;
         }
 
-        internal Sprite[] GetSlices(string path, int columns, int rows, bool fixedCells = false)
+        internal Sprite[] GetSlices(string path, int columns, int rows, bool fixedCells = false, bool fitRows = false)
         {
-            var source = Get(path, readable: !fixedCells);
+            var source = Get(path, readable: !fixedCells || fitRows);
             if (source == null) return null;
             if (_slices.TryGetValue(path, out var clips)) return clips;
             var texture = source.texture;
-            if (!fixedCells && !texture.isReadable) return null;
+            bool trim = texture.isReadable && (!fixedCells || fitRows);
+            if (!fixedCells && !trim) return null;
 
             try
             {
-                Color32[] pixels = fixedCells ? null : texture.GetPixels32();
+                Color32[] pixels = trim ? texture.GetPixels32() : null;
                 var rectangles = new Rect[columns * rows];
                 for (int row = 0; row < rows; row++)
                 {
@@ -1304,7 +1306,7 @@ namespace YGOPortable.UI
                     {
                         int left = texture.width * column / columns;
                         int right = texture.width * (column + 1) / columns;
-                        if (fixedCells)
+                        if (!trim)
                         {
                             rectangles[row * columns + column] = new Rect(left, bottom, right - left, top - bottom);
                             continue;
@@ -1322,6 +1324,25 @@ namespace YGOPortable.UI
                         if (xMin >= xMax || yMin >= yMax) return null;
                         rectangles[row * columns + column] = new Rect(xMin, yMin, xMax - xMin + 1, yMax - yMin + 1);
                     }
+                    if (fitRows && trim)
+                    {
+                        // Share a crop across the three poses so shoulders and feet do not jump between frames.
+                        var bounds = rectangles[row * columns];
+                        for (int column = 1; column < columns; column++)
+                        {
+                            var cell = rectangles[row * columns + column];
+                            bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, cell.xMin - texture.width * column / columns),
+                                Mathf.Min(bounds.yMin, cell.yMin),
+                                Mathf.Max(bounds.xMax, cell.xMax - texture.width * column / columns),
+                                Mathf.Max(bounds.yMax, cell.yMax));
+                        }
+                        for (int column = 0; column < columns; column++)
+                        {
+                            var fit = bounds;
+                            fit.x += texture.width * column / columns;
+                            rectangles[row * columns + column] = fit;
+                        }
+                    }
                 }
                 clips = rectangles.Select(rect => Sprite.Create(texture, rect, new Vector2(.5f, .5f),
                     100f, 0, SpriteMeshType.FullRect)).ToArray();
@@ -1330,7 +1351,7 @@ namespace YGOPortable.UI
             finally
             {
                 _slices.Add(path, clips);
-                if (!fixedCells) texture.Apply(false, true);
+                if (trim) texture.Apply(false, true);
             }
         }
 

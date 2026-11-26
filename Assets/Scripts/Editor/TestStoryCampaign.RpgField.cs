@@ -17,7 +17,7 @@ namespace YGOPortable.Editor
     {
         private const string MapNodes = "Atlas/MapInset/MapArt/Nodes";
 
-        private static void VerifyRpgField(UserDeck playerDeck, string save)
+        private static void VerifyRpgField(UserDeck playerDeck, string save, bool gxOnly = false)
         {
             const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
             string streaming = Application.streamingAssetsPath;
@@ -74,7 +74,7 @@ namespace YGOPortable.Editor
             ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
             var app = canvas.AddComponent<GameAppController>();
             app.AiDifficulty = AIDifficulty.Normal;
-            var story = new StoryModeUI(app, canvas.transform, new StoryHandSequence(0));
+            var story = new StoryModeUI(app, canvas.transform, new StoryHandSequence(new int[40]));
             var world = new TagForceWorldUI(app, canvas.transform);
             var menu = new TitleAndMenuUI(app, canvas.transform);
             var modals = new DuelPromptModals(canvas.transform, null, null);
@@ -98,6 +98,11 @@ namespace YGOPortable.Editor
                 Set("_duelField", new DuelFieldUI(app, canvas.transform, modals));
                 Set("_menuPad", new DeckPadUi(DuelUiKit.FillRect("RpgTestMenuPad", canvas.transform), null));
                 Set("_initialized", true);
+                if (gxOnly)
+                {
+                    VerifyGxCampaign();
+                    return;
+                }
 
                 app.ShowScreen(AppScreen.MainMenu);
                 var entry = menu.MenuRoot.GetComponentsInChildren<Button>()
@@ -287,6 +292,19 @@ namespace YGOPortable.Editor
                 VerifyDialogueBounds(gxScript, "GX");
                 var dialogue = typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
                 var dialogueType = typeof(StoryModeUI.StoryDialogueView);
+                var audioType = typeof(DuelAudio);
+                const BindingFlags audioFlags = BindingFlags.NonPublic | BindingFlags.Static;
+                var audioSource = audioType.GetField("_bgmSource", audioFlags);
+                var pausedMusic = audioType.GetField("_bgmPaused", audioFlags);
+                var oldMusic = audioSource.GetValue(null);
+                var oldPaused = pausedMusic.GetValue(null);
+                float oldVolume = DuelAudio.BgmVolume;
+                var gxAudio = new GameObject("GX field music verification", typeof(AudioSource));
+                var bgm = gxAudio.GetComponent<AudioSource>();
+                bgm.playOnAwake = false;
+                audioSource.SetValue(null, bgm);
+                pausedMusic.SetValue(null, false);
+                DuelAudio.BgmVolume = 0f;
                 Require(File.Exists(Path.Combine(streaming, gxMap.assetConfig.worldMapPath)), "Missing GX world map.");
                 Require(gxMap.roster.All(actor => DeckRepository.GetCharacter(actor.charId) != null), "GX resident has no character entry.");
                 int forbiddenTypes = (int)(YgoConstants.TYPE_SYNCHRO | YgoConstants.TYPE_XYZ |
@@ -307,10 +325,18 @@ namespace YGOPortable.Editor
                     CollectionProgress.Load(isolatedSave);
                     Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out var startingDeck, out string error), error);
                     DeckRepository.SaveUserDeck(startingDeck);
+                    var alternateDeck = CollectionProgress.CopyDeck(startingDeck);
+                    alternateDeck.id = null;
+                    alternateDeck.name = "GX QA · 교체 덱";
+                    DeckRepository.SaveUserDeck(alternateDeck);
                     CollectionProgress.RememberDuelDeck(startingDeck.id);
-                    app.OpenGxRpgField();
+                    app.ShowScreen(AppScreen.MainMenu);
+                    var gxMenu = menu.MenuRoot.GetComponentsInChildren<Button>()
+                        .Single(button => button.transform.parent.name == "GxRpgWorld");
+                    Require(gxMenu.IsInteractable(), "The GX campaign entry was unavailable on the main menu.");
+                    gxMenu.onClick.Invoke();
                     Require(world.Root.activeSelf && world.RpgCampaignId == gx && !world.CanWalk, "GX prologue did not start automatically.");
-                    int scenes = 0, duels = 0, pov = 0;
+                    int scenes = 0, duels = 0, pov = 0, defeats = 0, retries = 0;
                     for (int index = 0; index < gxScript.episodes.Length; index++)
                     {
                         var episode = gxScript.episodes[index];
@@ -322,7 +348,7 @@ namespace YGOPortable.Editor
                         {
                             for (int frame = 0; frame < 12 && !storyRoot.gameObject.activeInHierarchy; frame++)
                                 world.Update(.18f);
-                            Require(storyRoot.gameObject.activeInHierarchy && !world.CanWalk &&
+                            Require(storyRoot.gameObject.activeInHierarchy && !world.CanWalk && !WorldInputRestored() &&
                                 FieldScene().Find("DialogueCast") != null && Get("_session") == null,
                                 $"Automatic cutscene did not lock controls at {episode.id}.");
                             VerifyGxWalkerSizes();
@@ -333,6 +359,8 @@ namespace YGOPortable.Editor
                             {
                                 Require(FieldScene().Find("RpgCompanion") == null, "The GX prologue spawned a partner.");
                                 VerifyGxPrologue(episode);
+                                story.Update(.75f);
+                                CaptureGx("01-opening");
                                 Press(storyRoot, "Scene/DialogueTools/Auto/Button");
                                 Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
                                     .text == "오토 2배", "The cutscene did not switch to double speed.");
@@ -342,9 +370,16 @@ namespace YGOPortable.Editor
                                 VerifyGxGuestArt(episode.preDialogues, "세레나 (여성 프로)", 213);
                                 dialogueType.GetMethod("BindLine", flags).Invoke(dialogue, new object[] { 0, false });
                             }
-                            ReadDialogue(episode);
-                            Require(world.RpgClears == index + 1 && WorldInputRestored() && Get("_session") == null,
-                                $"A cutscene did not advance directly at {episode.id}.");
+                            if (index == 0) VerifyGxSaveRecovery(index, () => ReadDialogue(episode));
+                            else ReadDialogue(episode);
+                            Require(world.RpgClears == index + 1 && WorldInputRestored() && Get("_session") == null &&
+                                FieldScene().Find("DialogueCast") == null && world.HandleFieldInput(default) == world.CanWalk,
+                                $"A cutscene did not restore the field or its input at {episode.id}.");
+                            if (index == 0)
+                            {
+                                CollectionProgress.Load(isolatedSave);
+                                Require(world.RpgClears == 1, "The GX prologue was not saved when it finished.");
+                            }
                             scenes++;
                             continue;
                         }
@@ -352,15 +387,21 @@ namespace YGOPortable.Editor
                         if (episode.id == "gx_ep_01")
                         {
                             VerifyGxHarborWalk();
+                            world.Update(.5f);
+                            CaptureGx("02-harbor");
+                            VerifyGxAspectLayouts(everyMap: false);
                             PressRpgNavigation("Quests");
                             Require(panel.Find("GxStoryJournal/Memories").GetComponentsInChildren<Button>().Length == 0,
                                 "GX memories were visible before their episodes were cleared.");
                             world.Back();
-                            Press(panel, "FieldHud/QuestTrack/Guide");
-                            Require(panel.Find("RegionPreview/RegionName/Label").GetComponent<Text>().text == world.CampaignRegion(location).Name,
-                                "The GX field guide did not preselect the objective region on the map.");
-                            world.Back();
+                            Press(panel, "FieldHud/QuestTrack");
+                            for (int tick = 0; tick < 10 && !world.CanStartRpgEpisode(index); tick++) world.Update(.18f);
+                            Require(world.CanStartRpgEpisode(index) && WorldInputRestored(),
+                                "The GX objective banner did not travel directly from the harbor.");
+                            VerifyGxDeckReturn(location, startingDeck, alternateDeck);
+                            Require(world.EnterRpgRegion(world.CampaignRegionForEpisode(1)), "Could not reopen the harbor map.");
                             PressRpgNavigation("Map");
+                            CaptureGx("03-world-map");
                             Press(panel, "TravelToGoal");
                             for (int tick = 0; tick < 10 && !world.CanStartRpgEpisode(index); tick++) world.Update(.18f);
                             Require(world.CanStartRpgEpisode(index) && WorldInputRestored(),
@@ -374,6 +415,12 @@ namespace YGOPortable.Editor
                         string identity = FieldScene().Find("Player/GxIdentity/Label").GetComponent<Text>().text;
                         Require(identity.Contains(isPov ? "아스카" : "윤"), $"Wrong field point of view at {episode.id}.");
                         VerifyGxWalkerSizes();
+                        if (episode.id == "gx_ep_01")
+                        {
+                            VerifyGxNpcCamera();
+                            VerifyGxRunSpeed();
+                        }
+                        if (isPov) VerifyGxFieldWalker(107);
                         if (episode.id == "gx_ep_01")
                         {
                             var fieldHud = panel.Find("FieldHud");
@@ -397,19 +444,7 @@ namespace YGOPortable.Editor
                             FieldScene().Find("DialogueCast") != null, $"GX episode used the wrong deck or stage at {episode.id}.");
                         VerifyGxWalkerSizes();
                         VerifyDialogueStart(episode.preDialogues, episode.id);
-                        if (episode.id == "gx_ep_01")
-                        {
-                            VerifySpeaker(episode.preDialogues, "윤", player: true);
-                            app.StartStoryDuel(episode, startingDeck, true);
-                            AwardDuel(win: false);
-                            VerifyDialogueStart(episode.postLoseDialogues, episode.id);
-                            VerifySpeaker(episode.postLoseDialogues, "윤", player: true);
-                            Press(storyRoot, "Scene/DialogueTools/Skip/Button");
-                            Press(storyRoot, "Scene/Choices/Choice_3/Button");
-                            Require(world.RpgClears == index && WorldInputRestored() && world.CanStartRpgEpisode(index),
-                                "A GX loss advanced the story or prevented retrying.");
-                            app.OpenRpgFieldEpisode(index);
-                        }
+                        if (episode.id == "gx_ep_01") VerifySpeaker(episode.preDialogues, "윤", player: true);
                         if (isPov)
                         {
                             VerifySpeaker(episode.preDialogues, "텐죠인 아스카", player: true);
@@ -426,7 +461,54 @@ namespace YGOPortable.Editor
                         }
                         if (episode.id == "gx_ep_02") VerifyGxGuestArt(episode.preDialogues, "준코", 205);
                         VerifyGxDuelDialogueArt(episode);
+                        var fieldPosition = (Vector2)typeof(TagForceWorldUI).GetField("_position", flags).GetValue(world);
                         app.StartStoryDuel(episode, startingDeck, true);
+                        VerifyGxSurrender();
+                        defeats++;
+                        VerifyGxRetryMenu(isPov);
+                        if (episode.id == "gx_ep_01")
+                        {
+                            CaptureGx("05-duel-loss");
+                            Press(storyRoot, "Scene/Choices/Choice_3/Button");
+                            VerifyDialogueStart(episode.postLoseDialogues, episode.id);
+                            VerifySpeaker(episode.postLoseDialogues, "윤", player: true);
+                            Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                            VerifyGxRetryMenu(isPov);
+                        }
+                        Require(world.RpgClears == index && !world.CanWalk && !WorldInputRestored(),
+                            $"A lost duel advanced or unlocked the field at {episode.id}.");
+                        if (episode.id == "gx_ep_01")
+                        {
+                            Press(storyRoot, "Scene/Choices/Choice_2/Button");
+                            VerifyGxReturn(fieldPosition, episode.id);
+                            Require(world.CanStartRpgEpisode(index), "Returning after a loss removed the current quest.");
+                            app.OpenRpgFieldEpisode(index);
+                            app.StartStoryDuel(episode, startingDeck, true);
+                            VerifyGxSurrender();
+                            VerifyGxRetryMenu(isPov);
+                            Press(storyRoot, "Scene/Choices/Choice_1/Button");
+                            story.Back();
+                            VerifyGxRetryMenu(isPov);
+                            Press(storyRoot, "Scene/Choices/Choice_1/Button");
+                            Press(storyRoot, "DeckSelection/Window/Edit/Button");
+                            Require((AppScreen)Get("_screen") == AppScreen.DeckEditor,
+                                "The GX retry picker did not open the deck editor.");
+                            app.CloseDeckEditor();
+                            Require(storyRoot.Find("DeckSelection").gameObject.activeInHierarchy &&
+                                world.RpgClears == index, "Deck editor return lost the pending GX retry.");
+                            var picker = (Dropdown)dialogueType.GetField("_picker", flags).GetValue(dialogue);
+                            int option = picker.options.FindIndex(deck => deck.text == alternateDeck.name);
+                            Require(option >= 0, "The alternate GX deck was missing from the retry picker.");
+                            picker.SetValueWithoutNotify(option);
+                            Press(storyRoot, "DeckSelection/Window/Apply/Button");
+                        }
+                        else Press(storyRoot, "Scene/Choices/Choice_0/Button");
+                        Press(storyRoot, "Scene/Choices/Choice_1/Button");
+                        Press(storyRoot, "Scene/Choices/Choice_0/Button");
+                        story.Update(4f);
+                        Require(Get("_session") is DuelSession { NativePtr: var handle } && handle != IntPtr.Zero,
+                            $"The retry face-off never started a new duel at {episode.id}.");
+                        retries++;
                         Require(Get("_ai") is TacticalAI { Difficulty: AIDifficulty.Master } &&
                             Get("_activeOppDeck") is PresetDeckInfo rival && rival.id == episode.deckId,
                             $"GX opponent setup did not use Master and its exact tier deck at {episode.id}.");
@@ -438,7 +520,11 @@ namespace YGOPortable.Editor
                                 $"Forced deck was not equipped at {episode.id}.");
                             pov++;
                         }
-                        else Require(ReferenceEquals(Get("_activeMyDeck"), startingDeck), "GX POV deck was not restored.");
+                        var expectedDeck = episode.id == "gx_ep_01" ? alternateDeck : startingDeck;
+                        if (!isPov)
+                            Require(Get("_activeMyDeck") is UserDeck resumed && resumed.id == expectedDeck.id &&
+                                resumed.main.SequenceEqual(expectedDeck.main) && resumed.extra.SequenceEqual(expectedDeck.extra) &&
+                                resumed.side.SequenceEqual(expectedDeck.side), "Retry did not use the selected custom deck.");
                         var fieldUi = Get("_duelField") as DuelFieldUI;
                         var name = typeof(DuelFieldUI).GetField("_myNameText", flags).GetValue(fieldUi) as Text;
                         Require(name?.text.Contains(isPov ? "아스카" : "윤") == true,
@@ -452,14 +538,23 @@ namespace YGOPortable.Editor
                             VerifyGxDialogueArt(episode, episode.postWinDialogues[memoryIndex].cutscene);
                         }
                         if (episode.id == "gx_ep_27") VerifySpeaker(episode.postWinDialogues, "윤", player: false);
-                        Press(storyRoot, "Scene/DialogueTools/Skip/Button");
-                        Require(world.RpgClears == index + 1 && CollectionProgress.LastDuelDeckId == startingDeck.id,
+                        void FinishVictory() => Press(storyRoot, "Scene/DialogueTools/Skip/Button");
+                        if (episode.id == "gx_ep_01")
+                        {
+                            VerifyGxSaveRecovery(index, FinishVictory);
+                            CollectionProgress.Load(isolatedSave);
+                        }
+                        else FinishVictory();
+                        Require(world.RpgClears == index + 1 && CollectionProgress.LastDuelDeckId == expectedDeck.id,
                             $"Duel result or previous deck was lost after {episode.id}.");
+                        if (episode.id == "gx_ep_01") CollectionProgress.RememberDuelDeck(startingDeck.id);
+                        VerifyGxReturn(fieldPosition, episode.id);
+                        if (isPov) VerifyGxFieldWalker(0);
                         duels++;
                     }
 
                     CollectionProgress.Load(isolatedSave);
-                    Require(world.RpgClears == 53 && scenes == 19 && duels == 34 && pov == 3 &&
+                    Require(world.RpgClears == 53 && scenes == 19 && duels == 34 && defeats == 34 && retries == 34 && pov == 3 &&
                         !CollectionProgress.IsStoryEpisodeCleared("gx_ep_17") && CollectionProgress.RpgAffinity == 0,
                         "GX progress did not survive reloading or overwrote classic GX progress.");
                     foreach (int location in Enumerable.Range(0, gxMap.spots.Length))
@@ -469,6 +564,13 @@ namespace YGOPortable.Editor
                             $"Unable to enter GX map {map}.");
                         VerifyGxGrounded(location);
                         VerifyGroundedPresentation();
+                        var ground = CurrentTerrain();
+                        var start = ((RectTransform)FieldScene().Find("Player")).anchorMin;
+                        var far = ground.Spot.walkPolygon.OrderByDescending(vertex => (vertex - start).sqrMagnitude).First();
+                        var target = ground.Ground(Vector2.Lerp(far, start, .15f));
+                        WalkOnGxMap(target);
+                        Require(Vector2.Distance(((RectTransform)FieldScene().Find("Player")).anchorMin, target) < .001f,
+                            $"Click movement did not reach dry ground on {map}.");
                         var exitPoints = FieldScene().Find("Exploration").Cast<RectTransform>()
                             .Where(anchor => anchor.name.StartsWith("ExitTarget_", StringComparison.Ordinal))
                             .Select(anchor => anchor.anchorMin).ToArray();
@@ -494,15 +596,379 @@ namespace YGOPortable.Editor
                     world.Back();
                     VerifyGxArtwork(gxMap, expectedCg);
                     VerifyGxMemories();
+                    VerifyGxAspectLayouts(everyMap: true);
+                    VerifyGxCgAndPortraitTransitions();
                     VerifyEveryStageFootprint(gxScript);
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
-                    Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master duels, 19 lockouts, 12 grounded fields, solo travel and three POV decks passed.");
+                    Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master wins, 34 surrender/retry routes, 19 lockouts, 12 grounded fields and three POV decks passed.");
+                    Debug.Log("[VERIFY GX QOL] One-click travel, NPC prompts, running, deck swaps and editor return, save recovery and three aspect ratios passed.");
                 }
                 finally
                 {
+                    audioSource.SetValue(null, oldMusic);
+                    pausedMusic.SetValue(null, oldPaused);
+                    DuelAudio.BgmVolume = oldVolume;
+                    UnityEngine.Object.DestroyImmediate(gxAudio);
                     if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
                     else PlayerPrefs.DeleteKey(gxPreference);
                     PlayerPrefs.Save();
+                }
+
+                void CaptureGx(string name)
+                {
+                    var output = Environment.GetEnvironmentVariable("YGO_GX_QA_SCREENSHOTS");
+                    if (string.IsNullOrWhiteSpace(output)) return;
+                    Directory.CreateDirectory(output);
+                    var ui = canvas.GetComponent<Canvas>();
+                    var cameraObject = new GameObject("GX QA screenshot camera", typeof(Camera));
+                    var camera = cameraObject.GetComponent<Camera>();
+                    var frame = RenderTexture.GetTemporary(1600, 900, 24);
+                    var pixels = new Texture2D(frame.width, frame.height, TextureFormat.RGB24, false);
+                    var previousFrame = RenderTexture.active;
+                    var oldRenderMode = ui.renderMode;
+                    var oldCamera = ui.worldCamera;
+                    var canvasRect = (RectTransform)ui.transform;
+                    var size = canvasRect.sizeDelta;
+                    try
+                    {
+                        camera.targetTexture = frame;
+                        camera.clearFlags = CameraClearFlags.SolidColor;
+                        camera.backgroundColor = new Color(.012f, .018f, .025f);
+                        ui.worldCamera = camera;
+                        ui.renderMode = RenderMode.ScreenSpaceCamera;
+                        Canvas.ForceUpdateCanvases();
+                        camera.Render();
+                        RenderTexture.active = frame;
+                        pixels.ReadPixels(new Rect(0, 0, frame.width, frame.height), 0, 0);
+                        File.WriteAllBytes(Path.Combine(output, name + ".png"), pixels.EncodeToPNG());
+                    }
+                    finally
+                    {
+                        ui.renderMode = oldRenderMode;
+                        ui.worldCamera = oldCamera;
+                        camera.targetTexture = null;
+                        RenderTexture.active = previousFrame;
+                        RenderTexture.ReleaseTemporary(frame);
+                        UnityEngine.Object.DestroyImmediate(pixels);
+                        UnityEngine.Object.DestroyImmediate(cameraObject);
+                        canvasRect.sizeDelta = size;
+                        Canvas.ForceUpdateCanvases();
+                    }
+                }
+
+                void VerifyGxSaveRecovery(int progress, Action finish)
+                {
+                    string profile = Path.Combine(isolatedSave, CollectionProgress.ProfileFileName);
+                    using (SaveSyncFiles.LockProfile(profile)) finish();
+                    var choice = storyRoot.Find("Scene/Choices/Choice_0/Button");
+                    Require(world.RpgClears == progress && !world.CanWalk && choice.gameObject.activeInHierarchy &&
+                        choice.GetComponentInChildren<Text>().text == "진행도 다시 저장",
+                        "A failed GX save closed the result or advanced to the next scene.");
+                    Press(storyRoot, "Scene/Choices/Choice_0/Button");
+                    Require(world.RpgClears == progress + 1 && WorldInputRestored(),
+                        "The GX campaign did not recover after the profile became writable.");
+                }
+
+                void VerifyGxRetryMenu(bool forcedDeck)
+                {
+                    var choices = storyRoot.Find("Scene/Choices");
+                    Require(choices.gameObject.activeInHierarchy &&
+                        !storyRoot.Find("Scene/DialogueTools").gameObject.activeInHierarchy &&
+                        Choice(0).interactable && LabelOf(0) == "바로 재도전" &&
+                        Choice(1).interactable != forcedDeck && LabelOf(1) == "덱 변경 후 재도전" &&
+                        Choice(2).interactable && LabelOf(2) == "필드로 복귀",
+                        "The GX defeat menu did not offer immediate actions or allowed overriding a POV deck.");
+
+                    Button Choice(int index) => choices.Find($"Choice_{index}/Button").GetComponent<Button>();
+                    string LabelOf(int index) => Choice(index).GetComponentInChildren<Text>().text;
+                }
+
+                void VerifyGxDeckReturn(int location, UserDeck startingDeck, UserDeck alternateDeck)
+                {
+                    WalkOnGxMap(new Vector2(.39f, .24f));
+                    var position = ((RectTransform)FieldScene().Find("Player")).anchorMin;
+                    var framing = CameraFrame();
+                    int progress = world.RpgClears;
+                    PressRpgNavigation("Decks");
+                    Press(panel, "EditGxDecks");
+                    Require((AppScreen)Get("_screen") == AppScreen.DeckEditor, "GX field deck editing did not open.");
+                    app.CloseDeckEditor();
+                    Require(panel.Find("GxDeckList") != null, "GX deck editor did not return to the field deck selector.");
+                    ChooseDeck(alternateDeck);
+                    Require(CollectionProgress.LastDuelDeckId == alternateDeck.id &&
+                        world.CanStartRpgEpisode(progress) && world.CampaignRegion(location).IsOpen(progress) &&
+                        world.RpgClears == progress && ((RectTransform)FieldScene().Find("Player")).anchorMin == position &&
+                        CameraFrame() == framing && WorldInputRestored(), "Changing a GX field deck disturbed the field or quest.");
+                    PressRpgNavigation("Decks");
+                    ChooseDeck(startingDeck);
+
+                    void ChooseDeck(UserDeck deck)
+                    {
+                        var row = panel.Find("GxDeckList").GetComponentsInChildren<Button>()
+                            .Single(button => button.GetComponentInChildren<Text>()?.text == deck.name);
+                        row.onClick.Invoke();
+                    }
+                }
+
+                void VerifyGxRunSpeed()
+                {
+                    var walk = typeof(TagForceWorldUI).GetMethod("AdvanceRpgWalk", flags);
+                    FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(new Vector2(.61f, .21f));
+                    var position = ((RectTransform)FieldScene().Find("Player")).anchorMin;
+                    var walking = (Vector2)walk.Invoke(world, new object[] { .10f, false });
+                    var running = (Vector2)walk.Invoke(world, new object[] { .10f, true });
+                    Require(Vector2.Distance(running, position) > Vector2.Distance(walking, position) * 1.5f &&
+                        CurrentTerrain().Contains(running), "GX running did not speed up a grounded route.");
+                    world.Update(1f);
+                    WalkOnGxMap(new Vector2(.5f, .16f));
+                }
+
+                void VerifyGxNpcCamera()
+                {
+                    var local = (RectTransform)FieldScene().Find("Resident_107");
+                    Require(FieldScene().Find("RpgCardMerchant/SD").GetComponent<Image>().sprite != null,
+                        "The GX academy merchant was shown without SD art.");
+                    WalkOnGxMap(local.anchorMin - new Vector2(.061f, .03f));
+                    var viewport = ViewportSize();
+                    var framing = CameraFrame();
+                    var prompt = panel.Find("FieldHud/ContextAction");
+                    string hint = prompt.GetComponentInChildren<Text>(true).text;
+                    CaptureGx("04-academy");
+                    Require(((RectTransform)panel).anchorMin == Vector2.zero && ((RectTransform)panel).anchorMax == Vector2.one,
+                        "The GX field camera left padding around the viewport.");
+                    Require(prompt.gameObject.activeInHierarchy && hint.Contains("[Space / 클릭]") && hint.Contains("대화"),
+                        $"GX did not show the interaction hint near a resident. Hint={hint}, Player={FieldScene().Find("Player").GetComponent<RectTransform>().anchorMin}, NPC={local.anchorMin}.");
+                    Press(local, "SD");
+                    world.Update(0f);
+                    Require(panel.Find("ResidentChoices") != null && ViewportSize() == viewport && CameraFrame() == framing,
+                        "The field shrank or moved when a GX NPC began talking.");
+                    world.Back();
+                    Require(world.CanWalk && WorldInputRestored() && ViewportSize() == viewport && CameraFrame() == framing,
+                        "The GX NPC dialogue did not restore the field and its camera.");
+                    WalkOnGxMap(new Vector2(.5f, .16f));
+                }
+
+                void VerifyGxFieldWalker(int id)
+                {
+                    var art = FieldScene().Find("Player/Sprite").GetComponent<Image>();
+                    var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
+                    string key = id == 0 ? "protagonist" : id.ToString();
+                    var expected = images.Get($"TagForce/GX/WalkCycles/sd_{key}_field.png");
+                    Require(expected != null && art.sprite != null && art.sprite.texture == expected.texture,
+                        $"The field did not switch to the GX walker {key}.");
+                }
+
+                void VerifyGxSurrender()
+                {
+                    var duel = Get("_session") as DuelSession;
+                    var fieldUi = (DuelFieldUI)Get("_duelField");
+                    Require(duel != null && duel.NativePtr != IntPtr.Zero, "The GX duel did not start.");
+                    typeof(DuelFieldUI).GetMethod("OnPauseClicked", flags).Invoke(fieldUi, null);
+                    PressSurrender();
+                    PressSurrender();
+                    typeof(GameAppController).GetMethod("Update", flags).Invoke(app, null);
+                    Require(Get("_session") == null && duel.NativePtr == IntPtr.Zero,
+                        "GX surrender did not close the native duel.");
+
+                    void PressSurrender()
+                    {
+                        var controls = (RectTransform)typeof(DuelFieldUI).GetField("_actionList", flags).GetValue(fieldUi);
+                        var surrender = controls.GetComponentsInChildren<Button>()
+                            .Single(button => button.GetComponentInChildren<Text>()?.text == "항복");
+                        Require(surrender.IsInteractable(), "The GX surrender confirmation could not be selected.");
+                        surrender.onClick.Invoke();
+                    }
+                }
+
+                void VerifyGxReturn(Vector2 position, string episode)
+                {
+                    var player = FieldScene()?.Find("Player") as RectTransform;
+                    var hud = panel.Find("FieldHud");
+                    Require(world.Root.activeSelf && !storyRoot.gameObject.activeInHierarchy && WorldInputRestored() &&
+                        player != null && player.anchorMin == position && FieldScene().Find("DialogueCast") == null &&
+                        hud != null && hud.gameObject.activeInHierarchy && Get("_session") == null,
+                        $"The field, position, HUD or input did not return after {episode}.");
+                    var theme = CurrentTerrain().Spot.fieldTheme;
+                    var track = theme switch
+                    {
+                        "arena" => RpgFieldMusic.Circuit,
+                        "dark" or "volcano" => RpgFieldMusic.Crisis,
+                        "forest" or "shore" => RpgFieldMusic.Outskirts,
+                        _ => RpgFieldMusic.Home,
+                    };
+                    Require(bgm.clip == DuelAudio.GetRpgFieldMusic(track),
+                        $"The {theme} field music did not return after {episode}.");
+                }
+
+                void VerifyGxAspectLayouts(bool everyMap)
+                {
+                    var screen = (RectTransform)canvas.transform;
+                    Vector2 originalSize = screen.sizeDelta;
+                    int current = (int)typeof(TagForceWorldUI).GetField("_rpgLocation", flags).GetValue(world);
+                    var regionsToCheck = everyMap ? Enumerable.Range(0, gxMap.spots.Length) : new[] { current };
+                    try
+                    {
+                        foreach (var size in new[] { new Vector2(1600f, 900f), new Vector2(2100f, 900f), new Vector2(1200f, 900f) })
+                        {
+                            screen.sizeDelta = size;
+                            foreach (int index in regionsToCheck)
+                            {
+                                Require(world.EnterRpgRegion(index), $"Unable to check layout on {gxMap.spots[index].spotId}.");
+                                Canvas.ForceUpdateCanvases();
+                                var hud = panel.Find("FieldHud");
+                                VerifyDisjoint(hud, "QuestTrack", "Minimap", "DuelistHud", "Controls", "OpenMap", "MenuToggle");
+                                var mission = hud.Find("QuestTrack");
+                                VerifyDisjoint(mission, mission.Find("Guide") != null ?
+                                    new[] { "RegionName", "Chapter", "Objective", "Guide" } :
+                                    new[] { "RegionName", "Chapter", "Objective" });
+                                VerifyDisjoint(hud.Find("DuelistHud"), "Rank", "Dp");
+                                Press(hud, "MenuToggle");
+                                VerifyDisjoint(hud, "FieldDetails", "Minimap", "DuelistHud", "Controls", "OpenMap", "MenuToggle");
+                                Press(hud, "MenuToggle");
+                                Press(hud, "OpenMap");
+                                Canvas.ForceUpdateCanvases();
+                                VerifyDisjoint(panel, panel.Find("TravelToGoal") != null ?
+                                    new[] { "Atlas", "RegionPreview", "MapTitle", "MapArea", "TravelToGoal" } :
+                                    new[] { "Atlas", "RegionPreview", "MapTitle", "MapArea" });
+                                var atlas = panel.Find(MapNodes);
+                                VerifyDisjoint(atlas, gxMap.spots.SelectMany(spot => new[] { spot.spotId, spot.spotId + "/Name" }).ToArray());
+                                var preview = panel.Find("RegionPreview");
+                                VerifyDisjoint(preview, "Thumbnail", "RegionState", "RegionName", "Residents", "Travel");
+                                world.Back();
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        screen.sizeDelta = originalSize;
+                        Canvas.ForceUpdateCanvases();
+                        world.Update(0f);
+                    }
+
+                    void VerifyDisjoint(Transform host, params string[] paths)
+                    {
+                        var bounds = new List<(string Name, Rect Rect)>();
+                        foreach (var path in paths)
+                        {
+                            var rect = (RectTransform)host.Find(path);
+                            Require(rect != null && rect.gameObject.activeInHierarchy, $"Missing visible GX UI {path}.");
+                            var corners = new Vector3[4];
+                            rect.GetWorldCorners(corners);
+                            var min = screen.InverseTransformPoint(corners[0]);
+                            var max = screen.InverseTransformPoint(corners[2]);
+                            Require(min.x >= screen.rect.xMin - .05f && max.x <= screen.rect.xMax + .05f &&
+                                min.y >= screen.rect.yMin - .05f && max.y <= screen.rect.yMax + .05f,
+                                $"GX {screen.sizeDelta}: {path} escaped the screen.");
+                            var area = Rect.MinMaxRect(min.x + .15f, min.y + .15f, max.x - .15f, max.y - .15f);
+                            if (rect.GetComponentInChildren<Text>() is { } label && !string.IsNullOrEmpty(label.text) &&
+                                (path.EndsWith("/Name", StringComparison.Ordinal) || rect.GetComponent<Button>() != null ||
+                                 host.name is "DuelistHud" or "QuestTrack"))
+                            {
+                                var settings = label.GetGenerationSettings(label.rectTransform.rect.size);
+                                settings.resizeTextForBestFit = false;
+                                settings.fontSize = label.resizeTextForBestFit ? label.resizeTextMinSize : label.fontSize;
+                                settings.verticalOverflow = VerticalWrapMode.Overflow;
+                                var height = new TextGenerator().GetPreferredHeight(label.text, settings) / label.pixelsPerUnit;
+                                Require(height > 0f && height <= label.rectTransform.rect.height + 1f,
+                                    $"GX {screen.sizeDelta}: {path} label would be clipped.");
+                            }
+                            foreach (var other in bounds)
+                                Require(!other.Rect.Overlaps(area), $"GX {screen.sizeDelta}: {path} overlaps {other.Name}.");
+                            bounds.Add((path, area));
+                        }
+                    }
+                }
+
+                void VerifyGxCgAndPortraitTransitions()
+                {
+                    var host = DuelUiKit.FillRect("GxTransitionTest", canvas.transform);
+                    var view = new StoryModeUI.StoryDialogueView(host);
+                    var bind = dialogueType.GetMethod("BindLine", flags);
+                    var alpha = (CanvasGroup)dialogueType.GetField("_cutsceneOverlay", flags).GetValue(view);
+                    var current = (Image)dialogueType.GetField("_cutsceneImage", flags).GetValue(view);
+                    var previous = (Image)dialogueType.GetField("_cutscenePrevious", flags).GetValue(view);
+                    var hero = (Image)dialogueType.GetField("_hero", flags).GetValue(view);
+                    var sprites = (Dictionary<string, Sprite>)dialogueType.GetField("_rpgSprites", flags).GetValue(view);
+                    var lines = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
+                            .Concat(episode.postLoseDialogues)).Where(line => !string.IsNullOrEmpty(line.cutscene))
+                        .GroupBy(line => line.cutscene).Select(group => group.First()).ToList();
+                    int cgCount = lines.Count;
+                    lines.Add(new StoryDialogueLine { speaker = "", text = "대화 장면" });
+                    try
+                    {
+                        Open(lines.ToArray());
+                        view.Update(.4f);
+                        Require(alpha.alpha == 1f && current.enabled, "The first GX CG did not fully fade in.");
+                        for (int i = 1; i < cgCount; i++)
+                        {
+                            var outgoing = current.sprite;
+                            bind.Invoke(view, new object[] { i, false });
+                            var expected = sprites[Path.Combine(streaming, "TagForce/GX", $"Cutscenes/{lines[i].cutscene}.png")];
+                            Require(previous.enabled && previous.sprite == outgoing && alpha.alpha == 1f &&
+                                current.sprite == expected && current.color.a == 0f, $"GX CG flash at {lines[i].cutscene}.");
+                            view.Update(.175f);
+                            Require(previous.enabled && Mathf.Abs(current.color.a - .5f) < .01f && alpha.alpha == 1f,
+                                $"GX CG faded through the field at {lines[i].cutscene}.");
+                            view.Update(.175f);
+                            Require(!previous.enabled && current.enabled && current.color.a == 1f,
+                                $"GX CG did not clear its outgoing layer at {lines[i].cutscene}.");
+                        }
+
+                        bind.Invoke(view, new object[] { cgCount, false });
+                        view.Update(.12f);
+                        float opacity = alpha.alpha;
+                        Require(opacity > 0f && opacity < 1f, "The GX CG did not begin fading to the field.");
+                        bind.Invoke(view, new object[] { 0, false });
+                        Require(Mathf.Approximately(alpha.alpha, opacity) && previous.enabled,
+                            "Re-entering a CG during fade-out flashed the field.");
+
+                        var moods = new[] { "angry", "blush", "determined", "sad", "shock", "smile" };
+                        Open(moods.Select(emotion => new StoryDialogueLine { speaker = gxScript.protagonist, emotion = emotion, text = "표정 확인" }).ToArray());
+                        for (int i = 0; i < moods.Length; i++)
+                        {
+                            bind.Invoke(view, new object[] { i, false });
+                            view.Update(.25f);
+                            var expected = sprites[Path.Combine(streaming, "TagForce/GX", $"DialoguePortraits/bust_campaign_protagonist_{moods[i]}.png")];
+                            Require(hero.enabled && hero.sprite == expected && hero.color.a > 0f, $"GX portrait did not switch to {moods[i]}.");
+                        }
+
+                        view.Update(.6f);
+                        var root = host.Find("StoryDialogue");
+                        Press(root, "Scene/DialogueTools/Previous/Button");
+                        var index = (int)dialogueType.GetField("_index", flags).GetValue(view);
+                        Require(index == moods.Length - 2, "GX previous dialogue did not rewind.");
+                        Press(root, "Scene/DialogueTools/Log/Button");
+                        var history = (Text)dialogueType.GetField("_logText", flags).GetValue(view);
+                        var group = (CanvasGroup)dialogueType.GetField("_scene", flags).GetValue(view);
+                        Require(history.text.Contains(gxScript.protagonist) && history.text.Contains("표정 확인") &&
+                            !group.interactable && !group.blocksRaycasts, "GX dialogue history did not display or isolate its input.");
+                        Require(view.ClosePopup() && group.interactable && group.blocksRaycasts,
+                            "The GX dialogue log left input locked after closing.");
+                        Open(moods.Take(3).Select(emotion => new StoryDialogueLine
+                            { speaker = gxScript.protagonist, emotion = emotion, text = "대사 입력 확인" }).ToArray());
+                        var advance = dialogueType.GetMethod("AdvanceAt", flags);
+                        var visible = dialogueType.GetField("_visible", flags);
+                        var text = (Text)dialogueType.GetField("_text", flags).GetValue(view);
+                        advance.Invoke(view, new object[] { 1f, 10 });
+                        Require(text.text == "대사 입력 확인", "GX did not reveal the complete line on the first input.");
+                        advance.Invoke(view, new object[] { 1.01f, 10 });
+                        advance.Invoke(view, new object[] { 1.05f, 11 });
+                        Require((int)dialogueType.GetField("_index", flags).GetValue(view) == 0,
+                            "Repeated GX input skipped the just-completed line.");
+                        advance.Invoke(view, new object[] { 1.2f, 12 });
+                        Require((int)dialogueType.GetField("_index", flags).GetValue(view) == 1 &&
+                            (int)visible.GetValue(view) < "대사 입력 확인".Length,
+                            "The next valid GX input did not start the next line.");
+                    }
+                    finally
+                    {
+                        view.Close();
+                        UnityEngine.Object.DestroyImmediate(host.gameObject);
+                    }
+
+                    void Open(StoryDialogueLine[] dialogueLines) => view.Open("GX rendering verification",
+                        gxScript.protagonist, (OpponentCharacter)null, dialogueLines, null, rpg: true,
+                        backdropBelow: true, rpgAssetFolder: world.RpgAssetFolder);
                 }
 
                 void VerifyGxHarborWalk()
@@ -595,6 +1061,18 @@ namespace YGOPortable.Editor
                     Require(walkers.Length > 0 && walkers.All(walker => walker.transform.parent is RectTransform actor &&
                         actor.sizeDelta.y >= 220f && actor.pivot.y < .35f),
                         "A GX field or staged walker is too small or grows downward from the ground point.");
+                    foreach (var walker in walkers)
+                    {
+                        var image = walker.GetComponent<Image>();
+                        var actor = (RectTransform)walker.transform.parent;
+                        var art = image.rectTransform;
+                        float height = (art.anchorMax.y - art.anchorMin.y) * actor.sizeDelta.y;
+                        float width = (art.anchorMax.x - art.anchorMin.x) * actor.sizeDelta.x;
+                        float visibleHeight = Mathf.Min(height, width * image.sprite.rect.height / image.sprite.rect.width);
+                        Require(image.preserveAspect && visibleHeight >= 155f && visibleHeight <= 173f &&
+                            art.anchorMin.y == .15f && actor.Find("GroundShadow") != null,
+                            $"GX walker {actor.name} did not fit the shared silhouette height and ground line. Height={visibleHeight}");
+                    }
                 }
 
                 void VerifyDialogueStart(StoryDialogueLine[] lines, string episodeId)
@@ -948,9 +1426,9 @@ namespace YGOPortable.Editor
                 var host = DuelUiKit.FillRect("DialogueAspectVerification", canvas.transform);
                 host.anchorMin = host.anchorMax = Vector2.one * .5f;
                 var view = new StoryModeUI.StoryDialogueView(host);
-                var longest = campaign.episodes.SelectMany(entry => entry.preDialogues
-                    .Concat(entry.postWinDialogues).Concat(entry.postLoseDialogues))
-                    .OrderByDescending(line => line.text.Length).First();
+                var dialogueLines = campaign.episodes.SelectMany(entry => entry.preDialogues
+                    .Concat(entry.postWinDialogues).Concat(entry.postLoseDialogues)).ToArray();
+                var longest = dialogueLines.OrderByDescending(line => line.text.Length).First();
                 var dialogueType = typeof(StoryModeUI.StoryDialogueView);
                 var panelImage = (Image)dialogueType.GetField("_dialoguePanel", flags).GetValue(view);
                 var label = (Text)dialogueType.GetField("_text", flags).GetValue(view);
@@ -980,6 +1458,16 @@ namespace YGOPortable.Editor
                         float height = new TextGenerator().GetPreferredHeight(label.text, settings) / label.pixelsPerUnit;
                         Require(height > 0f && height <= label.rectTransform.rect.height + 1f,
                             $"RPG dialogue overflow on {assetFolder}, {display}: {height} vs {label.rectTransform.rect.height}.");
+                        if (assetFolder == "GX")
+                        {
+                            var generator = new TextGenerator();
+                            foreach (var line in dialogueLines)
+                            {
+                                float lineHeight = generator.GetPreferredHeight(line.text, settings) / label.pixelsPerUnit;
+                                Require(lineHeight > 0f && lineHeight <= label.rectTransform.rect.height + 1f,
+                                    $"A GX dialogue was clipped on {display}: {line.speaker} / {line.text}");
+                            }
+                        }
                         var buttons = controls.Cast<RectTransform>().Select(Bounds).ToArray();
                         var box = Bounds(panelImage.rectTransform);
                         Require(host.rect.Contains(box.min) && host.rect.Contains(box.max),
@@ -2306,7 +2794,7 @@ namespace YGOPortable.Editor
                 var firstEpisode = loaded.episodes[0];
                 Press(FieldScene(), "MainQuestNpc/SD");
                 world.Update(4f);
-                story.ShowFieldDuelResult(firstEpisode, true, false, () => "", default);
+                story.ShowFieldDuelResult(firstEpisode, true, false, () => (true, ""), default);
                 var opponent = (RectTransform)FieldScene().Find("DialogueCast/MainQuestNpc");
                 Vector2 before = opponent.anchorMin;
                 int exit = Array.FindIndex(firstEpisode.postWinDialogues,

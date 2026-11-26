@@ -46,7 +46,8 @@ namespace YGOPortable.UI
 
         private void RegisterRpgInteraction(RectTransform anchor, string caption, Action select,
             RpgActionPriority priority = RpgActionPriority.Conversation, float radius = .105f) =>
-            _rpgInteractions.Add(new RpgInteraction(anchor, caption, select, priority, radius));
+            _rpgInteractions.Add(new RpgInteraction(anchor, caption, select, priority,
+                IsGxCampaign && radius == .105f ? .122f : radius));
 
         private RpgInteraction NearbyRpgInteraction()
         {
@@ -56,7 +57,14 @@ namespace YGOPortable.UI
             {
                 if (!candidate.Anchor.gameObject.activeInHierarchy) continue;
                 float distance = RpgArtDirection(candidate.Anchor.anchorMin - _position).sqrMagnitude;
-                if (distance >= candidate.Radius * candidate.Radius || candidate.Priority < best.Priority ||
+                if (distance >= candidate.Radius * candidate.Radius) continue;
+                if (IsGxCampaign)
+                {
+                    if (distance > bestDistance + .00015f ||
+                        (candidate.Priority == best.Priority && distance >= bestDistance) ||
+                        (candidate.Priority < best.Priority && distance >= bestDistance - .00015f)) continue;
+                }
+                else if (candidate.Priority < best.Priority ||
                     (candidate.Priority == best.Priority && distance >= bestDistance)) continue;
                 bestDistance = distance;
                 best = candidate;
@@ -81,6 +89,8 @@ namespace YGOPortable.UI
             _rpgActionButton.interactable = available;
             if (IsGxCampaign) _rpgActionButton.gameObject.SetActive(available);
             string caption = candidate.Caption ?? "상호작용";
+            if (IsGxCampaign && available && !Application.isMobilePlatform)
+                caption = "[Space / 클릭] " + caption;
             if (_rpgActionText.text != caption) _rpgActionText.text = caption;
             _rpgActionText.color = available ? Color.white : new Color(.72f, .82f, .89f, .66f);
             if (_rpgFieldInput == null) return;
@@ -240,30 +250,31 @@ namespace YGOPortable.UI
             HudLabel(Area(mission, "Chapter", .056f, .338f, .69f, .594f),
                 episode == null ? "현재 진행" : $"!  다음 목표 · {episode.chapter}기", 17, RpgUiStyle.Gold, heading: true);
             var approach = _rpgInteractions.Find(candidate => candidate.Priority == RpgActionPriority.Story).Select;
-            var objectiveLabel = HudLabel(Area(mission, "Objective", .056f, .069f, approach != null || travel ? .705f : .947f, .344f),
+            var objectiveLabel = HudLabel(Area(mission, "Objective", .056f, .069f, approach != null || travel ? .705f : .947f, .315f),
                 objective, 21, Color.white, heading: true);
             objectiveLabel.resizeTextMinSize = 15;
             objectiveLabel.resizeTextMaxSize = 21;
             objectiveLabel.resizeTextForBestFit = true;
             if (approach != null || travel)
             {
-                var guide = RpgButton(Area(mission, "Guide", .724f, .103f, .951f, .482f), travel ? "지도에서 찾기" : "목표로 이동", () =>
+                void GoToObjective()
                 {
                     if (!CanWalk || _fieldMenu) return;
-                    if (travel)
-                    {
-                        _gxMapFocusGoal = true;
-                        Show(Page.Map);
-                    }
+                    if (travel) BeginRpgTravel(targetRegion, RpgArrival);
                     else approach();
-                }, 18, primary: true);
+                }
+
+                BindPortrait(mission, GoToObjective);
+                mission.GetComponent<Button>().navigation = new Navigation { mode = Navigation.Mode.None };
+                var guide = RpgButton(Area(mission, "Guide", .724f, .103f, .951f, .482f),
+                    travel ? "지역 이동" : "목표로 이동", GoToObjective, 18, primary: true);
                 guide.navigation = new Navigation { mode = Navigation.Mode.None };
             }
 
             BuildRpgMinimap(Area(_rpgFieldHud, "Minimap", .787f, .791f, .974f, .972f));
             var stats = Area(_rpgFieldHud, "DuelistHud", .787f, .715f, .974f, .782f);
             RpgUiStyle.Glass(stats);
-            HudLabel(Area(stats, "Rank", .09f, .27f, .47f, .96f), $"Lv. {CollectionProgress.RpgRank}", 19, RpgUiStyle.Cyan, heading: true);
+            HudLabel(Area(stats, "Rank", .09f, .27f, .40f, .96f), $"Lv. {CollectionProgress.RpgRank}", 19, RpgUiStyle.Cyan, heading: true);
             HudLabel(Area(stats, "Dp", .43f, .27f, .92f, .96f), $"DP {CollectionProgress.Balance:N0}",
                 20, Color.white, align: TextAnchor.MiddleRight, heading: true);
             var experience = Area(stats, "Experience", .09f, .18f, .92f, .25f);
@@ -285,12 +296,14 @@ namespace YGOPortable.UI
             if (_page == Page.Field) AddGxIdentity(_player, $"나 · {RpgPlayerName}", RpgUiStyle.Cyan);
             var controls = Area(_rpgFieldHud, "Controls", .025f, .035f, .263f, .085f);
             RpgUiStyle.Glass(controls);
-            HudLabel(Area(controls, "Move", .074f, 0f, .94f, 1f), Application.isMobilePlatform ? "바닥을 터치해 이동" : "방향키 또는 스틱으로 이동",
+            HudLabel(Area(controls, "Move", .074f, 0f, .94f, 1f), Application.isMobilePlatform ? "바닥을 터치해 이동" : "WASD / 방향키 · Shift 달리기",
                 17, new Color(.82f, .90f, .97f));
             _rpgActionButton = RpgButton(Area(_rpgFieldHud, "ContextAction", .501f, .030f, .745f, .098f),
                 "", ActivateRpgInteraction, 20, primary: true, sound: null, prominent: true);
             _rpgActionButton.navigation = new Navigation { mode = Navigation.Mode.None };
             _rpgActionText = _rpgActionButton.GetComponentInChildren<Text>();
+            _rpgActionText.resizeTextForBestFit = true;
+            _rpgActionText.resizeTextMinSize = 14;
             var map = RpgButton(Area(_rpgFieldHud, "OpenMap", .756f, .030f, .864f, .098f), "월드맵",
                 () => { if (CanWalk) Show(Page.Map); }, 21);
             map.navigation = new Navigation { mode = Navigation.Mode.None };

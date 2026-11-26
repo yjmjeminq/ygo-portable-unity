@@ -95,6 +95,7 @@ namespace YGOPortable.UI
             private int _index;
             private int _readThrough;
             private int _advanceFrame = -1;
+            private float _advanceTime;
             private int _visible;
             private float _typed;
             private float _readTime;
@@ -123,6 +124,7 @@ namespace YGOPortable.UI
             private int _branchLine;
             private Action _branch;
             private bool _waitingBranch;
+            private bool IsGxDialogue => _rpg && _rpgAssetFolder == "GX";
 
             internal bool IsOpen => _root.activeSelf;
             internal GameObject ActiveRoot => _logRoot.activeSelf ? _logRoot : _pickerRoot.activeSelf ? _pickerRoot :
@@ -196,11 +198,11 @@ namespace YGOPortable.UI
                 _caret = AddLabel(dialogue, "AdvanceCaret", .724f, .046f, .772f, .211f, 22, color: HeroColor);
                 _caret.text = "▼";
                 _counter = AddLabel(dialogue, "LineCount", .048f, .048f, .26f, .208f, 16, TextAnchor.MiddleLeft);
-                _previous = AddButton(dialogue, "Previous", "◀ 이전 대사", .36f, .727f, .50f, .927f, Previous);
-                _logButton = AddButton(dialogue, "Log", "대화 로그", .51f, .727f, .647f, .927f, OpenLog);
-                _auto = AddButton(dialogue, "Auto", "오토 꺼짐", .657f, .727f, .787f, .927f, ToggleAuto);
+                _previous = AddButton(dialogue, "Previous", "◀ 이전 대사", .36f, .727f, .50f, .927f, () => UseDialogueTool(Previous));
+                _logButton = AddButton(dialogue, "Log", "대화 로그", .51f, .727f, .647f, .927f, () => UseDialogueTool(OpenLog));
+                _auto = AddButton(dialogue, "Auto", "오토 꺼짐", .657f, .727f, .787f, .927f, () => UseDialogueTool(ToggleAuto));
                 _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, () =>
-                    (_onSkip ?? Finish).Invoke());
+                    UseDialogueTool(_onSkip ?? Finish));
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
                 _rpgTools = Region(content, "DialogueTools", .690f, .920f, .973f, .970f);
                 var flash = DuelUiKit.AddImage(DuelUiKit.FillRect("DialogueFlash", scene).gameObject, DuelUiKit.WhiteSprite,
@@ -281,6 +283,7 @@ namespace YGOPortable.UI
                 _rpg = rpg;
                 _rpgEpisode = rpgEpisode;
                 _rpgAssetFolder = rpgAssetFolder ?? field?.RpgAssetFolder ?? "5DS";
+                if (IsGxDialogue && Application.isPlaying) _advanceFrame = Time.frameCount;
                 _playAsCharacterId = playAsCharacterId;
                 ApplyDialogueStyle(rpg);
                 if (autoPlay) ToggleAuto();
@@ -357,6 +360,7 @@ namespace YGOPortable.UI
                 }
                 _rpgSprites.Clear();
                 _root.SetActive(false);
+                _dialoguePanel.gameObject.SetActive(true);
                 _logRoot.SetActive(false);
                 _picker.Hide();
                 _pickerRoot.SetActive(false);
@@ -365,6 +369,7 @@ namespace YGOPortable.UI
                 _scene.interactable = _scene.blocksRaycasts = true;
                 _dialogue = null;
                 _advanceFrame = -1;
+                _advanceTime = float.NegativeInfinity;
                 _onEnd = null;
                 _onSkip = null;
                 _choices = null;
@@ -417,6 +422,13 @@ namespace YGOPortable.UI
                     _readTime += delta * _autoSpeed;
                     if (_readTime >= Mathf.Max(1.05f, _characters.Length * .037f)) Advance();
                 }
+            }
+
+            internal void FocusOnChoices()
+            {
+                _dialoguePanel.gameObject.SetActive(false);
+                _rpgTools.gameObject.SetActive(false);
+                _advanceSurface.interactable = false;
             }
 
             internal void ShowChoices(Func<string> summary, params StoryChoice[] choices)
@@ -725,13 +737,29 @@ namespace YGOPortable.UI
                 }
             }
 
-            private void Advance()
+            private void UseDialogueTool(Action action)
             {
-                if (_stageCaption || _finished || _waitingBranch || _dialogue == null || ActiveRoot != _root) return;
-                if (Application.isPlaying)
+                if (IsGxDialogue && _choiceRoot.activeSelf) return;
+                if (IsGxDialogue && (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) ||
+                                     Input.GetKeyDown(KeyCode.KeypadEnter)))
                 {
-                    if (_advanceFrame == Time.frameCount) return;
-                    _advanceFrame = Time.frameCount;
+                    Advance();
+                    return;
+                }
+                action();
+            }
+
+            private void Advance() => AdvanceAt(Time.unscaledTime, Application.isPlaying ? Time.frameCount : -1);
+
+            private void AdvanceAt(float now, int frame)
+            {
+                if (_stageCaption || _finished || _waitingBranch || _dialogue == null || ActiveRoot != _root ||
+                    (IsGxDialogue && _choiceRoot.activeSelf)) return;
+                if (frame >= 0)
+                {
+                    if (_advanceFrame == frame || (IsGxDialogue && now - _advanceTime < .12f)) return;
+                    _advanceFrame = frame;
+                    _advanceTime = now;
                 }
                 if (_visible < _characters.Length) Reveal(_characters.Length);
                 else if (_branch != null && _index == _branchLine) OfferBranch();
@@ -865,7 +893,8 @@ namespace YGOPortable.UI
                 popup.SetActive(false);
                 _scene.interactable = _scene.blocksRaycasts = true;
                 _advanceSurface.interactable = !_finished && !_waitingBranch;
-                if (_popupReturn != null && _popupReturn.IsInteractable()) Focus(_popupReturn);
+                if (IsGxDialogue && !_choiceRoot.activeSelf && _next.interactable) Focus(_next);
+                else if (_popupReturn != null && _popupReturn.IsInteractable()) Focus(_popupReturn);
                 _popupReturn = null;
                 RefreshCaret();
             }
@@ -958,9 +987,13 @@ namespace YGOPortable.UI
                 if (picture == null) return;
                 if (_cutsceneImage.sprite != picture)
                 {
-                    if (continuing && _cutsceneImage.sprite != null)
+                    bool gx = _rpgAssetFolder == "GX";
+                    if ((continuing || gx && _cutsceneOverlay.alpha > 0f) && _cutsceneImage.sprite != null)
                     {
-                        SetSprite(_cutscenePrevious, _cutsceneImage.sprite);
+                        // Keep a painted layer visible when previous/next interrupts a GX fade.
+                        var outgoing = gx && _cutsceneBlend < .5f && _cutscenePrevious.enabled
+                            ? _cutscenePrevious.sprite : _cutsceneImage.sprite;
+                        SetSprite(_cutscenePrevious, outgoing);
                         _cutsceneBlend = 0f;
                         _cutsceneImage.color = new Color(1f, 1f, 1f, 0f);
                     }

@@ -188,9 +188,12 @@ namespace YGOPortable.UI
                     "dp_small" => "150 DP",
                     _ => item,
                 };
-                bool narrowAisle = spot.spotId == "spot_library";
-                var point = narrowAisle ? new Vector2(.50f, .18f + .07f * index) :
-                    new Vector2(index % 2 == 0 ? .21f : .75f, .30f + .08f * (index / 2));
+                var point = spot.spotId switch
+                {
+                    "spot_library" => new Vector2(.50f, .18f + .07f * index),
+                    "spot_main_academy" => new Vector2(index % 2 == 0 ? .295f : .66f, .21f + .055f * index),
+                    _ => new Vector2(index % 2 == 0 ? .21f : .75f, .30f + .08f * (index / 2)),
+                };
                 var position = RpgGroundMark(_rpgLocation, point);
                 var marker = RpgFieldProp($"Pickup_{item}", position, new Vector2(89f, 35f));
                 RpgButton(marker, "✦ 줍기", Approach, 17, primary: true);
@@ -256,11 +259,13 @@ namespace YGOPortable.UI
         internal static int StageOpponentId(StoryEpisodeData episode) =>
             episode.playAsCharacterId > 0 && episode.playAsCharacterId == episode.charId ? 0 : episode.charId;
 
-        private string CampaignSdPath(int id) =>
-            RpgArt + $"Characters_SD/sd_{(id == 0 ? "protagonist" : RpgArtKey(id))}.png";
+        private string CampaignSdPath(int id) => IsGxCampaign && id == RpgShopkeeperId
+            ? "TagForce/5DS/Characters_SD/sd_shopkeeper.png"
+            : RpgArt + $"Characters_SD/sd_{(id == 0 ? "protagonist" : RpgArtKey(id))}.png";
 
-        private string CampaignBustPath(int id) => IsGxCampaign && id == 0
-            ? RpgArt + "Standing/full_campaign_protagonist.png"
+        private string CampaignBustPath(int id) => IsGxCampaign && id == RpgShopkeeperId
+            ? "TagForce/5DS/Characters_Standing/full_shopkeeper.png"
+            : IsGxCampaign && id == 0 ? RpgArt + "Standing/full_campaign_protagonist.png"
             : RpgArt + (IsGxCampaign ? "Standing/" : "Characters_Standing/") +
                 $"full_{(id == 0 ? "protagonist" : RpgArtKey(id))}.png";
     }

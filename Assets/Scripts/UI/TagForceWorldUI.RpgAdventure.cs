@@ -183,7 +183,7 @@ namespace YGOPortable.UI
         private void AddRpgShopkeeper()
         {
             if (!HasRpgMerchant(_rpgLocation, RpgClears)) return;
-            var point = IsGxCampaign ? new Vector2(.71f, .42f) : new Vector2(.82f, .38f);
+            var point = IsGxCampaign ? new Vector2(.68f, .47f) : new Vector2(.82f, .38f);
             AddRpgResident(RpgShopkeeperId, RpgShopkeeperName, "RpgCardMerchant", RpgGroundMark(_rpgLocation, point),
                 RpgResidentRole.Shop, () => OpenRpgService(RpgShopkeeperId));
         }

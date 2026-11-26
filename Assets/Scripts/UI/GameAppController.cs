@@ -889,17 +889,17 @@ namespace YGOPortable.UI
                         var plan = _activeStoryPlan;
                         var opponentDeck = _activeOppDeck;
                         bool fromField = _storyMode.FromRpgField;
-                        string Settle()
+                        (bool Saved, string Message) Settle()
                         {
                             int previousRank = CollectionProgress.RpgRank;
                             int previousXp = CollectionProgress.RpgExperience;
                             if (!CollectionProgress.TryAwardStoryDuel(_storyMode.ProgressIdFor(episode), won, raid, opponentDeck, plan,
-                                out var prize, out string error, rpgField: fromField, awardPartnerAffinity: !_storyMode.IsGxRpg)) return error;
+                                out var prize, out string error, rpgField: fromField, awardPartnerAffinity: !_storyMode.IsGxRpg)) return (false, error);
                             if (fromField) _tagForceWorld.QueueRpgRankNotice(previousRank);
                             int gained = CollectionProgress.RpgExperience - previousXp;
-                            return FormatStoryPrize(prize) + (gained > 0 ? $" · +{gained} EXP" : "");
+                            return (true, FormatStoryPrize(prize) + (gained > 0 ? $" · +{gained} EXP" : ""));
                         }
-                        string storyReward = fromField ? null : Settle();
+                        string storyReward = fromField ? null : Settle().Message;
                         ShowScreen(AppScreen.StoryMode);
                         if (fromField) _storyMode.ShowFieldDuelResult(episode, won, draw, Settle, plan);
                         else _storyMode.ShowDuelResult(episode, won, draw, storyReward, plan);

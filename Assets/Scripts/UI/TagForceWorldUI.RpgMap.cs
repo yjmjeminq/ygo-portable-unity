@@ -20,7 +20,6 @@ namespace YGOPortable.UI
 
         private readonly List<(Image Image, Color Color, float Phase)> _rpgMapPulses = new();
         private float _rpgMapTime;
-        private bool _gxMapFocusGoal;
 
         private void BuildRpgMap()
         {
@@ -107,20 +106,24 @@ namespace YGOPortable.UI
                 bool open = region.IsOpen(cleared), current = i == _rpgLocation, goal = i == target;
                 Color color = goal ? RpgUiStyle.Gold : current ? RpgUiStyle.Cyan : open
                     ? new Color32(159, 209, 234, 255) : new Color32(163, 173, 198, 255);
-                var pin = Anchor(nodes, region.Id, CampaignMapPoint(i), new Vector2(71f, 66f));
+                const float gxPinWidth = .056f, gxPinHeight = .104f;
+                var mapPoint = CampaignMapPoint(i);
+                var pin = IsGxCampaign ? Area(nodes, region.Id, mapPoint.x - gxPinWidth * .5f,
+                    mapPoint.y - gxPinHeight * .5f, mapPoint.x + gxPinWidth * .5f, mapPoint.y + gxPinHeight * .5f) :
+                    Anchor(nodes, region.Id, mapPoint, new Vector2(71f, 66f));
                 var button = pin.gameObject.AddComponent<Button>();
                 pins[i] = button;
                 DuelUiKit.AddImage(pin.gameObject, DuelUiKit.WhiteSprite, Color.clear, false, true);
-                var pinBody = Anchor(pin, "Body", new(.5f, .5f), Vector2.one * 49f);
+                var pinBody = PinArt("Body", 49f);
                 DuelUiKit.AddImage(pinBody.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Hexagon),
-                    new Color(.076f, .124f, .223f, .97f), false, false);
-                var ring = Anchor(pin, "Ring", new(.5f, .5f), Vector2.one * 42f);
-                var rim = DuelUiKit.AddImage(ring.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Ring), color, false, false);
+                    new Color(.076f, .124f, .223f, .97f), IsGxCampaign, false);
+                var ring = PinArt("Ring", 42f);
+                var rim = DuelUiKit.AddImage(ring.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Ring), color, IsGxCampaign, false);
                 var glyph = goal ? RpgUiStyle.Symbol.Alert : open ? RpgUiStyle.Symbol.Dot : RpgUiStyle.Symbol.Lock;
-                var sign = Anchor(pin, open ? "Symbol" : "MapLock", new(.5f, .5f), Vector2.one * (open && !goal ? 15f : 25f));
-                DuelUiKit.AddImage(sign.gameObject, RpgUiStyle.Glyph(glyph), color, false, false);
-                var focus = Anchor(pin, "Selection", new(.5f, .5f), Vector2.one * 55f);
-                selections[i] = DuelUiKit.AddImage(focus.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Ring), Color.white, false, false);
+                var sign = PinArt(open ? "Symbol" : "MapLock", open && !goal ? 15f : 25f);
+                DuelUiKit.AddImage(sign.gameObject, RpgUiStyle.Glyph(glyph), color, IsGxCampaign, false);
+                var focus = PinArt("Selection", 55f);
+                selections[i] = DuelUiKit.AddImage(focus.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Ring), Color.white, IsGxCampaign, false);
                 selections[i].enabled = false;
                 if (current) AddPulse("CurrentPulse", RpgUiStyle.Cyan, 0f, 71f);
                 if (goal) AddPulse("GoalPulse", RpgUiStyle.Gold, 1.5f, 62f);
@@ -130,10 +133,33 @@ namespace YGOPortable.UI
                     DuelUiKit.AddImage(currentMark.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Dot), RpgUiStyle.Cyan, false, false);
                 }
                 float labelCenter = i == RpgHideout ? .76f : .5f;
-                var name = HudLabel(Anchor(pin, "Name", new(labelCenter, -.120f), new Vector2(141f, 26f)), region.Name,
-                    15, color, align: TextAnchor.MiddleCenter, heading: true);
-                name.horizontalOverflow = HorizontalWrapMode.Overflow;
-                name.resizeTextForBestFit = false;
+                RectTransform label;
+                string caption = region.Name;
+                if (IsGxCampaign)
+                {
+                    var (offset, shortName) = region.Id switch
+                    {
+                        "spot_main_academy" => (new Vector2(-.04f, .078f), "아카데미아"),
+                        "spot_library" or "spot_dark_dimension" => (new Vector2(0f, .078f), region.Name),
+                        "spot_blue_arena" => (new Vector2(0f, -.078f), "블루 아레나"),
+                        "spot_red_dorm" => (new Vector2(0f, -.078f), "레드 기숙사"),
+                        "spot_darkness_altar" => (new Vector2(-.015f, .078f), region.Name),
+                        _ => (new Vector2(0f, -.078f), region.Name),
+                    };
+                    var center = new Vector2(.5f + offset.x / gxPinWidth, .5f + offset.y / gxPinHeight);
+                    var half = new Vector2(.07f / gxPinWidth, .019f / gxPinHeight);
+                    label = Area(pin, "Name", center.x - half.x, center.y - half.y, center.x + half.x, center.y + half.y);
+                    caption = shortName;
+                }
+                else label = Anchor(pin, "Name", new(labelCenter, -.120f), new Vector2(141f, 26f));
+                var name = HudLabel(label, caption, 15, color, align: TextAnchor.MiddleCenter, heading: true);
+                name.horizontalOverflow = IsGxCampaign ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
+                name.resizeTextForBestFit = IsGxCampaign;
+                if (IsGxCampaign)
+                {
+                    name.resizeTextMinSize = 11;
+                    name.resizeTextMaxSize = 15;
+                }
                 name.raycastTarget = false;
                 var shadow = name.gameObject.AddComponent<Outline>();
                 shadow.effectColor = new Color(.018f, .033f, .057f, .95f);
@@ -146,15 +172,21 @@ namespace YGOPortable.UI
                 MenuButtonMotion.Attach(button, ring, color, underline: false);
                 button.onClick.AddListener(() => Select(index));
 
+                RectTransform PinArt(string id, float size)
+                {
+                    float half = size / 142f;
+                    return IsGxCampaign ? Area(pin, id, .5f - half, .5f - half, .5f + half, .5f + half) :
+                        Anchor(pin, id, new(.5f, .5f), Vector2.one * size);
+                }
+
                 void AddPulse(string id, Color glowColor, float phase, float size)
                 {
-                    var glowSlot = Anchor(pin, id, new(.5f, .5f), Vector2.one * size);
-                    var glow = DuelUiKit.AddImage(glowSlot.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Ring), glowColor, false, false);
+                    var glowSlot = PinArt(id, size);
+                    var glow = DuelUiKit.AddImage(glowSlot.gameObject, RpgUiStyle.Glyph(RpgUiStyle.Symbol.Ring), glowColor, IsGxCampaign, false);
                     _rpgMapPulses.Add((glow, glowColor, phase));
                 }
             }
-            int initial = _gxMapFocusGoal && target >= 0 ? target : _rpgLocation;
-            _gxMapFocusGoal = false;
+            int initial = _rpgLocation;
             Select(initial, false);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(pins[initial].gameObject);
             UpdateRpgMapPulse(0f);

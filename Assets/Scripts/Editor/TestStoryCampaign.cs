@@ -15,7 +15,11 @@ namespace YGOPortable.Editor
 {
     internal static partial class TestStoryCampaign
     {
-        public static void Run()
+        public static void Run() => RunCampaignChecks(gxOnly: false);
+
+        public static void RunGx() => RunCampaignChecks(gxOnly: true);
+
+        private static void RunCampaignChecks(bool gxOnly)
         {
             string streaming = Application.streamingAssetsPath;
             string save = Path.Combine(Path.GetTempPath(), "ygo-story-" + Guid.NewGuid().ToString("N"));
@@ -32,23 +36,34 @@ namespace YGOPortable.Editor
                 {
                     if (type == 0) nativeErrors.Add(message);
                 }) == 0, "The native engine did not start.");
-                VerifyCampaigns();
-                VerifyOpeningCardRemoval();
-                nativeErrors.Clear();
-                VerifyDmScenarioEffects();
-                VerifyGxScenarioEffects();
-                Verify5DsScenarioEffects();
-                VerifyRpgCampaign(starter);
-                VerifyZexalScenarioEffects();
-                VerifyArcVScenarioEffects();
-                VerifyVrainsScenarioEffects();
-                Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
-                VerifyMutedMusicRouting();
-                VerifyDialogueChoices(starter);
-                VerifyOpeningAndSave(save);
-                VerifyRpgTerrainData(streaming);
-                VerifyRpgField(starter, save);
-                Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
+                if (gxOnly)
+                {
+                    VerifyGxScenarioEffects();
+                    VerifyRpgTerrainData(streaming, gxOnly: true);
+                    VerifyRpgField(starter, save, gxOnly: true);
+                    Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
+                    Debug.Log("[VERIFY GX] All GX checks passed. Native script errors=0.");
+                }
+                else
+                {
+                    VerifyCampaigns();
+                    VerifyOpeningCardRemoval();
+                    nativeErrors.Clear();
+                    VerifyDmScenarioEffects();
+                    VerifyGxScenarioEffects();
+                    Verify5DsScenarioEffects();
+                    VerifyRpgCampaign(starter);
+                    VerifyZexalScenarioEffects();
+                    VerifyArcVScenarioEffects();
+                    VerifyVrainsScenarioEffects();
+                    Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
+                    VerifyMutedMusicRouting();
+                    VerifyDialogueChoices(starter);
+                    VerifyOpeningAndSave(save);
+                    VerifyRpgTerrainData(streaming);
+                    VerifyRpgField(starter, save);
+                    Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
+                }
                 exit = 0;
             }
             catch (Exception error)

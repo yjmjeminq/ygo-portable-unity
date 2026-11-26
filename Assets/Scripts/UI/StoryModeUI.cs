@@ -113,6 +113,7 @@ namespace YGOPortable.UI
 
         private int _selectedSeries;
         private bool _rpgWorld;
+        private Action _resumeAfterDeckEditor;
         private int _unlockedIndex;
         private int _selectedIndex;
         private string _deckId;
@@ -239,44 +240,77 @@ namespace YGOPortable.UI
                 OpenEpisode(index);
         }
 
-        internal void ShowFieldDuelResult(StoryEpisodeData episode, bool won, bool draw, Func<string> settle,
+        internal void ShowFieldDuelResult(StoryEpisodeData episode, bool won, bool draw, Func<(bool Saved, string Message)> settle,
             StoryBattlePlan plan)
         {
             string result = won ? "승리" : draw ? "무승부" : "패배";
             int index = IndexOf(episode);
             if (index >= 0) SelectEpisode(index);
             string reward = null;
+            bool gx = IsGxRpg;
+            bool gxLoss = !won && gx;
             _finishFieldResult = ReturnToField;
             PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues,
-                $"{TitleOf(episode)} · {result}", () =>
-                {
-                    if (won)
-                    {
-                        ReturnToField();
-                    }
-                    else
-                    {
-                        reward = settle() ?? string.Empty;
-                        _finishFieldResult = null;
-                        _stance = plan.Stance;
-                        _supports = RaidSupport.None;
-                        _opponentOpening = plan.OpponentOpening;
-                        ShowRetryChoices();
-                    }
-                });
+                $"{TitleOf(episode)} · {result}", won ? ReturnToField : FinishDefeat);
+            if (gxLoss) FinishDefeat();
+
+            void FinishDefeat()
+            {
+                reward ??= settle().Message ?? string.Empty;
+                _finishFieldResult = gxLoss ? ReturnToField : null;
+                _stance = plan.Stance;
+                _supports = RaidSupport.None;
+                _opponentOpening = plan.OpponentOpening;
+                ShowRetryChoices();
+            }
 
             void ReturnToField()
             {
+                if (reward == null)
+                {
+                    var settlement = settle();
+                    if (gx && won && !settlement.Saved)
+                    {
+                        _dialogue.FocusOnChoices();
+                        _dialogue.ShowChoices(() => settlement.Message, new StoryChoice("진행도 다시 저장", ReturnToField));
+                        return;
+                    }
+                    reward = settlement.Message;
+                }
                 _finishFieldResult = null;
                 if (won && Application.isPlaying) DuelAudio.PlayWin();
-                _app.ReturnToRpgField(reward ?? settle());
+                _app.ReturnToRpgField(reward);
             }
 
-            void ShowRetryChoices() => _dialogue.ShowChoices(() => string.IsNullOrEmpty(reward) ? result : $"{result} · {reward}",
-                new("바로 재도전", () => ChooseTurnOrder(episode, ShowRetryChoices), () => HasEpisodeDeck(episode)),
-                new("대화부터 다시", () => OpenEpisode(index), () => index >= 0),
-                new("덱 편집", _app.OpenStoryDeckEditor, () => episode.forcedPlayerDeckId == 0),
-                new("필드로 돌아가기", ReturnToField));
+            void ShowRetryChoices()
+            {
+                string Summary() => string.IsNullOrEmpty(reward) ? result : $"{result} · {reward}";
+                var retry = new StoryChoice("바로 재도전", Retry, () => HasEpisodeDeck(episode));
+                if (gxLoss)
+                {
+                    _finishFieldResult = ReturnToField;
+                    _dialogue.FocusOnChoices();
+                    _dialogue.ShowChoices(Summary, retry,
+                        new("덱 변경 후 재도전", () => PickDeck(Retry), () => episode.forcedPlayerDeckId == 0),
+                        new("필드로 복귀", ReturnToField),
+                        new("패배 대화 보기", () =>
+                        {
+                            _finishFieldResult = FinishDefeat;
+                            PlayDialogue(episode, episode.postLoseDialogues, $"{TitleOf(episode)} · {result}", FinishDefeat);
+                        }, () => episode.postLoseDialogues?.Length > 0));
+                }
+                else _dialogue.ShowChoices(Summary, retry,
+                    new("대화부터 다시", () => OpenEpisode(index), () => index >= 0),
+                    new("덱 편집", _app.OpenStoryDeckEditor, () => episode.forcedPlayerDeckId == 0),
+                    new("필드로 돌아가기", ReturnToField));
+            }
+
+            void Retry()
+            {
+                if (!HasEpisodeDeck(episode)) return;
+                _finishFieldResult = null;
+                ChooseTurnOrder(episode, ShowRetryChoices);
+            }
         }
 
         private void LayoutEpisodeRows(int count)
@@ -313,6 +347,7 @@ namespace YGOPortable.UI
                 .SelectMany(tab => Enumerable.Range(1, StoryCampaign.LegacyEpisodeCount)
                     .Select(number => StoryCampaign.LegacyEpisodeId(tab.Id, number))
                     .Where(id => PlayerPrefs.GetInt(ClearedKey(tab.Id, id), 0) != 0)));
+            if (IsGxRpg && FromRpgField) _deckId = CollectionProgress.LastDuelDeckId;
             LoadDeckChoices();
             SelectSeries(_selectedSeries);
             _tournament.GetComponentInChildren<Text>().text = DimensionTournament.Unlocked ? "차원 대항전" : "차원 대항전 · 잠김";
@@ -334,6 +369,9 @@ namespace YGOPortable.UI
             LoadDeckChoices();
             _dialogue.CloseDeckPicker();
             _dialogue.RefreshChoices();
+            var resume = _resumeAfterDeckEditor;
+            _resumeAfterDeckEditor = null;
+            resume?.Invoke();
         }
 
         internal void Update(float delta)
@@ -809,13 +847,20 @@ namespace YGOPortable.UI
         private string SelectedStoryDeckLabel() => _playableDecks.Count == 0
             ? DuelDeckAvailability.ExplainEmptyList(_deckId) : $"내 덱 · {_playableDecks[_deckPicker.value].name}";
 
-        private void PickDeck() => _dialogue.OpenDeckPicker(_playableDecks, _deckPicker.value, index =>
+        private void PickDeck() => PickDeck(null);
+
+        private void PickDeck(Action afterSelection) => _dialogue.OpenDeckPicker(_playableDecks, _deckPicker.value, index =>
         {
             _deckPicker.SetValueWithoutNotify(index);
             _deckPicker.RefreshShownValue();
             SelectDeck(index);
-            _dialogue.RefreshChoices();
-        }, _app.OpenStoryDeckEditor, _deckId);
+            if (afterSelection != null) afterSelection();
+            else _dialogue.RefreshChoices();
+        }, () =>
+        {
+            if (afterSelection != null) _resumeAfterDeckEditor = () => PickDeck(afterSelection);
+            _app.OpenStoryDeckEditor();
+        }, _deckId);
 
         private void ChooseTurnOrder(StoryEpisodeData episode, Action restore)
         {
@@ -917,6 +962,7 @@ namespace YGOPortable.UI
             ClearTurnOrder();
             _returnFromOpeningPicker = null;
             _finishFieldResult = null;
+            _resumeAfterDeckEditor = null;
             _dialogue.Close();
             _backdrop.enabled = true;
             _browser.gameObject.SetActive(true);

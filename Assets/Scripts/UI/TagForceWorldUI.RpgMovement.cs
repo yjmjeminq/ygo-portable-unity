@@ -142,10 +142,11 @@ namespace YGOPortable.UI
             ApplyRpgCameraPan(span);
         }
 
-        private Vector2 AdvanceRpgWalk(float delta)
+        private Vector2 AdvanceRpgWalk(float delta, bool running)
         {
             var position = _position;
-            float travel = RpgWalkSpeed * delta * Mathf.Lerp(1f, FieldTerrain.ScaleAt(position.y), .28f);
+            float speed = IsGxCampaign ? .325f * (running ? 1.55f : 1f) : RpgWalkSpeed;
+            float travel = speed * delta * Mathf.Lerp(1f, FieldTerrain.ScaleAt(position.y), .28f);
             if (_manualWalk)
             {
                 var step = _destination - position;
@@ -206,8 +207,9 @@ namespace YGOPortable.UI
         private RectTransform BuildRpgActorArt(RectTransform art, string path, string name, string outfitAtlas = null)
         {
             string cycle = RpgArt + "WalkCycles/" + Path.GetFileNameWithoutExtension(path);
-            var field = outfitAtlas == null ? null : _images.GetSlices(RpgArt + outfitAtlas, 3, 3, fixedCells: true);
-            if (field == null && path != null) field = _images.GetSlices(cycle + "_field.png", 3, 3, fixedCells: true);
+            var field = outfitAtlas == null ? null : _images.GetSlices(RpgArt + outfitAtlas, 3, 3, fixedCells: true, fitRows: IsGxCampaign);
+            if (field == null && path != null)
+                field = _images.GetSlices(cycle + "_field.png", 3, 3, fixedCells: true, fitRows: IsGxCampaign);
             var directions = field ?? (path == null ? null : _images.GetSlices(cycle + "_directions.png", 3, 3));
             var sides = path == null || directions != null ? null : _images.GetSlices(cycle + ".png", 2, 2);
             var profile = path == null || directions != null ? null : _images.GetSlices(cycle + "_side_idle.png", 1, 1)?[0];
@@ -230,20 +232,24 @@ namespace YGOPortable.UI
                 var actor = (RectTransform)art.parent;
                 actor.sizeDelta = GxFieldActorSize;
                 actor.pivot = new Vector2(.5f, .277f);
+                art.anchorMin = new Vector2(0f, .15f);
+                art.anchorMax = new Vector2(1f, .90f);
             }
-
-            if (directions != null || sides != null || profile != null)
+            else if (directions != null || sides != null || profile != null)
             {
                 float padding = (art.anchorMax.y - art.anchorMin.y) * .095f;
                 art.anchorMin += Vector2.up * padding;
                 art.anchorMax -= Vector2.up * padding;
             }
             var depth = sides == null ? null : _images.GetSlices(cycle + "_vertical.png", 3, 2);
-            var (penumbra, core) = AddRpgGroundShadow(art, field != null ? .06f : 0f);
+            var (penumbra, core) = AddRpgGroundShadow(art, field != null && !IsGxCampaign ? .06f : 0f);
             var image = DuelUiKit.AddImage(art.gameObject, idle, Color.white, true, false);
-            // Keep the transparent sides of the larger atlas cells from intercepting floor taps.
-            if (IsGxCampaign) image.raycastPadding = new Vector4(44f, 0f, 44f, 0f);
-            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions, field != null,
+            if (IsGxCampaign)
+            {
+                image.preserveAspect = true;
+                image.raycastPadding = new Vector4(29f, -10f, 29f, -8f);
+            }
+            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions, field != null || IsGxCampaign,
                 penumbra, core);
             return art;
         }

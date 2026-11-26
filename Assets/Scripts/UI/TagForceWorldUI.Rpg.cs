@@ -157,7 +157,11 @@ namespace YGOPortable.UI
             var bar = Area(parent, "RpgNavigation", .05f, .027f, .95f, .101f);
             Add(0, "Map", "월드맵", () => Show(Page.Map));
             Add(1, "Quests", "의뢰 수첩", () => Show(Page.Ledger));
-            Add(2, "Decks", "덱 편집", _app.OpenTagForceDeckEditor);
+            Add(2, "Decks", "덱 편집", () =>
+            {
+                if (IsGxCampaign && _page == Page.Field) Show(Page.GxDecks);
+                else _app.OpenTagForceDeckEditor();
+            });
             Add(3, "Menu", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu));
             return bar;
 
@@ -172,14 +176,16 @@ namespace YGOPortable.UI
         {
             bool field = _rpgField && page == Page.Field;
             bool fullScreen = _rpgField && page is Page.Field or Page.Talk or Page.Prologue or Page.Guide or Page.SummerEpilogue;
-            _body.anchorMin = fullScreen ? new Vector2(.012f, .012f) : new Vector2(.05f, .174f);
-            _body.anchorMax = fullScreen ? new Vector2(.988f, .988f) : new Vector2(.95f, .895f);
+            bool gxField = _rpgField && IsGxCampaign && page is Page.Field or Page.Talk;
+            _body.anchorMin = gxField ? Vector2.zero : fullScreen ? new Vector2(.012f, .012f) : new Vector2(.05f, .174f);
+            _body.anchorMax = gxField ? Vector2.one : fullScreen ? new Vector2(.988f, .988f) : new Vector2(.95f, .895f);
             _status.rectTransform.anchorMin = fullScreen ? new Vector2(.025f, .105f) : new Vector2(.05f, .112f);
             _status.rectTransform.anchorMax = fullScreen ? new Vector2(.46f, .151f) : new Vector2(.95f, .168f);
             _header.gameObject.SetActive(!fullScreen);
             _back.gameObject.SetActive(!fullScreen);
             _rpgNavigation.anchorMin = field ? new Vector2(.777f, .113f) : new Vector2(.05f, .027f);
             _rpgNavigation.anchorMax = field ? new Vector2(.973f, .409f) : new Vector2(.95f, .101f);
+            _rpgNavItems[2].GetComponentInChildren<Text>().text = field && IsGxCampaign ? "내 덱" : "덱 편집";
             for (int i = 0; i < _rpgNavItems.Length; i++)
             {
                 _rpgNavItems[i].gameObject.SetActive(true);
@@ -223,7 +229,7 @@ namespace YGOPortable.UI
         {
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(page is not
-                (Page.Field or Page.Talk or Page.Prologue or Page.Guide or Page.ResortWardrobe or Page.SummerEpilogue));
+                (Page.Field or Page.Talk or Page.Prologue or Page.Guide or Page.ResortWardrobe or Page.SummerEpilogue or Page.GxDecks));
             _header.text = $"{(IsGxCampaign ? "GX" : "5D's")} RPG 월드 · {CampaignRegions[_rpgLocation].Name}";
             DuelAudio.PlayRpgFieldMusic(IsGxCampaign ? GxFieldMusic(CampaignFieldTheme) : MusicForRpgRegion(_rpgLocation));
             switch (page)
@@ -242,6 +248,7 @@ namespace YGOPortable.UI
                 case Page.Guide: BuildRpgIntro(true); break;
                 case Page.Talk: BuildRpgTalk(); break;
                 case Page.Duel: BuildRpgPractice(); break;
+                case Page.GxDecks: BuildGxDecks(); break;
                 case Page.Ledger: BuildRpgQuestJournal(); break;
                 case Page.ResortWardrobe: BuildRpgResortWardrobe(); break;
                 case Page.SummerEpilogue: BuildRpgSummerEpilogue(); break;
@@ -404,7 +411,16 @@ namespace YGOPortable.UI
             var profile = BuildRpgActorArt(art, CampaignSdPath(id), name,
                 outfit == null ? null : RpgWardrobe.WalkAtlas(id, outfit));
             PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
-            void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact, actor);
+            void Approach()
+            {
+                var point = actor.anchorMin - Vector2.up * .06f;
+                if (IsGxCampaign && role == RpgResidentRole.Conversation)
+                {
+                    var side = actor.anchorMin + new Vector2(_position.x < actor.anchorMin.x ? -.061f : .061f, -.03f);
+                    if (FieldTerrain.Contains(side)) point = side;
+                }
+                MoveTo(point, interact, actor);
+            }
             BindPortrait(art, Approach);
             BuildRpgResidentMotion(actor, profile, spot, role, patrol, name);
             string verb = role switch
@@ -542,6 +558,34 @@ namespace YGOPortable.UI
             DeckPadUi.LimitKeyboardNavigation(panel);
             EventSystem.current?.SetSelectedGameObject(first?.gameObject);
             return first;
+        }
+
+        private void BuildGxDecks()
+        {
+            BuildRpgMenuBackdrop();
+            var selected = CollectionProgress.LastDuelDeckId;
+            HudLabel(Area(_body, "DeckHeading", .06f, .81f, .94f, .96f), "GX에서 사용할 내 덱", 25, Color.white, heading: true);
+            var list = List("GxDeckList", .10f, .20f, .90f, .80f);
+            var status = HudLabel(Area(_body, "DeckStatus", .10f, .155f, .90f, .20f), "", 16, Color.white);
+            foreach (var deck in DeckRepository.UserDecks.Where(deck => GameAppController.CanStartWithDeck(deck, out _)))
+            {
+                bool active = selected == deck.id;
+                var row = Row(list, (active ? "✓ " : "") + deck.name, () =>
+                {
+                    CollectionProgress.RememberDuelDeck(deck.id);
+                    if (CollectionProgress.LastDuelDeckId != deck.id)
+                    {
+                        status.text = "덱 선택을 저장하지 못했습니다.";
+                        return;
+                    }
+                    _deckId = deck.id;
+                    Show(Page.Field);
+                }, 50);
+                RpgUiStyle.Control(row.GetComponent<Button>(), active);
+            }
+            if (list.childCount == 0) status.text = DuelDeckAvailability.ExplainEmptyList(selected);
+            RpgButton(Area(_body, "EditGxDecks", .10f, .036f, .43f, .139f), "덱 편집 열기", _app.OpenTagForceDeckEditor, primary: true);
+            RpgButton(Area(_body, "CloseGxDecks", .57f, .036f, .90f, .139f), "필드로 복귀", () => Show(Page.Field));
         }
 
         private void BuildRpgPractice()
