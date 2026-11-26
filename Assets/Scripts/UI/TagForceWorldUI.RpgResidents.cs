@@ -39,7 +39,7 @@ namespace YGOPortable.UI
         private float _rpgMarkerTime;
 
         private void BuildRpgResidentMotion(RectTransform actor, RectTransform art, Vector2 home,
-            RpgResidentRole role, bool patrol)
+            RpgResidentRole role, bool patrol, string name)
         {
             var (symbol, tint) = role switch
             {
@@ -51,9 +51,9 @@ namespace YGOPortable.UI
                 _ => ("…", new Color32(240, 245, 249, 255)),
             };
             bool story = role == RpgResidentRole.Story;
+            bool gxGoal = story && IsGxCampaign;
             var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.06f),
-                story ? new Vector2(36f, 29f) : new Vector2(31f, 25f));
-            DuelUiKit.AddImage(marker.gameObject, _rpgSpeechBubble ??= CreateRpgSpeechBubble(), tint, false, false);
+                gxGoal ? new Vector2(184f, 36f) : story ? new Vector2(36f, 29f) : new Vector2(31f, 25f));
             string icon = role switch
             {
                 RpgResidentRole.Story => "icon_quest_main.png",
@@ -61,8 +61,18 @@ namespace YGOPortable.UI
                 RpgResidentRole.Shop => "icon_shop.png",
                 _ => "icon_talk.png",
             };
-            var artSlot = Area(marker, "Icon", .13f, .24f, .87f, .95f);
-            DrawRpgIcon(artSlot, icon, symbol, new Color(.10f, .15f, .21f));
+            if (gxGoal)
+            {
+                RpgUiStyle.Glass(marker);
+                HudLabel(Area(marker, "TargetName", .046f, 0f, .954f, 1f), $"! {name}", 19, RpgUiStyle.Gold,
+                    align: TextAnchor.MiddleCenter, heading: true);
+            }
+            else
+            {
+                DuelUiKit.AddImage(marker.gameObject, _rpgSpeechBubble ??= CreateRpgSpeechBubble(), tint, false, false);
+                var artSlot = Area(marker, "Icon", .13f, .24f, .87f, .95f);
+                DrawRpgIcon(artSlot, icon, symbol, new Color(.10f, .15f, .21f));
+            }
             var visibility = marker.gameObject.AddComponent<CanvasGroup>();
             visibility.blocksRaycasts = visibility.interactable = false;
             visibility.alpha = role == RpgResidentRole.Conversation ? 0f : 1f;

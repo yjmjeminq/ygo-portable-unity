@@ -67,10 +67,10 @@ namespace YGOPortable.UI
             UpdateRpgExitSigns();
 
             var landmark = CampaignLandmark(_rpgLocation);
-            var marker = Anchor(_rpgFieldObjects, "Landmark", landmark.Position, new Vector2(146f, 31f));
+            var marker = Anchor(_rpgFieldObjects, "Landmark", landmark.Position, IsGxCampaign ? new Vector2(87f, 34f) : new Vector2(146f, 31f));
             void Inspect() => MoveTo(landmark.Position, OpenRpgLandmark);
-            RpgButton(marker, landmark.Name, Inspect, 16);
-            _rpgLandmarkLabel = marker.GetComponentInChildren<Text>();
+            RpgButton(marker, IsGxCampaign ? "지역 안내" : landmark.Name, Inspect, 16);
+            if (!IsGxCampaign) _rpgLandmarkLabel = marker.GetComponentInChildren<Text>();
             RegisterRpgInteraction(marker, $"{landmark.Name} · 조사", Inspect, RpgActionPriority.Service);
 
             void AddExit(int slot, int destination, int entry)

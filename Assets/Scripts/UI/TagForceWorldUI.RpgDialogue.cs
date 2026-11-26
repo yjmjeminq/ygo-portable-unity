@@ -90,6 +90,8 @@ namespace YGOPortable.UI
 
             foreach (var resident in _rpgResidentMotion)
                 resident.Marker.gameObject.SetActive(false);
+            _player.Find("GxIdentity")?.gameObject.SetActive(false);
+            _rpgCompanion?.Find("GxIdentity")?.gameObject.SetActive(false);
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldObjects?.gameObject.SetActive(false);
             _rpgGreeting?.gameObject.SetActive(false);

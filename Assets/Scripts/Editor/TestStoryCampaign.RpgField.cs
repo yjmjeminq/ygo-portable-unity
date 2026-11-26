@@ -307,14 +307,37 @@ namespace YGOPortable.Editor
                             continue;
                         }
 
+                        if (episode.id == "gx_ep_01")
+                        {
+                            Press(panel, "FieldHud/QuestTrack/Guide");
+                            Require(panel.Find("RegionPreview/RegionName/Label").GetComponent<Text>().text == world.CampaignRegion(location).Name,
+                                "The GX field guide did not preselect the objective region on the map.");
+                            world.Back();
+                        }
                         Require(world.EnterRpgRegion(location) && world.CanStartRpgEpisode(index) &&
                             FieldScene().Find("Scenery").GetComponent<Image>().sprite != null &&
-                            panel.Find("FieldHud/GxOpponentTier/Difficulty/Label") != null,
+                            panel.Find("FieldHud/FieldDetails/GxOpponentTier/Value/Label") != null,
                             $"GX duel HUD or field was missing for {episode.id}.");
                         bool isPov = episode.playAsCharacterId > 0;
-                        Require((panel.Find("FieldHud/GxPov") != null) == isPov, $"Wrong field point of view at {episode.id}.");
+                        string identity = FieldScene().Find("Player/GxIdentity/Label").GetComponent<Text>().text;
+                        Require(identity.Contains(isPov ? "아스카" : "윤"), $"Wrong field point of view at {episode.id}.");
                         VerifyGxWalkerSizes();
-                        app.OpenRpgFieldEpisode(index);
+                        if (episode.id == "gx_ep_01")
+                        {
+                            var fieldHud = panel.Find("FieldHud");
+                            Require(!fieldHud.Find("FieldDetails").gameObject.activeSelf &&
+                                !fieldHud.Find("ContextAction").gameObject.activeSelf &&
+                                panel.Find("RegionBanner") == null && panel.Find("PartnerGreeting") == null &&
+                                FieldScene().Find("MainQuestNpc/MainQuestMarker/TargetName/Label").GetComponent<Text>()
+                                    .text.Contains(episode.opponentName), "The GX field did not prioritize the active objective.");
+                            Press(fieldHud, "MenuToggle");
+                            Require(fieldHud.Find("FieldDetails").gameObject.activeSelf, "The GX field menu dropped its duel details.");
+                            Press(fieldHud, "MenuToggle");
+                            Press(fieldHud, "QuestTrack/Guide");
+                            for (int tick = 0; tick < 40 && !storyRoot.gameObject.activeInHierarchy; tick++) world.Update(.15f);
+                            Require(storyRoot.gameObject.activeInHierarchy, "The GX field guide did not reach the active NPC.");
+                        }
+                        else app.OpenRpgFieldEpisode(index);
                         Require(story.IsGxRpg && story.GetOpponentMatch(episode).Deck?.id == episode.deckId &&
                             FieldScene().Find("DialogueCast") != null, $"GX episode used the wrong deck or stage at {episode.id}.");
                         VerifyGxWalkerSizes();

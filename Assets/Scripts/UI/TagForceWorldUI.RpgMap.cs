@@ -20,6 +20,7 @@ namespace YGOPortable.UI
 
         private readonly List<(Image Image, Color Color, float Phase)> _rpgMapPulses = new();
         private float _rpgMapTime;
+        private bool _gxMapFocusGoal;
 
         private void BuildRpgMap()
         {
@@ -149,8 +150,10 @@ namespace YGOPortable.UI
                     _rpgMapPulses.Add((glow, glowColor, phase));
                 }
             }
-            Select(_rpgLocation, false);
-            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(pins[_rpgLocation].gameObject);
+            int initial = _gxMapFocusGoal && target >= 0 ? target : _rpgLocation;
+            _gxMapFocusGoal = false;
+            Select(initial, false);
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(pins[initial].gameObject);
             UpdateRpgMapPulse(0f);
 
             void Select(int index, bool playSound = true)

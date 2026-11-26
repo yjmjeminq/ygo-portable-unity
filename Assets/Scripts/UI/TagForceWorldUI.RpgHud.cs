@@ -13,6 +13,7 @@ namespace YGOPortable.UI
         private Text _rpgActionText;
         private Text _rpgMenuCaption;
         private CanvasGroup _rpgFieldInput;
+        private RectTransform _gxFieldDetails;
         private readonly List<(RectTransform Icon, RectTransform Actor)> _rpgRadarMarkers = new();
         private static readonly Color32 ExitGreen = new(135, 250, 175, 255);
 
@@ -78,6 +79,7 @@ namespace YGOPortable.UI
             var candidate = CanWalk && !_fieldMenu ? NearbyRpgInteraction() : default;
             bool available = candidate.Select != null;
             _rpgActionButton.interactable = available;
+            if (IsGxCampaign) _rpgActionButton.gameObject.SetActive(available);
             string caption = candidate.Caption ?? "상호작용";
             if (_rpgActionText.text != caption) _rpgActionText.text = caption;
             _rpgActionText.color = available ? Color.white : new Color(.72f, .82f, .89f, .66f);
@@ -85,6 +87,7 @@ namespace YGOPortable.UI
             UpdateRpgResidentMarkers(candidate.Anchor, delta);
             UpdateRpgMinimap();
             _rpgNavigation.gameObject.SetActive(_fieldMenu);
+            if (_gxFieldDetails != null) _gxFieldDetails.gameObject.SetActive(_fieldMenu);
             _rpgFieldInput.interactable = _rpgFieldInput.blocksRaycasts = !_fieldMenu;
             string menuText = _fieldMenu ? "메뉴 닫기" : "메뉴";
             if (_rpgMenuCaption.text != menuText) _rpgMenuCaption.text = menuText;
@@ -97,6 +100,7 @@ namespace YGOPortable.UI
             _rpgActionText = null;
             _rpgMenuCaption = null;
             _rpgFieldInput = null;
+            _gxFieldDetails = null;
             _rpgRadarMarkers.Clear();
             _rpgQuestRewardBanner = null;
         }
@@ -107,10 +111,13 @@ namespace YGOPortable.UI
             var soft = new Color(.75f, .84f, .89f);
             var accent = new Color(.44f, .89f, .93f);
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
+            if (IsGxCampaign)
+            {
+                BuildGxFieldHud(cleared, targetRegion, episodes);
+                return;
+            }
 
-            var (timeName, timeIcon) = IsGxCampaign
-                ? (CampaignFieldTheme == "dark" ? ("밤", "☾") : ("낮", "☀"))
-                : RpgTimeOfDay(_rpgLocation, cleared + 1);
+            var (timeName, timeIcon) = RpgTimeOfDay(_rpgLocation, cleared + 1);
             var clock = Area(_rpgFieldHud, "TimeOfDay", .024f, .929f, .109f, .982f);
             RpgUiStyle.Panel(clock, gold: true);
             HudLabel(Area(clock, "TimeText", .08f, .08f, .91f, .94f), $"{timeIcon}  {timeName}", 17, RpgUiStyle.Gold,
@@ -120,17 +127,8 @@ namespace YGOPortable.UI
             RpgUiStyle.Display(HudLabel(Area(locationRibbon, "RegionName", .105f, .08f, .95f, .93f),
                 CampaignRegions[_rpgLocation].Name, 26, Color.white));
 
-            var deckName = DeckRepository.UserDecks.Find(deck => deck.id == (_deckId ?? CollectionProgress.LastDuelDeckId))?.name ??
-                DeckRepository.UserDecks.Find(deck => GameAppController.CanStartWithDeck(deck, out _))?.name ?? "덱 없음";
+            var deckName = RpgFieldDeckName();
             var episode = cleared < episodes.Length ? episodes[cleared] : null;
-            if (episode?.forcedPlayerDeckId is > 0 && _rpgWorldDecks.TryGetValue(episode.forcedPlayerDeckId, out var povDeck))
-                deckName = povDeck.title;
-            if (RpgPlayerId > 0)
-            {
-                var pov = Area(_rpgFieldHud, "GxPov", .365f, .927f, .555f, .982f);
-                RpgUiStyle.Panel(pov, gold: true);
-                HudLabel(pov, "아스카 시점 (POV)", 20, RpgUiStyle.Gold, align: TextAnchor.MiddleCenter, heading: true);
-            }
             var deckPlate = Area(_rpgFieldHud, "Deck", .024f, .89f, .233f, .925f);
             RpgUiStyle.Panel(deckPlate);
             HudLabel(Area(deckPlate, "Icon", .059f, .1f, .20f, .95f), "덱", 15, accent, heading: true);
@@ -138,9 +136,7 @@ namespace YGOPortable.UI
 
             bool hasEpisode = cleared < episodes.Length;
             string location = CampaignRegions[_rpgLocation].Name;
-            string caption = IsGxCampaign && episode != null
-                ? $"[제{episode.chapter}기] {CampaignRegions[targetRegion].Name}"
-                : $"[메인] {(hasEpisode ? CampaignRegions[targetRegion].Name : location)}";
+            string caption = $"[메인] {(hasEpisode ? CampaignRegions[targetRegion].Name : location)}";
             string objective = episodes.Length == 0 ? "대본을 불러오지 못했습니다." :
                 !hasEpisode ? "자유 탐험" :
                 episode.isCutsceneOnly ? episode.title :
@@ -152,13 +148,6 @@ namespace YGOPortable.UI
             HudLabel(Area(quest, "Chapter", .126f, .51f, .955f, .975f), caption, 16, DuelUiKit.GoldAccent);
             HudLabel(Area(quest, "Objective", .047f, .035f, .955f, .50f),
                 objective, 18, Color.white, heading: true);
-            if (IsGxCampaign && episode != null && _rpgWorldDecks.TryGetValue(episode.deckId, out var rival))
-            {
-                var preview = Area(_rpgFieldHud, "GxOpponentTier", .024f, .746f, .303f, .797f);
-                RpgUiStyle.Panel(preview, accent: true);
-                HudLabel(Area(preview, "Difficulty", .047f, .08f, .955f, .92f), StoryModeUI.GxDeckPreview(rival),
-                    16, accent, heading: true);
-            }
             if (sideObjective is { } side)
             {
                 var sub = Area(_rpgFieldHud, "SideQuestTrack", .024f, .684f, .303f, .792f);
@@ -232,6 +221,109 @@ namespace YGOPortable.UI
             RefreshRpgFieldPrompt();
         }
 
+        private string RpgFieldDeckName() => DeckRepository.UserDecks.Find(deck =>
+                deck.id == (_deckId ?? CollectionProgress.LastDuelDeckId))?.name ??
+            DeckRepository.UserDecks.Find(deck => GameAppController.CanStartWithDeck(deck, out _))?.name ?? "덱 없음";
+
+        private void BuildGxFieldHud(int cleared, int targetRegion, StoryEpisodeData[] episodes)
+        {
+            var episode = cleared < episodes.Length ? episodes[cleared] : null;
+            var mission = Area(_rpgFieldHud, "QuestTrack", .025f, .810f, .369f, .972f);
+            RpgUiStyle.Glass(mission);
+            RpgUiStyle.Display(HudLabel(Area(mission, "RegionName", .056f, .627f, .95f, .942f),
+                CampaignRegions[_rpgLocation].Name, 29, Color.white));
+            Tint(Area(mission, "Divider", .056f, .602f, .946f, .609f), new Color(.46f, .63f, .80f, .32f));
+            bool travel = episode != null && targetRegion != _rpgLocation;
+            string objective = episode == null ? episodes.Length > 0 ? "자유 탐험" : "이야기를 불러오지 못했습니다" :
+                travel ? $"{CampaignRegions[targetRegion].Name} · 이동" : episode.isCutsceneOnly ? episode.title :
+                $"{episode.opponentName}에게 말 걸기";
+            HudLabel(Area(mission, "Chapter", .056f, .338f, .69f, .594f),
+                episode == null ? "현재 진행" : $"!  다음 목표 · {episode.chapter}기", 17, RpgUiStyle.Gold, heading: true);
+            var approach = _rpgInteractions.Find(candidate => candidate.Priority == RpgActionPriority.Story).Select;
+            var objectiveLabel = HudLabel(Area(mission, "Objective", .056f, .069f, approach != null || travel ? .705f : .947f, .344f),
+                objective, 21, Color.white, heading: true);
+            objectiveLabel.resizeTextMinSize = 15;
+            objectiveLabel.resizeTextMaxSize = 21;
+            objectiveLabel.resizeTextForBestFit = true;
+            if (approach != null || travel)
+            {
+                var guide = RpgButton(Area(mission, "Guide", .724f, .103f, .951f, .482f), travel ? "지도에서 찾기" : "목표로 이동", () =>
+                {
+                    if (!CanWalk || _fieldMenu) return;
+                    if (travel)
+                    {
+                        _gxMapFocusGoal = true;
+                        Show(Page.Map);
+                    }
+                    else approach();
+                }, 18, primary: true);
+                guide.navigation = new Navigation { mode = Navigation.Mode.None };
+            }
+
+            BuildRpgMinimap(Area(_rpgFieldHud, "Minimap", .787f, .791f, .974f, .972f));
+            var stats = Area(_rpgFieldHud, "DuelistHud", .787f, .715f, .974f, .782f);
+            RpgUiStyle.Glass(stats);
+            HudLabel(Area(stats, "Rank", .09f, .27f, .47f, .96f), $"Lv. {CollectionProgress.RpgRank}", 19, RpgUiStyle.Cyan, heading: true);
+            HudLabel(Area(stats, "Dp", .43f, .27f, .92f, .96f), $"DP {CollectionProgress.Balance:N0}",
+                20, Color.white, align: TextAnchor.MiddleRight, heading: true);
+            var experience = Area(stats, "Experience", .09f, .18f, .92f, .25f);
+            Tint(experience, new Color(.23f, .35f, .46f));
+            float progress = Mathf.Clamp01(CollectionProgress.RpgRankProgress);
+            if (progress > 0f) Tint(Area(experience, "Fill", 0f, 0f, progress, 1f), RpgUiStyle.Cyan);
+
+            _gxFieldDetails = Area(_rpgFieldHud, "FieldDetails", .741f, .426f, .974f, .699f);
+            RpgUiStyle.Glass(_gxFieldDetails);
+            var deck = episode?.forcedPlayerDeckId is > 0 && _rpgWorldDecks.TryGetValue(episode.forcedPlayerDeckId, out var povDeck)
+                ? povDeck.title : RpgFieldDeckName();
+            Detail("Deck", .69f, "출전 덱", deck.TrimStart(' ', '/'));
+            Detail("Partner", .40f, "동료", $"{RpgPartnerName}  ·  호감도 {CollectionProgress.RpgAffinityFor(RpgPartnerId)} / 100");
+            PresetDeckInfo rival = null;
+            if (episode != null) _rpgWorldDecks.TryGetValue(episode.deckId, out rival);
+            Detail("GxOpponentTier", .11f, rival == null ? "상대 덱" : $"상대 덱 · ★{rival.difficultyTier}",
+                rival?.title ?? "예정된 듀얼 없음");
+            _gxFieldDetails.gameObject.SetActive(false);
+
+            if (_page == Page.Field)
+            {
+                AddGxIdentity(_player, $"나 · {RpgPlayerName}", RpgUiStyle.Cyan);
+                if (_rpgCompanion != null) AddGxIdentity(_rpgCompanion, $"동료 · {RpgPartnerName}", Color.white);
+            }
+            var controls = Area(_rpgFieldHud, "Controls", .025f, .035f, .263f, .085f);
+            RpgUiStyle.Glass(controls);
+            HudLabel(Area(controls, "Move", .074f, 0f, .94f, 1f), Application.isMobilePlatform ? "바닥을 터치해 이동" : "방향키 또는 스틱으로 이동",
+                17, new Color(.82f, .90f, .97f));
+            _rpgActionButton = RpgButton(Area(_rpgFieldHud, "ContextAction", .501f, .030f, .745f, .098f),
+                "", ActivateRpgInteraction, 20, primary: true, sound: null, prominent: true);
+            _rpgActionButton.navigation = new Navigation { mode = Navigation.Mode.None };
+            _rpgActionText = _rpgActionButton.GetComponentInChildren<Text>();
+            var map = RpgButton(Area(_rpgFieldHud, "OpenMap", .756f, .030f, .864f, .098f), "월드맵",
+                () => { if (CanWalk) Show(Page.Map); }, 21);
+            map.navigation = new Navigation { mode = Navigation.Mode.None };
+            var menu = RpgButton(Area(_rpgFieldHud, "MenuToggle", .875f, .030f, .974f, .098f), "메뉴",
+                () => ToggleFieldMenu(), 21, sound: null);
+            menu.navigation = new Navigation { mode = Navigation.Mode.None };
+            _rpgMenuCaption = menu.GetComponentInChildren<Text>();
+            if (_page == Page.Field) _rpgFieldInput = _rpgViewport.gameObject.AddComponent<CanvasGroup>();
+            RefreshRpgFieldPrompt();
+
+            void Detail(string id, float y, string title, string text)
+            {
+                var section = Area(_gxFieldDetails, id, .075f, y, .925f, y + .25f);
+                HudLabel(Area(section, "Heading", 0f, .55f, 1f, 1f), title, 16, RpgUiStyle.Cyan, heading: true);
+                var value = HudLabel(Area(section, "Value", 0f, 0f, 1f, .55f), text, 18, Color.white, heading: true);
+                value.resizeTextMinSize = 14;
+                value.resizeTextMaxSize = 18;
+                value.resizeTextForBestFit = true;
+            }
+        }
+
+        private static void AddGxIdentity(RectTransform actor, string caption, Color color)
+        {
+            var tag = Anchor(actor, "GxIdentity", new Vector2(.5f, .012f), new Vector2(144f, 27f));
+            RpgUiStyle.Glass(tag);
+            HudLabel(tag, caption, 16, color, align: TextAnchor.MiddleCenter, heading: true).raycastTarget = false;
+        }
+
         private static (string, string) RpgTimeOfDay(int region, int episode) => region switch
         {
             RpgArk or RpgWrgp or RpgMoment or RpgStadium or RpgPrison or RpgHideout => ("밤", "☾"),
@@ -241,8 +333,10 @@ namespace YGOPortable.UI
 
         private void BuildRpgMinimap(RectTransform plate)
         {
-            RpgUiStyle.Panel(plate, accent: true);
-            var radar = Area(plate, "Radar", .072f, .11f, .927f, .725f);
+            bool gx = IsGxCampaign;
+            if (gx) RpgUiStyle.Glass(plate);
+            else RpgUiStyle.Panel(plate, accent: true);
+            var radar = Area(plate, "Radar", .072f, gx ? .24f : .11f, .927f, .725f);
             Tint(radar, new Color(.043f, .10f, .167f, .94f));
             var grid = DuelUiKit.FillRect("Grid", radar);
             var rule = new Color(.36f, .66f, .77f, .17f);
@@ -251,25 +345,32 @@ namespace YGOPortable.UI
             for (int i = 1; i < 4; i++)
                 Tint(Area(grid, "Latitude", 0f, i / 4f, 1f, i / 4f + .009f), rule);
             var points = Area(radar, "Points", .035f, .1f, .965f, .9f);
-            HudLabel(Area(plate, "Title", .085f, .744f, .73f, .941f), "구역 레이더", 16,
+            HudLabel(Area(plate, "Title", .085f, .744f, gx ? .90f : .73f, .941f), gx ? "지역 미니맵" : "구역 레이더", gx ? 18 : 16,
                 RpgUiStyle.Cyan, heading: true);
-            HudLabel(Area(plate, "Orientation", .74f, .744f, .915f, .941f), "N", 15, Color.white,
+            if (gx)
+            {
+                HudLabel(Area(plate, "LegendPlayer", .085f, .015f, .33f, .22f), "● 나", 15, RpgUiStyle.Cyan, heading: true);
+                HudLabel(Area(plate, "LegendGoal", .34f, .015f, .59f, .22f), "! 목표", 15, RpgUiStyle.Gold, heading: true);
+                HudLabel(Area(plate, "LegendExit", .62f, .015f, .94f, .22f), "▲ 출구", 15, ExitGreen, heading: true);
+            }
+            else HudLabel(Area(plate, "Orientation", .74f, .744f, .915f, .941f), "N", 15, Color.white,
                 align: TextAnchor.MiddleRight, heading: true);
             foreach (var (slot, destination, _) in _rpgExits)
             {
                 var icon = Mark($"Exit_{destination}", RpgUiStyle.Symbol.Arrow, ExitGreen, 16f, RpgExitPoints[slot]);
                 icon.localRotation = Quaternion.Euler(0f, 0f, slot == 0 ? 90f : slot == 1 ? -90f : 0f);
             }
-            if (_rpgFieldObjects != null && _rpgFieldObjects.Find("HiddenCache") is RectTransform treasure)
+            if (!gx && _rpgFieldObjects != null && _rpgFieldObjects.Find("HiddenCache") is RectTransform treasure)
                 Mark("Cache", RpgUiStyle.Symbol.Star, RpgUiStyle.Gold, 18f, treasure.anchorMin);
             foreach (var resident in _rpgResidentMotion)
             {
                 bool story = resident.Role == RpgResidentRole.Story;
+                if (gx && !story) continue;
                 var icon = Mark(story ? "Story" : resident.Actor.name, story ? RpgUiStyle.Symbol.Alert : RpgUiStyle.Symbol.Dot,
                     story ? RpgUiStyle.Gold : RpgUiStyle.Cyan, story ? 19f : 9f, resident.Actor.anchorMin);
                 _rpgRadarMarkers.Add((icon, resident.Actor));
             }
-            var player = Mark("Player", RpgUiStyle.Symbol.Dot, Color.white, 12f, _position);
+            var player = Mark("Player", RpgUiStyle.Symbol.Dot, gx ? RpgUiStyle.Cyan : Color.white, gx ? 17f : 12f, _position);
             _rpgRadarMarkers.Add((player, _player));
 
             RectTransform Mark(string name, RpgUiStyle.Symbol symbol, Color color, float size, Vector2 point)

@@ -374,7 +374,7 @@ namespace YGOPortable.UI
             PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact, actor);
             BindPortrait(art, Approach);
-            BuildRpgResidentMotion(actor, profile, spot, role, patrol);
+            BuildRpgResidentMotion(actor, profile, spot, role, patrol, name);
             string verb = role switch
             {
                 RpgResidentRole.Story => "이야기 진행",

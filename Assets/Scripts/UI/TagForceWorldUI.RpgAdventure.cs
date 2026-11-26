@@ -264,6 +264,7 @@ namespace YGOPortable.UI
             _rpgTravelTime = 0f;
             _rpgTravelFade = DuelUiKit.AddImage(DuelUiKit.FillRect("TravelFade", _body).gameObject,
                 DuelUiKit.WhiteSprite, new Color(.012f, .023f, .040f, 1f), false, false);
+            if (IsGxCampaign) return;
             _rpgTravelBanner = Area(_body, "RegionBanner", .27f, .108f, .73f, .201f);
             RpgUiStyle.Panel(_rpgTravelBanner, accent: true);
             HudLabel(_rpgTravelBanner, CampaignRegions[_rpgLocation].Name, 27, DuelUiKit.GoldAccent,

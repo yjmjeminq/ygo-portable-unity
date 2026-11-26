@@ -141,8 +141,8 @@ namespace YGOPortable.UI
                     _ => item,
                 };
                 var position = new Vector2(index % 2 == 0 ? .21f : .75f, .30f + .08f * (index / 2));
-                var marker = Anchor(_rpgFieldObjects, $"Pickup_{item}", position, new Vector2(50f, 46f));
-                RpgButton(marker, "✦", Approach, 24, primary: true);
+                var marker = Anchor(_rpgFieldObjects, $"Pickup_{item}", position, new Vector2(89f, 35f));
+                RpgButton(marker, "✦ 줍기", Approach, 17, primary: true);
                 _questMarkers.Add(marker);
                 RegisterRpgInteraction(marker, "반짝이는 물건 · 줍기", Approach, RpgActionPriority.Service);
 
