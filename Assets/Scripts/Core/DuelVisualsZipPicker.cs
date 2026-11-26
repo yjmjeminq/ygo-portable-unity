@@ -10,7 +10,9 @@ namespace YGOPortable.Core
     {
         internal static bool Supported => Application.platform == RuntimePlatform.IPhonePlayer;
 
-        internal static async Task<bool> Import(string root)
+        internal static Task<bool> Import(string root) => Import(archive => DuelVisualsZipImport.Install(archive, root));
+
+        internal static async Task<bool> Import(Action<string> install)
         {
 #if UNITY_IOS && !UNITY_EDITOR
             if (_selection != null) throw new InvalidOperationException("A ZIP picker is already open.");
@@ -27,7 +29,7 @@ namespace YGOPortable.Core
 
             try
             {
-                await Task.Run(() => DuelVisualsZipImport.Install(archive, root));
+                await Task.Run(() => install(archive));
                 return true;
             }
             finally

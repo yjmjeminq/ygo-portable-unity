@@ -114,7 +114,7 @@ namespace YGOPortable.UI
             var entries = new Dictionary<uint, (int, int)>();
             try
             {
-                using var reader = new BinaryReader(File.OpenRead(Path.Combine(Application.streamingAssetsPath, CoverFileName)));
+                using var reader = new BinaryReader(File.OpenRead(CardDataPack.RuntimePath(CoverFileName)));
                 if (reader.BaseStream.Length < 12 || reader.ReadUInt32() != CoverMagic || reader.ReadUInt32() != 1)
                     return entries;
                 int count = reader.ReadInt32();
@@ -142,7 +142,7 @@ namespace YGOPortable.UI
             if (!_entries.TryGetValue(passcode, out var entry)) return null;
             try
             {
-                using var reader = new BinaryReader(File.OpenRead(Path.Combine(Application.streamingAssetsPath, CoverFileName)));
+                using var reader = new BinaryReader(File.OpenRead(CardDataPack.RuntimePath(CoverFileName)));
                 reader.BaseStream.Position = entry.offset;
                 byte[] data = reader.ReadBytes(entry.length);
                 if (data.Length != entry.length) return null;

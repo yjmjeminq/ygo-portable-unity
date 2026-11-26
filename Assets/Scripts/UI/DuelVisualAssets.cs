@@ -271,6 +271,7 @@ namespace YGOPortable.UI
         }
 
         internal static string FindSummonVideo(DuelEffectKind kind) =>
+            (CardDataPack.Root == null ? null : FindSummonVideo(kind, CardArtLoader.ActiveDuelVisualsPath, CardDataPack.Root)) ??
             FindSummonVideo(kind, CardArtLoader.ActiveDuelVisualsPath, Application.streamingAssetsPath);
 
         internal static string FindSummonVideo(DuelEffectKind kind, string visualPack, string streamingAssets)

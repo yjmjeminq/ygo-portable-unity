@@ -71,7 +71,7 @@ namespace YGOPortable.Core
         private static Dictionary<uint, CardRarity> LoadMasterDuelRarities()
         {
             var rarities = new Dictionary<uint, CardRarity>();
-            string path = Path.Combine(Application.streamingAssetsPath, FileName);
+            string path = CardDataPack.RuntimePath(FileName);
             if (!File.Exists(path)) return rarities;
 
             try

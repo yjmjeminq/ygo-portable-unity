@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -81,6 +82,11 @@ namespace YGOPortable.UI
         private TagForceDuel _activeTagForce;
 
         private bool _initialized;
+        private RectTransform _cardDataSetup;
+        private CanvasGroup _cardDataControls;
+        private Text _cardDataStatus;
+        private string _cardDataFolder;
+        private string[] _cardDataFiles;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void OnBeforeSceneLoad()
@@ -104,93 +110,195 @@ namespace YGOPortable.UI
 
         private void Start()
         {
+            if (Application.platform == RuntimePlatform.IPhonePlayer &&
+                !File.Exists(Path.Combine(Application.streamingAssetsPath, "cards_kr.json")))
+            {
+                _cardDataFolder = Path.Combine(Application.persistentDataPath, "CardData");
+                _cardDataFiles = CardDataPack.ReadFileList();
+                string installed = CardDataPack.FindInstalled(_cardDataFolder, _cardDataFiles);
+                if (installed != null)
+                    StartWithCardData(installed);
+                else
+                    StartCoroutine(ImportCardData(selectFile: false));
+                return;
+            }
+
+            try { InitializeGame(Application.streamingAssetsPath); }
+            catch (Exception error) { Debug.LogError($"[GameApp] Fatal Exception in Start(): {error}"); }
+        }
+
+        private void StartWithCardData(string directory)
+        {
+            if (directory == null)
+            {
+                ShowCardDataSetup();
+                _cardDataStatus.text = "설치된 카드 데이터를 찾지 못했습니다. CardData.zip을 다시 가져오세요.";
+                return;
+            }
+            CardDataPack.Root = directory;
             try
             {
-                Debug.Log($"[GameApp] Start() starting... StreamingAssets: {Application.streamingAssetsPath}");
-                Application.runInBackground = true;
-                if (Application.isMobilePlatform) Application.targetFrameRate = 60;
-                DuelAudio.EnsureInit(gameObject);
-                PersonalReplayEnabled = PlayerPrefs.GetInt(PersonalReplayPreference, 0) != 0;
-                AiDifficulty = ReadAiDifficulty();
-
-                if (!YgoNativeBridge.IsInitialized)
+                InitializeGame(directory);
+                if (_cardDataSetup != null)
                 {
-                    int rc = YgoNativeBridge.Initialize(Application.streamingAssetsPath, OnNativeLog);
-                    if (rc != 0) Debug.LogError($"[GameApp] YGO_Init failed rc={rc}");
-                    else Debug.Log("[GameApp] YgoNativeBridge initialized.");
+                    _cardDataSetup.gameObject.SetActive(false);
+                    Destroy(_cardDataSetup.gameObject);
                 }
-
-                Debug.Log("[GameApp] 1. Loading CardDatabase...");
-                if (!CardDatabase.IsLoaded)
-                    CardDatabase.Load(Application.streamingAssetsPath);
-
-                Debug.Log("[GameApp] 2. Initializing CardArtLoader...");
-                CardArtLoader.Initialize(Application.streamingAssetsPath);
-
-                var saveFiles = new SaveSyncFiles(Application.persistentDataPath);
-                saveFiles.Recover();
-                Debug.Log("[GameApp] 3. Loading DeckRepository...");
-                if (DeckRepository.PresetDecks.Count == 0)
-                    DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath, seedDefaultDecks: false);
-                CollectionProgress.Load(Application.persistentDataPath);
-
-                Debug.Log("[GameApp] 4. Ensuring EventSystem & Canvas...");
-                EnsureEventSystem();
-                var canvas = EnsureMainCanvas();
-                CardDragManager.Ensure(canvas);
-                CardAnimationManager.Ensure(canvas);
-
-                Debug.Log("[GameApp] 5. Constructing TitleAndMenuUI...");
-                _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
-                _saveSync = new GitHubSaveSync(this, Application.persistentDataPath, saveFiles,
-                    CanApplyCloudSave, ReloadCloudSave);
-                _saveSyncMenu = new SaveSyncMenu(canvas.transform, _saveSync, () => CloseSaveSync());
-                _collectionShop = new CollectionShopUI(canvas.transform,
-                    CloseCollectionShop,
-                    _ => ShowScreen(AppScreen.MainMenu));
-                _secretPackToast = new SecretPackToast(canvas.transform);
-                _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
-                _storyMode = new StoryModeUI(this, canvas.transform);
-                _tournament = new DimensionTournamentUI(this, canvas.transform);
-                _ranked = new OfflineRankedUI(this, canvas.transform);
-                _tagForceWorld = new TagForceWorldUI(this, canvas.transform);
-
-                Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
-                _oppSelect = new OpponentSelectUI(this, canvas.transform);
-
-                Debug.Log("[GameApp] 7. Constructing DeckEditorUI...");
-                _deckEditor = new DeckEditorUI(this, canvas.transform);
-
-                Debug.Log("[GameApp] 8. Constructing DuelPromptModals...");
-                _modals = new DuelPromptModals(canvas.transform, code => _duelField?.InspectCard(code), null,
-                    TrySubmitHumanModalResponse);
-
-                Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
-                _duelField = new DuelFieldUI(this, canvas.transform, _modals);
-                _menuPad = new DeckPadUi(DuelUiKit.FillRect("MenuPad", canvas.transform),
-                    () => _screen is AppScreen.CardShop or AppScreen.ArchetypeCodex);
-
-                // Ensure Modals, Animation Layer, and Drag Ghost Layer render ABOVE DuelFieldUI and DeckEditorUI
-                _modals.ModalRoot.transform.SetAsLastSibling();
-                _modals.ZoneViewRoot.transform.SetAsLastSibling();
-                _modals.ResultRoot.transform.SetAsLastSibling();
-                CardAnimationManager.Instance?.BringToFront();
-                if (Application.platform == RuntimePlatform.IPhonePlayer)
-                    Input.simulateMouseWithTouches = false;
-
-                _initialized = true;
-                Debug.Log("[GameApp] 10. Showing Title screen...");
-                ShowScreen(AppScreen.Title);
-
-                Debug.Log("[GameApp] 11. Processing Command Line Args...");
-                ProcessCommandLineArgs();
-
-                Debug.Log("[GameApp] 12. Start() completed successfully. Ready for input!");
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
-                Debug.LogError($"[GameApp] Fatal Exception in Start(): {ex}");
+                Debug.LogError($"[CardData] Startup failed: {error}");
+                if (YgoNativeBridge.IsInitialized && !CardDatabase.IsLoaded)
+                    YgoNativeBridge.Shutdown();
+                ShowCardDataSetup();
+                _cardDataSetup.SetAsLastSibling();
+                _cardDataStatus.text = "카드 데이터를 불러오지 못했습니다. 올바른 CardData.zip을 다시 가져오세요.";
             }
+        }
+
+        private void ShowCardDataSetup()
+        {
+            if (_cardDataSetup != null) return;
+            EnsureEventSystem();
+            var canvas = EnsureMainCanvas();
+            _cardDataSetup = DuelUiKit.FillRect("CardDataSetup", canvas.transform);
+            _cardDataSetup.gameObject.AddComponent<Image>().color = new Color(.025f, .055f, .10f, 1f);
+            var panel = DuelUiKit.CreateRect("CardDataPanel", _cardDataSetup, new Vector2(.18f, .20f),
+                new Vector2(.82f, .80f), Vector2.zero, Vector2.zero);
+            _cardDataControls = panel.gameObject.AddComponent<CanvasGroup>();
+            var title = DuelUiKit.CreateRect("Title", panel, new Vector2(0f, .71f), Vector2.one, Vector2.zero, Vector2.zero);
+            DuelUiKit.AddFittedText(title, "Label", "카드 데이터 설치", 42, 30,
+                TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
+            var hint = DuelUiKit.CreateRect("Hint", panel, new Vector2(0f, .47f), new Vector2(1f, .70f), Vector2.zero, Vector2.zero);
+            DuelUiKit.AddFittedText(hint, "Label", "파일 앱에서 CardData.zip을 선택하세요.\n카드 정보와 일러스트를 한 번 설치하면 오프라인에서도 사용할 수 있습니다.", 25, 16,
+                TextAnchor.MiddleCenter, DuelUiKit.TextMuted);
+            var status = DuelUiKit.CreateRect("Status", panel, new Vector2(0f, .28f), new Vector2(1f, .46f), Vector2.zero, Vector2.zero);
+            _cardDataStatus = DuelUiKit.AddFittedText(status, "Label", "", 24, 15, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent);
+            var import = DuelUiKit.CreateRect("Import", panel, new Vector2(.12f, .06f), new Vector2(.50f, .24f), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateButton(import, "Button", "ZIP 가져오기", () => StartCoroutine(ImportCardData(selectFile: true)), 24, gold: true);
+            var retry = DuelUiKit.CreateRect("Retry", panel, new Vector2(.52f, .06f), new Vector2(.88f, .24f), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateButton(retry, "Button", "앱 폴더 다시 확인", () => StartCoroutine(ImportCardData(selectFile: false)), 22);
+        }
+
+        private IEnumerator ImportCardData(bool selectFile)
+        {
+            ShowCardDataSetup();
+            if (!_cardDataControls.interactable) yield break;
+            string localArchive = Path.Combine(Application.persistentDataPath, CardDataPack.ZipName);
+            if (!selectFile && !File.Exists(localArchive))
+            {
+                _cardDataStatus.text = "아직 카드 데이터가 설치되지 않았습니다.";
+                yield break;
+            }
+
+            _cardDataControls.interactable = false;
+            _cardDataStatus.text = "카드 데이터와 일러스트를 가져오는 중입니다…";
+            void Install(string archive) => CardDataPack.Install(archive, _cardDataFolder, _cardDataFiles);
+            var job = selectFile ? DuelVisualsZipPicker.Import(Install) : Task.Run(() =>
+            {
+                Install(localArchive);
+                return true;
+            });
+            while (!job.IsCompleted) yield return null;
+
+            _cardDataControls.interactable = true;
+            if (job.IsFaulted)
+            {
+                Exception error = job.Exception.GetBaseException();
+                Debug.LogWarning($"[CardData] Import failed: {error}");
+                _cardDataStatus.text = error is InvalidDataException ? error.Message :
+                    "ZIP을 읽지 못했습니다. 다운로드 상태와 저장 공간을 확인하세요.";
+            }
+            else if (job.IsCanceled || !job.Result)
+                _cardDataStatus.text = "ZIP 선택을 취소했습니다.";
+            else
+                StartWithCardData(CardDataPack.FindInstalled(_cardDataFolder, _cardDataFiles));
+        }
+
+        private void InitializeGame(string cardDataPath)
+        {
+            Debug.Log($"[GameApp] Start() starting... StreamingAssets: {Application.streamingAssetsPath}");
+            Application.runInBackground = true;
+            if (Application.isMobilePlatform) Application.targetFrameRate = 60;
+            DuelAudio.EnsureInit(gameObject);
+            PersonalReplayEnabled = PlayerPrefs.GetInt(PersonalReplayPreference, 0) != 0;
+            AiDifficulty = ReadAiDifficulty();
+
+            if (!YgoNativeBridge.IsInitialized)
+            {
+                int rc = YgoNativeBridge.Initialize(cardDataPath, OnNativeLog);
+                if (rc != 0 && CardDataPack.Root != null)
+                    throw new InvalidDataException($"카드 효과 데이터를 초기화하지 못했습니다. ({rc})");
+                if (rc != 0) Debug.LogError($"[GameApp] YGO_Init failed rc={rc}");
+                else Debug.Log("[GameApp] YgoNativeBridge initialized.");
+            }
+
+            Debug.Log("[GameApp] 1. Loading CardDatabase...");
+            if (!CardDatabase.IsLoaded)
+                CardDatabase.Load(cardDataPath);
+
+            Debug.Log("[GameApp] 2. Initializing CardArtLoader...");
+            CardArtLoader.Initialize(cardDataPath);
+
+            var saveFiles = new SaveSyncFiles(Application.persistentDataPath);
+            saveFiles.Recover();
+            Debug.Log("[GameApp] 3. Loading DeckRepository...");
+            if (DeckRepository.PresetDecks.Count == 0)
+                DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath, seedDefaultDecks: false);
+            CollectionProgress.Load(Application.persistentDataPath);
+
+            Debug.Log("[GameApp] 4. Ensuring EventSystem & Canvas...");
+            EnsureEventSystem();
+            var canvas = EnsureMainCanvas();
+            CardDragManager.Ensure(canvas);
+            CardAnimationManager.Ensure(canvas);
+
+            Debug.Log("[GameApp] 5. Constructing TitleAndMenuUI...");
+            _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
+            _saveSync = new GitHubSaveSync(this, Application.persistentDataPath, saveFiles,
+                CanApplyCloudSave, ReloadCloudSave);
+            _saveSyncMenu = new SaveSyncMenu(canvas.transform, _saveSync, () => CloseSaveSync());
+            _collectionShop = new CollectionShopUI(canvas.transform,
+                CloseCollectionShop,
+                _ => ShowScreen(AppScreen.MainMenu));
+            _secretPackToast = new SecretPackToast(canvas.transform);
+            _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
+            _storyMode = new StoryModeUI(this, canvas.transform);
+            _tournament = new DimensionTournamentUI(this, canvas.transform);
+            _ranked = new OfflineRankedUI(this, canvas.transform);
+            _tagForceWorld = new TagForceWorldUI(this, canvas.transform);
+
+            Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
+            _oppSelect = new OpponentSelectUI(this, canvas.transform);
+
+            Debug.Log("[GameApp] 7. Constructing DeckEditorUI...");
+            _deckEditor = new DeckEditorUI(this, canvas.transform);
+
+            Debug.Log("[GameApp] 8. Constructing DuelPromptModals...");
+            _modals = new DuelPromptModals(canvas.transform, code => _duelField?.InspectCard(code), null,
+                TrySubmitHumanModalResponse);
+
+            Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
+            _duelField = new DuelFieldUI(this, canvas.transform, _modals);
+            _menuPad = new DeckPadUi(DuelUiKit.FillRect("MenuPad", canvas.transform),
+                () => _screen is AppScreen.CardShop or AppScreen.ArchetypeCodex);
+
+            // Ensure Modals, Animation Layer, and Drag Ghost Layer render ABOVE DuelFieldUI and DeckEditorUI
+            _modals.ModalRoot.transform.SetAsLastSibling();
+            _modals.ZoneViewRoot.transform.SetAsLastSibling();
+            _modals.ResultRoot.transform.SetAsLastSibling();
+            CardAnimationManager.Instance?.BringToFront();
+            if (Application.platform == RuntimePlatform.IPhonePlayer)
+                Input.simulateMouseWithTouches = false;
+
+            _initialized = true;
+            Debug.Log("[GameApp] 10. Showing Title screen...");
+            ShowScreen(AppScreen.Title);
+
+            Debug.Log("[GameApp] 11. Processing Command Line Args...");
+            ProcessCommandLineArgs();
+
+            Debug.Log("[GameApp] 12. Start() completed successfully. Ready for input!");
         }
 
         private void OnNativeLog(int logType, string msg)

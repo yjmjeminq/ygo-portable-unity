@@ -342,8 +342,12 @@ namespace YGOPortable.UI
             if (!CardArtLoader.IsDuelArtActive)
                 _duelArtStatus.text = "<color=#FFAA00>카드 일러스트: 미연동</color>";
             else
+            {
+                string source = CardArtLoader.HasExternalDuelArt ? "별도 일러스트 팩" :
+                    CardDataPack.Root != null ? "카드 데이터 ZIP" : "내장 팩";
                 _duelArtStatus.text = $"<color=#55FF55>카드 일러스트: " +
-                    $"{(CardArtLoader.HasExternalDuelArt ? "정상 연동됨" : "내장 팩")} ({CardArtLoader.ActiveDuelArtCount:N0}장 감지)</color>";
+                    $"{source} ({CardArtLoader.ActiveDuelArtCount:N0}장 감지)</color>";
+            }
         }
 
         private void ReloadDuelArtwork()
@@ -354,6 +358,7 @@ namespace YGOPortable.UI
             foreach (Transform card in _shopCardBacks) card.GetComponent<Image>().sprite = sleeve;
             RefreshDuelArtStatus();
             ShowDuelArtNotice(CardArtLoader.HasExternalDuelArt ? "일러스트를 다시 불러왔습니다."
+                : CardDataPack.Root != null && CardArtLoader.IsDuelArtActive ? "카드 데이터 ZIP의 일러스트를 다시 불러왔습니다."
                 : CardArtLoader.HasExternalDuelArtFile
                     ? "cardart.pack을 읽지 못했습니다."
                     : "DuelVisuals 안에 cardart.pack이 없습니다.");

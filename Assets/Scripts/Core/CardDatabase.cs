@@ -767,6 +767,8 @@ namespace YGOPortable.Core
             }
             string json = File.ReadAllText(path);
             var wrapper = JsonUtility.FromJson<CardKrWrapper>(json);
+            if (CardDataPack.Root != null && (wrapper?.cards == null || wrapper.cards.Length == 0))
+                throw new InvalidDataException("카드 목록이 비어 있습니다.");
             _allCards = new List<CardInfo>(wrapper?.cards ?? Array.Empty<CardInfo>());
             _byCode = new Dictionary<uint, CardInfo>(_allCards.Count);
             foreach (var c in _allCards)

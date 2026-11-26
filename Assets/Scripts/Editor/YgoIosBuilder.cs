@@ -56,6 +56,7 @@ namespace YGOPortable.Editor
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException($"iOS Xcode export {report.summary.result} ({report.summary.totalErrors} errors).");
 
+            ExcludeCardData(projectRoot, output);
             if (Array.IndexOf(arguments, "-ygoIosFullVisuals") < 0)
                 OptimizeTagForceSprites(output);
 
@@ -75,6 +76,19 @@ namespace YGOPortable.Editor
             if (teamId != null) ConfigureSigning(project, teamId, profileId, identity);
             project.WriteToFile(projectPath);
             Debug.Log($"[iOS] Exported Xcode project to {output}");
+        }
+
+        private static void ExcludeCardData(string projectRoot, string output)
+        {
+            string raw = Path.Combine(output, "Data", "Raw");
+            string files = Path.Combine(projectRoot, "Assets", "Resources", "CardDataPackFiles.txt");
+            foreach (string name in File.ReadLines(files))
+                if (name.Length != 0) File.Delete(Path.Combine(raw, name));
+            File.Delete(Path.Combine(raw, "cards.cdb"));
+            File.Delete(Path.Combine(raw, "cards_ko.cdb"));
+            string optionalVisuals = Path.Combine(raw, "DuelVisuals");
+            if (Directory.Exists(optionalVisuals)) Directory.Delete(optionalVisuals, recursive: true);
+            Debug.Log("[iOS] Card database, scripts and artwork are installed separately from CardData.zip.");
         }
 
         private static void OptimizeTagForceSprites(string output)

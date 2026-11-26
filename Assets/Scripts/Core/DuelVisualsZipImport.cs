@@ -72,7 +72,7 @@ namespace YGOPortable.Core
             }
         }
 
-        private static bool IsVisualFile(string[] parts)
+        internal static bool IsVisualFile(string[] parts)
         {
             if (parts.Length == 1)
                 return parts[0] is CardArtLoader.DuelArtFileName or CardArtLoader.SourceOverframeFileName or "Field.png" or "Ground.png";
