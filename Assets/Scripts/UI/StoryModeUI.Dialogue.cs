@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
@@ -72,6 +73,10 @@ namespace YGOPortable.UI
             private readonly Button _auto;
             private readonly Button _skip;
             private readonly Button _logButton;
+            private readonly Button _hide;
+            private readonly GameObject _restoreSurface;
+            private readonly CanvasGroup[] _dialogueChrome;
+            private readonly bool[] _visibleChrome;
             private readonly GameObject _choiceRoot;
             private readonly Text _choiceSummary;
             private readonly Button[] _choiceButtons = new Button[6];
@@ -103,6 +108,11 @@ namespace YGOPortable.UI
             private float _typed;
             private float _readTime;
             private int _autoSpeed;
+            private bool _dialogueHidden;
+            private int _displayInputFrame = -1;
+            private float _chromeVisibility = 1f;
+            private float _shadeOpacity;
+            private Selectable _focusBeforeHide;
             private bool _finished;
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
@@ -213,8 +223,9 @@ namespace YGOPortable.UI
                 _auto = AddButton(dialogue, "Auto", "오토 꺼짐", .657f, .727f, .787f, .927f, () => UseDialogueTool(ToggleAuto));
                 _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, () =>
                     UseDialogueTool(_onSkip ?? Finish));
+                _hide = AddButton(dialogue, "Hide", "창 숨김", .797f, .727f, .952f, .927f, () => HandleDisplayInput(toggle: true));
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
-                _rpgTools = Region(content, "DialogueTools", .690f, .920f, .973f, .970f);
+                _rpgTools = Region(content, "DialogueTools", .661f, .920f, .973f, .970f);
                 var flash = DuelUiKit.AddImage(DuelUiKit.FillRect("DialogueFlash", scene).gameObject, DuelUiKit.WhiteSprite,
                     Color.clear, false, false);
                 _fx = scene.gameObject.AddComponent<StoryDialogueFx>();
@@ -266,6 +277,18 @@ namespace YGOPortable.UI
                 _pickerEdit = AddButton(picker.Panel, "Edit", "덱 편집 열기", .092f, .315f, .483f, .472f, () => _editDeck?.Invoke());
                 AddButton(picker.Panel, "Back", "돌아가기", .31f, .098f, .69f, .246f, CloseDeckPicker);
                 _supports = new RaidSupportPanel(overlay, CloseSupportPicker);
+                _dialogueChrome = new[] { _heading.transform.parent.gameObject, _heroIdentity.transform.parent.gameObject,
+                    _dialoguePanel.gameObject, _rpgTools.gameObject, _choiceRoot }
+                    .Select(root => root.AddComponent<CanvasGroup>()).ToArray();
+                _visibleChrome = new bool[_dialogueChrome.Length];
+                var restore = DuelUiKit.FillRect("RestoreDialogue", overlay);
+                var restoreGraphic = DuelUiKit.AddImage(restore.gameObject, DuelUiKit.WhiteSprite, Color.clear);
+                var restoreButton = restore.gameObject.AddComponent<Button>();
+                restoreButton.targetGraphic = restoreGraphic;
+                restoreButton.transition = Selectable.Transition.None;
+                restoreButton.navigation = new Navigation { mode = Navigation.Mode.None };
+                restoreButton.onClick.AddListener(() => HandleDisplayInput(restore: true));
+                _restoreSurface = restore.gameObject;
                 Close();
             }
 
@@ -273,7 +296,7 @@ namespace YGOPortable.UI
                 Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
                 string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
                 string preferredRpgBackdrop = null, int rpgEpisode = 0,
-                int playAsCharacterId = 0, bool autoPlay = false, string rpgAssetFolder = null,
+                int playAsCharacterId = 0, string rpgAssetFolder = null,
                 string originalProtagonist = null, string opponentName = null, bool waitForOpponentGreeting = false)
             {
                 Close();
@@ -283,7 +306,8 @@ namespace YGOPortable.UI
                 _heroIdentity.text = protagonist;
                 _heroIdentity.gameObject.SetActive(!rpg && !onField);
                 _portraitGroup.gameObject.SetActive(rpg || !onField);
-                _shade.color = new Color(.014f, .026f, .058f, onField ? .14f : .95f);
+                _shadeOpacity = onField ? .14f : .95f;
+                ApplyChromeOpacity(1f);
                 float dialogueTop = rpg ? .405f : onField ? .32f : .406f;
                 _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, dialogueTop);
                 _protagonist = protagonist;
@@ -299,7 +323,6 @@ namespace YGOPortable.UI
                 if (IsGxDialogue && Application.isPlaying) _advanceFrame = Time.frameCount;
                 _playAsCharacterId = playAsCharacterId;
                 ApplyDialogueStyle(rpg);
-                if (autoPlay) ToggleAuto();
                 _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, dialogueTop - .018f) : new Vector2(.07f, .26f);
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .859f) : new Vector2(.493f, .855f);
                 _opponent.rectTransform.anchorMin = rpg ? new Vector2(onField ? .765f : .635f, dialogueTop - .018f) : new Vector2(.508f, .26f);
@@ -343,6 +366,14 @@ namespace YGOPortable.UI
 
             internal void Close()
             {
+                _dialogueHidden = false;
+                _displayInputFrame = -1;
+                _chromeVisibility = 1f;
+                _focusBeforeHide = null;
+                _restoreSurface.SetActive(false);
+                _heading.transform.parent.gameObject.SetActive(true);
+                _heroIdentity.transform.parent.gameObject.SetActive(true);
+                foreach (var chrome in _dialogueChrome) chrome.alpha = 1f;
                 _fx.ResetEffect();
                 _sceneTimeBadge.gameObject.SetActive(false);
                 _showCutscene = false;
@@ -401,11 +432,15 @@ namespace YGOPortable.UI
             internal void Update(float delta)
             {
                 if (_dialogue == null || !_root.activeInHierarchy) return;
+                bool displayInput = HandleDisplayInput(
+                    toggle: Input.GetKeyDown(KeyCode.H) || Input.GetMouseButtonDown(1),
+                    restore: Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter));
+                bool changingVisibility = UpdateDialogueVisibility(delta);
                 _field?.UpdateRpgDialogue(delta);
                 RefreshStageCaption();
                 _poseTime += delta;
                 if (_sceneTimeBadge.gameObject.activeSelf)
-                    _sceneTimeBadge.alpha = Mathf.Clamp01(_poseTime / .24f);
+                    _sceneTimeBadge.alpha = Mathf.Clamp01(_poseTime / .24f) * _chromeVisibility;
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
                 if (_cutsceneBlend < 1f)
                 {
@@ -426,7 +461,7 @@ namespace YGOPortable.UI
                     _opponentSpeaking ? _emotion : null, _poseTime, 1f, ref _opponentFade, ref _opponentSlide,
                     usePaintedExpression: _speakerUsesPaintedExpression);
                 RefreshCaret();
-                if (_stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
+                if (displayInput || changingVisibility || _dialogueHidden || _stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
                     _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
@@ -441,6 +476,65 @@ namespace YGOPortable.UI
                     if (_sceneTimeBadge.gameObject.activeSelf) readDuration += 1.15f * _autoSpeed;
                     if (_readTime >= readDuration) Advance();
                 }
+            }
+
+            internal bool HandleDisplayInput(bool toggle = false, bool restore = false)
+            {
+                if ((!toggle && !restore) || _dialogue == null || !_root.activeInHierarchy || ActiveRoot != _root) return false;
+                if (Application.isPlaying && _displayInputFrame == Time.frameCount) return true;
+                if (!_dialogueHidden && !toggle) return false;
+                if (Application.isPlaying) _advanceFrame = _displayInputFrame = Time.frameCount;
+
+                _dialogueHidden = !_dialogueHidden;
+                _restoreSurface.SetActive(_dialogueHidden);
+                if (_dialogueHidden)
+                {
+                    _focusBeforeHide = EventSystem.current?.currentSelectedGameObject?.GetComponent<Selectable>();
+                    for (int i = 0; i < _dialogueChrome.Length; i++)
+                    {
+                        var chrome = _dialogueChrome[i];
+                        _visibleChrome[i] = chrome.gameObject.activeSelf;
+                        if (chrome.TryGetComponent<UiEntranceMotion>(out var entrance)) entrance.enabled = false;
+                    }
+                    _scene.interactable = _scene.blocksRaycasts = false;
+                    EventSystem.current?.SetSelectedGameObject(null);
+                }
+                else
+                {
+                    for (int i = 0; i < _dialogueChrome.Length; i++)
+                        _dialogueChrome[i].gameObject.SetActive(_visibleChrome[i]);
+                    // Also handle reversal before the fade has moved at all.
+                    _chromeVisibility = Mathf.Min(_chromeVisibility, .999f);
+                }
+                return true;
+            }
+
+            private bool UpdateDialogueVisibility(float delta)
+            {
+                float target = _dialogueHidden ? 0f : 1f;
+                if (_chromeVisibility == target) return false;
+                _chromeVisibility = Mathf.MoveTowards(_chromeVisibility, target, delta / .18f);
+                ApplyChromeOpacity(Mathf.SmoothStep(0f, 1f, _chromeVisibility));
+                if (_chromeVisibility == 0f)
+                {
+                    foreach (var chrome in _dialogueChrome) chrome.gameObject.SetActive(false);
+                }
+                else if (_chromeVisibility == 1f)
+                {
+                    _scene.interactable = _scene.blocksRaycasts = true;
+                    if (_focusBeforeHide != null && _focusBeforeHide.isActiveAndEnabled && _focusBeforeHide.IsInteractable())
+                        Focus(_focusBeforeHide);
+                    else if (_choiceRoot.activeInHierarchy) RefreshChoices();
+                    else if (_next.IsInteractable()) Focus(_next);
+                    _focusBeforeHide = null;
+                }
+                return true;
+            }
+
+            private void ApplyChromeOpacity(float alpha)
+            {
+                foreach (var chrome in _dialogueChrome) chrome.alpha = alpha;
+                _shade.color = new Color(.014f, .026f, .058f, _shadeOpacity * alpha);
             }
 
             internal void FocusOnChoices()
@@ -579,6 +673,8 @@ namespace YGOPortable.UI
                 }
                 BindCutscene(_rpg ? line.cutscene : null);
                 _fx.Play(showSceneTime ? "time-skip" : _rpg ? line.fx : null);
+                if (Application.isPlaying && playStageMotion && !string.IsNullOrEmpty(line.sfx))
+                    DuelAudio.PlayStorySfx(line.sfx);
                 _formatting = _rpg ? DialogueTag.Matches(line.text).Cast<Match>().ToArray() : Array.Empty<Match>();
                 _characters = StringInfo.ParseCombiningCharacters(line.text);
                 if (_formatting.Length > 0)
@@ -662,7 +758,7 @@ namespace YGOPortable.UI
                 _text.resizeTextMinSize = rpg ? 23 : 13;
                 _text.lineSpacing = rpg ? 1.28f : 1f;
                 _text.supportRichText = rpg;
-                foreach (var button in new[] { _previous, _logButton, _auto, _skip })
+                foreach (var button in new[] { _previous, _logButton, _auto, _skip, _hide })
                     StyleButton(button);
                 StyleButton(_next, primary: true);
                 LayoutDialogueControls(rpg);
@@ -724,14 +820,12 @@ namespace YGOPortable.UI
                     _speakerPlate.sprite = DuelUiKit.WhiteSprite;
                     _speakerPlate.type = Image.Type.Simple;
                 }
-                var tools = new[] { _previous, _logButton, _auto, _skip };
-                var legacy = new[] { new Rect(.36f, .727f, .14f, .20f), new Rect(.51f, .727f, .137f, .20f),
-                    new Rect(.657f, .727f, .13f, .20f), new Rect(.797f, .727f, .155f, .20f) };
-                var captions = new[] { rpg ? "이전" : "◀ 이전 대사", rpg ? "로그" : "대화 로그", "오토 꺼짐", rpg ? "스킵" : "건너뛰기" };
+                var tools = new[] { _previous, _logButton, _auto, _skip, _hide };
+                var captions = new[] { rpg ? "이전" : "◀ 이전 대사", rpg ? "로그" : "대화 로그", "오토 꺼짐", rpg ? "스킵" : "건너뛰기", "창 숨김" };
                 for (int i = 0; i < tools.Length; i++)
                 {
                     Place(tools[i].transform.parent, rpg ? _rpgTools : panel,
-                        rpg ? new Rect(i * .253f, .04f, .235f, .92f) : legacy[i]);
+                        rpg ? new Rect(i * .202f, .04f, .19f, .92f) : new Rect(.36f + i * .12f, .727f, .11f, .20f));
                     var label = tools[i].GetComponentInChildren<Text>();
                     label.text = captions[i];
                     label.fontSize = label.resizeTextMaxSize = rpg ? 18 : 22;
@@ -770,6 +864,7 @@ namespace YGOPortable.UI
 
             private void UseDialogueTool(Action action)
             {
+                if (_dialogueHidden || _chromeVisibility < 1f || (Application.isPlaying && _displayInputFrame == Time.frameCount)) return;
                 if (IsGxDialogue && _choiceRoot.activeSelf) return;
                 if (IsGxDialogue && (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) ||
                                      Input.GetKeyDown(KeyCode.KeypadEnter)))
@@ -784,7 +879,7 @@ namespace YGOPortable.UI
 
             private void AdvanceAt(float now, int frame)
             {
-                if (_stageCaption || _finished || _waitingBranch || _dialogue == null || ActiveRoot != _root ||
+                if (_dialogueHidden || _chromeVisibility < 1f || _stageCaption || _finished || _waitingBranch || _dialogue == null || ActiveRoot != _root ||
                     (IsGxDialogue && _choiceRoot.activeSelf)) return;
                 if (frame >= 0)
                 {
@@ -810,8 +905,8 @@ namespace YGOPortable.UI
                 _autoSpeed = _autoSpeed == 0 ? 1 : _rpg && _autoSpeed == 1 ? 2 : 0;
                 _auto.GetComponentInChildren<Text>().text = _autoSpeed switch
                 {
-                    1 => "오토 켜짐",
-                    2 => "오토 2배",
+                    1 => _rpg ? "오토 1x" : "오토 켜짐",
+                    2 => "오토 2x",
                     _ => "오토 꺼짐",
                 };
             }

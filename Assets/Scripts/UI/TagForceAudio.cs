@@ -15,6 +15,7 @@ namespace YGOPortable.UI
     public static partial class DuelAudio
     {
         private static readonly Dictionary<TagForceSfx, AudioClip> TagForceSfxClips = new();
+        private static readonly Dictionary<string, AudioClip> StorySfxClips = new(StringComparer.Ordinal);
         private static AudioClip _clipWorldReward, _clipWorldDayBgm, _clipWorldNightBgm, _clipRpgCircuit, _clipRpgCrisis;
 
         internal static AudioClip GetTagForceClip(TagForceSfx sfx)
@@ -65,6 +66,76 @@ namespace YGOPortable.UI
         internal static void PlayRpgFootstep(RpgSurface surface, int foot, float volume)
         {
             if (_sfxSource != null && SfxVolume > .01f) Play(GetRpgFootstep(surface, foot), volume);
+        }
+
+        internal static void PlayStorySfx(string cue)
+        {
+            if (_sfxSource == null || SfxVolume <= .01f) return;
+            Play(GetStorySfx(cue), cue is "crowd" or "rain" ? .58f : .75f);
+        }
+
+        internal static AudioClip GetStorySfx(string cue)
+        {
+            if (string.IsNullOrEmpty(cue)) return null;
+            if (cue == "footstep") return GetRpgFootstep(RpgSurface.Stone, -1);
+            if (StorySfxClips.TryGetValue(cue, out var cached)) return cached;
+            var (length, seed) = cue switch
+            {
+                "duel_disk" => (.27f, 11),
+                "crowd" => (1.45f, 17),
+                "rain" => (1.55f, 23),
+                "thunder" => (1.25f, 31),
+                "can_open" => (.42f, 37),
+                "door_knock" => (.43f, 43),
+                "shatter" => (.61f, 53),
+                "alarm" => (.87f, 61),
+                "transition" => (.52f, 71),
+                _ => (0f, 0),
+            };
+            if (length <= 0f) return null;
+            return StorySfxClips[cue] = DuelVisualAssets.LoadSound("story_" + cue) ??
+                (cue == "duel_disk" ? _clipActivate ?? DuelVisualAssets.LoadSound("Activate") : null) ??
+                MakeStoryFoley(cue, length, seed);
+        }
+
+        private static AudioClip MakeStoryFoley(string cue, float duration, int seed)
+        {
+            const int rate = 22050;
+            const float tau = 2f * Mathf.PI;
+            var samples = new float[Mathf.RoundToInt(duration * rate)];
+            var random = new System.Random(seed);
+            float low = 0f, mid = 0f;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float t = i / (float)rate;
+                float noise = (float)random.NextDouble() * 2f - 1f;
+                low += .019f * (noise - low);
+                mid += .17f * (noise - mid);
+                float value = cue switch
+                {
+                    "crowd" => (mid * .63f + low * 1.1f) * (.66f + .20f * Mathf.Sin(t * 19f) + .14f * Mathf.Sin(t * 37f)),
+                    "rain" => mid * .37f + noise * .13f * (.4f + .6f * Mathf.Pow(Mathf.Abs(Mathf.Sin(131f * t)), 10f)),
+                    "thunder" => (low * 2.8f + Mathf.Sin(tau * 44f * t) * .17f) * Mathf.Exp(-t * 3.4f),
+                    "can_open" => (noise * .56f + Mathf.Sin(tau * 1450f * t) * .24f) * Mathf.Exp(-t * 75f) +
+                        Mathf.Max(0f, noise) * .27f * Mathf.Exp(-t * 9f),
+                    "door_knock" => Knock(t) + .8f * Knock(t - .157f),
+                    "shatter" => (noise * .50f + Mathf.Sin(tau * 2097f * t) * .14f + Mathf.Sin(tau * 3389f * t) * .09f) *
+                        Mathf.Exp(-t * 10f) * (.72f + .28f * Mathf.Sin(121f * t)),
+                    "alarm" => Mathf.Sin(tau * (t % .29f < .12f ? 812f : 612f) * t) * .23f *
+                        Mathf.Sin(Mathf.PI * Mathf.Clamp01(t % .29f / .19f)),
+                    "transition" => (Mathf.Sin(tau * 329.63f * t) + .42f * Mathf.Sin(tau * 493.88f * t)) *
+                        .19f * Mathf.Sin(Mathf.PI * t / duration),
+                    _ => Mathf.Sin(tau * (190f * t + 2200f * t * t)) * .29f * Mathf.Exp(-t * 9f) + mid * .40f * Mathf.Exp(-t * 48f),
+                };
+                float edge = Mathf.Clamp01(t * 850f) * Mathf.Clamp01((duration - t) * 18f);
+                samples[i] = Mathf.Clamp(value * edge, -.95f, .95f);
+
+                float Knock(float strike) => strike < 0f ? 0f :
+                    (Mathf.Sin(tau * 122f * strike) * .41f + mid * .29f) * Mathf.Exp(-strike * 59f);
+            }
+            var clip = AudioClip.Create("story_" + cue, samples.Length, 1, rate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         private static AudioClip MakeRpgFootstep(RpgSurface surface, int take)

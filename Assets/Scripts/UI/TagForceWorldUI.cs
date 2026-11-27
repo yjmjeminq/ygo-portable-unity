@@ -68,7 +68,8 @@ namespace YGOPortable.UI
         private TagForceSpot CurrentSpot => _manager.CurrentSpot;
         private TagForcePersona Selected => _data.Persona(_selectedId);
         internal GameObject Root => _screen.gameObject;
-        internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null && _rpgPendingRegion < 0 && !AutomaticRpgScenePending;
+        internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null &&
+            _rpgPendingRegion < 0 && !RpgInterludeActive && !AutomaticRpgScenePending;
 
         internal TagForceWorldUI(GameAppController app, Transform parent)
         {
@@ -106,6 +107,7 @@ namespace YGOPortable.UI
 
         internal void Close()
         {
+            ClearRpgInterlude();
             Root.SetActive(false);
             ClearBody();
             _images.Clear();
@@ -113,7 +115,8 @@ namespace YGOPortable.UI
 
         internal void Back()
         {
-            if (_closingConversation || _rpgDialogueCast != null || _rpgPendingRegion >= 0) return;
+            if (RpgInterludeActive || _rpgIntroDialogue?.HandleDisplayInput(restore: true) == true ||
+                _closingConversation || _rpgDialogueCast != null || _rpgPendingRegion >= 0) return;
             DuelAudio.PlayTagForceSfx(TagForceSfx.Cancel);
             if (_rpgField)
             {
@@ -261,7 +264,7 @@ namespace YGOPortable.UI
         private void ClearBody()
         {
             ClearRpgDialogue();
-            _worldInput.interactable = _worldInput.blocksRaycasts = true;
+            _worldInput.interactable = _worldInput.blocksRaycasts = !RpgInterludeActive;
             ClearRpgAtmosphere();
             ClearRpgExploration();
             ClearRpgResidentMotion();
@@ -485,6 +488,7 @@ namespace YGOPortable.UI
 
         internal void Update(float delta, Vector2 padDirection = default)
         {
+            if (UpdateRpgInterlude(delta)) return;
             UpdateBreadSpin(delta);
             UpdateConversation(delta);
             bool traveling = _rpgPendingRegion >= 0;
@@ -610,6 +614,11 @@ namespace YGOPortable.UI
 
         internal bool HandleFieldInput(DeckPadFrame frame)
         {
+            if (RpgInterludeActive)
+            {
+                if (frame.Submit) SkipRpgInterludeTitle();
+                return true;
+            }
             if (_rpgPendingRegion >= 0) return true;
             if (!CanWalk) return false;
             if (frame.Search)

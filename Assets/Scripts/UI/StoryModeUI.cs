@@ -20,6 +20,7 @@ namespace YGOPortable.UI
         public string memoryTitle;
         public string emotion;
         public string fx;
+        public string sfx;
         public StoryStageAction[] stage;
 
         internal string SceneMapPath => !string.IsNullOrEmpty(sceneMap) &&
@@ -284,7 +285,7 @@ namespace YGOPortable.UI
                 }
                 _finishFieldResult = null;
                 if (won && Application.isPlaying) DuelAudio.PlayWin();
-                _app.ReturnToRpgField(reward);
+                _app.ReturnToRpgField(reward, afterStoryEvent: gx && won);
             }
 
             void ShowRetryChoices()
@@ -381,6 +382,7 @@ namespace YGOPortable.UI
 
         internal void Update(float delta)
         {
+            if (_app.RpgField?.RpgInterludeActive == true) return;
             _dialogue.Update(delta);
             UpdateRpgFaceoff(delta);
             if (_startAfterLoss != null && (_lossRevealTime -= delta) <= 0f)
@@ -389,6 +391,7 @@ namespace YGOPortable.UI
 
         internal void Back()
         {
+            if (_app.RpgField?.RpgInterludeActive == true || RestoreHiddenDialogue()) return;
             if (_rpgFaceoff != null) { FinishRpgFaceoff(); return; }
             if (!_dialogue.IsOpen)
             {
@@ -408,6 +411,8 @@ namespace YGOPortable.UI
                 _app.ShowScreen(AppScreen.MainMenu);
             else ReturnToEpisodes();
         }
+
+        internal bool RestoreHiddenDialogue() => _dialogue.HandleDisplayInput(restore: true);
 
         internal bool CanPlay(StoryEpisodeData episode)
         {
@@ -757,25 +762,25 @@ namespace YGOPortable.UI
             _supports = RaidSupport.None;
             _opponentOpening = StoryOpponentOpening.Standard;
             var deck = GetOpponentMatch(episode).Deck;
-            var choices = StoryDialogueBranch.Create(episode, raid.HasValue,
-                deck?.sigCard is > 0 ? CardDatabase.GetName(deck.sigCard) : "");
             bool pickedInitialDeck = false;
             PlayDialogue(episode, episode.preDialogues, TitleOf(episode), ShowPreparation);
-            int choiceLine = StoryDialogueBranch.AfterLine(episode);
-            string replyingSpeaker = IsGxRpg && !string.IsNullOrWhiteSpace(episode.preDialogues[choiceLine].speaker)
-                ? episode.preDialogues[choiceLine].speaker : episode.opponentName;
-            _dialogue.SetBranch(choiceLine, () =>
-                _dialogue.ShowChoices(() => "어떻게 답할까?", choices.Select(choice => new StoryChoice(
-                    $"{choice.Reply}\n{StoryDialogueBranch.Effect(choice.Stance)}", () =>
-                    {
-                        _stance = choice.Stance;
-                        _dialogue.AnswerBranch(choice.Reply, replyingSpeaker, choice.Response);
-                    })).ToArray()));
+            if (!IsGxRpg)
+            {
+                var choices = StoryDialogueBranch.Create(episode, raid.HasValue,
+                    deck?.sigCard is > 0 ? CardDatabase.GetName(deck.sigCard) : "");
+                _dialogue.SetBranch(StoryDialogueBranch.AfterLine(episode), () =>
+                    _dialogue.ShowChoices(() => "어떻게 답할까?", choices.Select(choice => new StoryChoice(
+                        $"{choice.Reply}\n{StoryDialogueBranch.Effect(choice.Stance)}", () =>
+                        {
+                            _stance = choice.Stance;
+                            _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
+                        })).ToArray()));
+            }
 
             void CompleteScene()
             {
                 if (CollectionProgress.TryClearStoryScene(ProgressIdFor(episode), out string error))
-                    _app.ReturnToRpgField();
+                    _app.ReturnToRpgField(afterStoryEvent: IsGxRpg && FromRpgField);
                 else _dialogue.ShowChoices(() => error, new StoryChoice("진행도 다시 저장", CompleteScene));
             }
 
@@ -952,7 +957,7 @@ namespace YGOPortable.UI
             }
             _dialogue.Open(heading, hero, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field,
                 rpgEpisode: RpgWardrobe.EpisodeNumber(episode), playAsCharacterId: episode.playAsCharacterId,
-                autoPlay: episode.isCutsceneOnly, originalProtagonist: Script.protagonist, opponentName: episode.opponentName,
+                originalProtagonist: Script.protagonist, opponentName: episode.opponentName,
                 waitForOpponentGreeting: IsGxRpg && episode.id == "gx_cutscene_00_prologue");
         }
 

@@ -131,6 +131,7 @@ namespace YGOPortable.UI
 
         internal bool PrepareRpgField(bool openIntro = false, string seriesId = StoryModeUI.RpgSeriesId)
         {
+            ClearRpgInterlude();
             if (!LoadWorldCampaign(seriesId)) return false;
             _rpgField = true;
             _observedRpgClears = RpgClears;
@@ -149,6 +150,7 @@ namespace YGOPortable.UI
 
         internal bool CanStartRpgEpisode(int index) =>
             _rpgField && _rpgCampaign?.episodes != null && index >= 0 && index == RpgClears &&
+            !RpgInterludeActive &&
             index < _rpgCampaign.episodes.Length && CampaignRegionForEpisode(index + 1) == _rpgLocation &&
             (CanWalk || AutomaticRpgScenePending && _rpgPendingRegion < 0 && _rpgDialogueCast == null);
 
@@ -297,6 +299,13 @@ namespace YGOPortable.UI
             if (!_rpgField || _rpgDialogueCast != null || index < 0 || index >= CampaignRegions.Length ||
                 !CampaignRegions[index].IsOpen(RpgClears))
                 return false;
+            StoreRpgRegion(index, arrival);
+            Show(Page.Field);
+            return true;
+        }
+
+        private void StoreRpgRegion(int index, Vector2 arrival)
+        {
             if (index != _rpgLocation)
             {
                 _position = arrival == RpgArrival ? RpgFieldArrival(index) : RpgGroundPoint(index, arrival);
@@ -305,8 +314,6 @@ namespace YGOPortable.UI
             _rpgLocation = index;
             PlayerPrefs.SetString(RpgRegionPreference, CampaignRegions[index].Id);
             PlayerPrefs.Save();
-            Show(Page.Field);
-            return true;
         }
 
         private Sprite GetRpgDialogueScenery(string sceneMapPath) =>

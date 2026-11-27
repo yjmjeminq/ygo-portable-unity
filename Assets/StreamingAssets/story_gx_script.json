@@ -45,45 +45,61 @@
           "speaker": "",
           "text": "대기실 문이 닫히자 환호가 벽 너머로 멀어졌다. 스마트폰에는 축하 인사와 다음 촬영 일정이 번갈아 떴다.",
           "sceneMap": "spot_pro_backstage",
-          "fx": "fade"
+          "fx": "fade",
+          "cutscene": "cg_gx_prologue_lonely_champion"
         },
         {
           "speaker": "",
           "text": "매니저가 보내 온 이번 달 일정표를 열었다. 같은 덱, 같은 질문, 같은 표정. 한 곳이라도 비는 날짜가 있나 끝까지 내려 봤다.",
-          "sceneMap": "spot_pro_backstage"
+          "sceneMap": "spot_pro_backstage",
+          "cutscene": "cg_gx_prologue_lonely_champion"
         },
         {
           "speaker": "윤",
           "text": "매니저한테 다음 경기 얘기 말고 다른 걸 물어본 적이 있었나.",
           "emotion": "sad",
-          "sceneMap": "spot_pro_backstage"
+          "sceneMap": "spot_pro_backstage",
+          "cutscene": "cg_gx_prologue_lonely_champion"
         },
         {
           "speaker": "",
-          "text": "전화기를 뒤집어 놓으니 테이블 위에 봉투 하나가 눈에 들어왔다. 붉은 봉랍 아래 인더스트리얼 일루전과 카이바 코퍼레이션의 이름이 나란히 적혀 있었다.",
-          "sceneMap": "spot_pro_backstage"
+          "text": "전화기를 뒤집어 놓으니 테이블 위 봉투가 눈에 들어왔다. 붉은 봉랍 양옆으로 인더스트리얼 일루전과 카이바 코퍼레이션의 이름이 찍혀 있었다.",
+          "sceneMap": "spot_pro_backstage",
+          "cutscene": "cg_gx_prologue_lonely_champion"
         },
         {
           "speaker": "",
           "text": "「방학도 없는 사람에게 휴가를 권하긴 어렵겠지. 듀얼 아카데미아 특별 연구생 자리를 한 달 비워 두겠네. 갈지는 자네가 정하게.」",
-          "sceneMap": "spot_pro_backstage"
+          "sceneMap": "spot_pro_backstage",
+          "cutscene": "cg_gx_prologue_lonely_champion"
         },
         {
           "speaker": "",
           "text": "페가수스의 서명 밑에 한 줄이 더 있었다. 「시상식 사진은 잘 받았네. 자네가 웃은 건 그날 몇 번째 촬영이었나?」",
-          "sceneMap": "spot_pro_backstage"
+          "sceneMap": "spot_pro_backstage",
+          "cutscene": "cg_gx_prologue_lonely_champion"
         },
         {
           "speaker": "윤",
           "text": "그걸 또 세었을 양반이지. ……한 달이면 돌아올 수 있겠어.",
           "emotion": "smile",
-          "sceneMap": "spot_pro_backstage"
+          "sceneMap": "spot_pro_backstage",
+          "cutscene": "cg_gx_prologue_lonely_champion"
         },
         {
           "speaker": "",
           "text": "며칠 뒤, 선체가 부두의 완충재에 닿으며 낮게 울렸다. 작은 섬이었다. 배 위에서도 기숙사 지붕과 그 뒤의 화산이 한눈에 들어왔다.",
           "fx": "fade",
           "sceneTime": "며칠 뒤 · 아카데미아 부두"
+        },
+        {
+          "speaker": "",
+          "text": "젖은 발판이 발밑에서 한 번 울렸다.",
+          "sfx": "footstep"
+        },
+        {
+          "speaker": "",
+          "text": "교수의 환영 인사보다 먼저, 배 밑에서 썰물에 끌리는 쇠사슬 소리가 들렸다."
         },
         {
           "speaker": "",
@@ -152,8 +168,13 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "구경이라니, 난 학생회 일 때문에 부두에 나온 것뿐이야. ……그보다 쥬다이, 입학식 늦겠어. 얼른 본관으로 가.",
+          "text": "난 학생회 일 때문에 부두에 나온 거야.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "쥬다이, 입학식 시작하면 우리 둘 다 자리 없어. 정문에서 보자.",
+          "emotion": "smile"
         },
         {
           "speaker": "",
@@ -201,7 +222,8 @@
         },
         {
           "speaker": "",
-          "text": "관중석은 이미 꽉 차 있었다. 자리가 없는 학생들은 맨 위 난간에까지 기대 서 있었다."
+          "text": "관중석은 이미 꽉 차 있었다. 자리가 없는 학생들은 맨 위 난간에까지 기대 서 있었다.",
+          "sfx": "crowd"
         },
         {
           "speaker": "",
@@ -278,12 +300,17 @@
         },
         {
           "speaker": "윤",
-          "text": "네 덱이 가장 멀리 가는 턴을 한번 보고 싶어. 내가 먼저 틈을 내는지는 네가 봐.",
+          "text": "네 덱이 가장 멀리 가는 턴을 한번 보고 싶어.",
+          "emotion": "smile"
+        },
+        {
+          "speaker": "윤",
+          "text": "어디까지 가게 둘지는 지금부터 네가 봐.",
           "emotion": "determined"
         },
         {
           "speaker": "마루후지 료",
-          "text": "호오, 3턴이라. 내 사이버 드래곤을 보고도 같은 말을 할 수 있을지 두고 보지!",
+          "text": "내가 끝까지 가는 걸 보고 싶다고? 사이버 드래곤을 보고 나서도 같은 말을 할지 궁금하군.",
           "emotion": "determined"
         },
         {
@@ -308,7 +335,8 @@
         {
           "speaker": "",
           "text": "양쪽 필드의 홀로그램 시스템이 가동되며 아레나 전체에 푸른 에너지 라인이 번쩍였다.",
-          "cutscene": "cg_gx_kaiser_exhibition"
+          "cutscene": "cg_gx_kaiser_exhibition",
+          "fx": "flash"
         },
         {
           "speaker": "",
@@ -328,6 +356,18 @@
           "cutscene": "cg_gx_kaiser_exhibition"
         },
         {
+          "speaker": "",
+          "text": "난간을 두드리던 학생이 손을 멈췄다.",
+          "cutscene": "cg_gx_kaiser_exhibition",
+          "sfx": "crowd",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "그제야 료의 디스크가 내 것보다 먼저 켜져 있었다는 걸 알아차렸다.",
+          "cutscene": "cg_gx_kaiser_exhibition"
+        },
+        {
           "speaker": "마루후지 료",
           "text": "듀얼!",
           "emotion": "determined",
@@ -336,9 +376,10 @@
         },
         {
           "speaker": "윤",
-          "text": "듀얼.",
+          "text": "듀얼!",
           "emotion": "determined",
-          "cutscene": "cg_gx_kaiser_exhibition"
+          "cutscene": "cg_gx_kaiser_exhibition",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -436,21 +477,17 @@
         },
         {
           "speaker": "윤",
-          "text": "시차 탓을 하려다가 관뒀어. 내가 먼저 끝났다고 생각한 턴이 있었지.",
+          "text": "시차 탓을 하려다 관뒀어. 덱을 접기 전에, 내가 끝났다고 착각한 턴부터 다시 볼게.",
           "emotion": "sad"
         },
         {
           "speaker": "마루후지 료",
           "text": "다시 덱을 다듬고 와라. 언제든 다시 상대해 주지.",
           "emotion": "smile"
-        },
-        {
-          "speaker": "",
-          "text": "나는 씁쓸하게 입맛을 다시며 덱을 정리했다. 이 정도로 무너질 순 없다."
         }
       ],
       "fieldObjective": "카이저와 시범전 치르기",
-      "choiceAfterLine": 21,
+      "choiceAfterLine": 22,
       "choices": [
         {
           "stance": "Challenge",
@@ -558,6 +595,16 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "아스카의 디스크가 펴지자 나도 모르게 관중석부터 올려다봤다.",
+          "sfx": "duel_disk",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "아스카는 그사이 나를 보고 있었다. 아까와 같은 버릇을 벌써 두 번 보인 셈이었다."
+        },
+        {
           "speaker": "텐죠인 아스카",
           "text": "기다리게 할 생각 없었어. 이제 시작해. 듀얼!",
           "emotion": "shock",
@@ -565,8 +612,9 @@
         },
         {
           "speaker": "윤",
-          "text": "듀얼.",
-          "emotion": "determined"
+          "text": "듀얼!",
+          "emotion": "determined",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -581,8 +629,13 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "한 판이면 어디까지 통하는지 알 수 있을 줄 알았는데. 다시 맞춰 봐야겠어.",
+          "text": "한 판이면 알 수 있을 줄 알았는데.",
           "emotion": "shock"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "어디서부터 막혔는지, 덱부터 다시 펼쳐 봐야겠어.",
+          "emotion": "determined"
         },
         {
           "speaker": "",
@@ -590,7 +643,7 @@
         },
         {
           "speaker": "윤",
-          "text": "세트부터 하지 않았으면 그다음 수는 봤을 거야. 넌 그 카드를 먼저 내려놨어.",
+          "text": "네가 먼저 내려놓은 카드 기억해? 그 수는 이미 료와 붙을 때 봤어.",
           "emotion": "determined"
         },
         {
@@ -600,7 +653,7 @@
         },
         {
           "speaker": "윤",
-          "text": "내가 그 순서를 이미 봤거든. 내가 못 본 순서가 있으면 그걸 보고 싶어.",
+          "text": "네 수를 한 번 더 보고 싶어. 같은 카드를 다른 자리에 놓으면 나도 오늘처럼 받을 수는 없을 테니까.",
           "emotion": "determined"
         },
         {
@@ -616,30 +669,37 @@
           "speaker": "텐죠인 아스카",
           "text": "……기다려!",
           "emotion": "determined",
-          "fx": "shake"
+          "fx": "shake",
+          "cutscene": "cg_gx_asuka_first_defeat"
         },
         {
           "speaker": "",
-          "text": "계단 쪽으로 두 걸음 갔을 때였다. 아스카는 덱 케이스도 닫지 못한 채 내 쪽을 보고 있었다."
+          "text": "계단 쪽으로 두 걸음 갔을 때였다. 아스카는 덱 케이스도 닫지 못한 채 내 쪽을 보고 있었다.",
+          "cutscene": "cg_gx_asuka_first_defeat",
+          "sfx": "footstep"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "언제 다 고칠지는 나도 몰라. 그전에도 상대는 해 줄 거야?",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_asuka_first_defeat"
         },
         {
           "speaker": "윤",
           "text": "그걸 물을 줄은 몰랐다. 나는 주머니에 넣으려던 디스크를 다시 빼 들었다.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_asuka_first_defeat"
         },
         {
           "speaker": "",
-          "text": "아스카는 새어 나온 숨을 짧게 들이켰다. 손에 남은 카드를 뒤집어 그림을 한 번 확인했다."
+          "text": "아스카는 새어 나온 숨을 짧게 들이켰다. 손에 남은 카드를 뒤집어 그림을 한 번 확인했다.",
+          "cutscene": "cg_gx_asuka_first_defeat"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "이 카드부터 바꿔 볼게. 다음에 만나면 어디에 넣었는지 맞혀 봐.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_asuka_first_defeat"
         },
         {
           "speaker": "",
@@ -834,10 +894,19 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "쥬다이는 상대가 첫 장을 놓을 자리까지 손바닥으로 쓸어 주었다."
+        },
+        {
+          "speaker": "",
+          "text": "재촉하던 녀석이 디스크를 들고 나서는 한 번도 먼저 말을 꺼내지 않았다."
+        },
+        {
           "speaker": "유우키 쥬다이",
           "text": "좋았어! 간다, 듀얼!",
           "emotion": "smile",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -1041,6 +1110,15 @@
           "text": "덱을 넣어 둔 주머니에 손을 넣었다. 보통은 이 정도로 고집을 부리면 돌아설 핑계부터 골랐을 텐데, 오늘은 먼저 자리를 잡고 싶었다."
         },
         {
+          "speaker": "",
+          "text": "아스카가 선을 사이에 두고 반 걸음 물러났다. 마른 잎이 구두 밑에서 부서졌다.",
+          "sfx": "footstep"
+        },
+        {
+          "speaker": "",
+          "text": "나는 덱을 꺼내기 전에 평평한 돌 두 개를 주워 양쪽 발 앞에 놓았다."
+        },
+        {
           "speaker": "텐죠인 아스카",
           "text": "그래, 그럼 한 판 부탁해. 이번엔 내 첫 수부터 잘 봐 둬!",
           "emotion": "determined"
@@ -1161,10 +1239,19 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "만죠메는 손목에 난 흠집 위로 디스크 끈을 한 칸 당겼다."
+        },
+        {
+          "speaker": "",
+          "text": "아까까지 떠들던 자신이 먼저 조용해진 걸, 그쪽도 알아차린 것 같았다."
+        },
+        {
           "speaker": "만죠메 쥰",
           "text": "5분?! 후회하게 해주마! 일! 십! 백! 천! 만죠메 썬더!! 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -1343,10 +1430,19 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "아스카는 셔플을 마치고도 덱을 내밀지 않았다."
+        },
+        {
+          "speaker": "",
+          "text": "내가 생각을 마칠 때까지 기다렸다가, 먼저 덱을 자르겠느냐고 손짓했다."
+        },
+        {
           "speaker": "윤",
           "text": "좋아, 그 각오가 얼마나 통하는지 직접 확인해 보지. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -1644,8 +1740,13 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "지난번에 자판기 앞에서 아무한테도 그런 얘기 안 했다고 했잖아. 내가 잘 들었다는 말을 못 하고 갔어.",
+          "text": "그날 자판기 앞에서, 아무한테도 그런 얘기 안 했다고 했잖아.",
           "emotion": "blush"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "내가 대답 안 하고 갔지. 들었다는 말은 해 두고 싶었어.",
+          "emotion": "sad"
         },
         {
           "speaker": "",
@@ -1716,6 +1817,14 @@
           "speaker": "텐죠인 아스카",
           "text": "아, 그런데 시험 문제에서 똑같은 게 나오면 내가 먼저 알아낸 걸로 해 줘. 잘 자!",
           "emotion": "smile"
+        },
+        {
+          "speaker": "",
+          "text": "문 앞까지 간 아스카가 뒤돌아보며 답안 뒷면을 가리켰다."
+        },
+        {
+          "speaker": "",
+          "text": "틀렸던 풀이를 지우지 않고 남겨 둔 건, 나도 나중에 보고 싶어서였다."
         },
         {
           "speaker": "",
@@ -1802,10 +1911,19 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "미사와가 노트 귀퉁이를 덱 밑에 밀어 넣었다."
+        },
+        {
+          "speaker": "",
+          "text": "계산이 안 맞아도 펼쳐 보지 않겠다는, 누구에게도 들리지 않는 약속 같았다."
+        },
+        {
           "speaker": "미사와 다이치",
           "text": "감사합니다! 제 6개의 덱 중 가장 완성도 높은 속성 전술로 도전하겠습니다! 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -1996,27 +2114,32 @@
         },
         {
           "speaker": "",
-          "text": "나는 아스카의 앞을 가로막으며 차갑게 걸어 나왔다. 아스카가 놀란 눈으로 내 등을 바라보았다."
+          "text": "나는 아스카의 앞을 가로막으며 차갑게 걸어 나왔다. 아스카가 놀란 눈으로 내 등을 바라보았다.",
+          "cutscene": "cg_gx_abandoned_dorm_rescue"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "네가 어떻게 여길 알았어? 난 숲에 늦는다고도 못 보냈는데.",
-          "emotion": "shock"
+          "emotion": "shock",
+          "cutscene": "cg_gx_abandoned_dorm_rescue"
         },
         {
           "speaker": "윤",
-          "text": "약속 시간에 안 오길래 KC 보안망 좀 빌렸다. ……혼자서 무모한 짓 좀 하지 마. 위험하면 말을 하라고.",
-          "emotion": "determined"
+          "text": "네가 지난번에 보여 준 쪽지에 이곳이 적혀 있었어. 대답은 나가서 해도 돼. 지금은 문에서 떨어져.",
+          "emotion": "determined",
+          "cutscene": "cg_gx_abandoned_dorm_rescue"
         },
         {
           "speaker": "타이탄",
           "text": "흥, 어디서 굴러먹은 애송이가 프로 흉내를 내며 끼어들어! 어둠의 듀얼로 네 영혼까지 갉아먹어 주마!",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_abandoned_dorm_rescue"
         },
         {
           "speaker": "윤",
-          "text": "어둠의 듀얼? 웃기지 마라. 가짜 트릭으로 여학생이나 겁주는 놈 따위, 프로의 계산 앞에서 3분도 못 버텨. 아스카, 뒤로 물러나 있어.",
-          "emotion": "determined"
+          "text": "그 장난으로 끝낼 수 있다면 지금 끝내. 여기서부터는 나한테만 말해, 타이탄.",
+          "emotion": "determined",
+          "cutscene": "cg_gx_abandoned_dorm_rescue"
         },
         {
           "speaker": "",
@@ -2029,7 +2152,7 @@
         },
         {
           "speaker": "윤",
-          "text": "아스카, 저 펜던트 안에 장치가 있어. 빛이 번쩍여도 속지 마. 뒤로 물러나 있으면 내가 저 녀석을 막을게.",
+          "text": "불빛이 번쩍여도 펜던트부터 보지 마. 저 사람이 문을 막으면 네가 먼저 움직여.",
           "emotion": "determined"
         },
         {
@@ -2057,16 +2180,27 @@
           "emotion": "sad"
         },
         {
+          "speaker": "",
+          "text": "천둥이 멎을 때까지 천장에서 흙가루가 떨어졌다.",
+          "sfx": "thunder",
+          "fx": "shake"
+        },
+        {
+          "speaker": "",
+          "text": "아스카는 내 디스크를 두드리며 이제 눈을 뗄 곳은 저쪽뿐이라고 알려 줬다."
+        },
+        {
           "speaker": "윤",
           "text": "걱정 마. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "",
-          "text": "승부가 끝나자 타이탄이 벽을 짚었다. 펜던트 불빛이 꺼지면서 그 뒤에 있어야 할 그림자가 한참 다르게 움직였다.",
+          "text": "종료 신호가 울리자 타이탄이 벽을 짚었다. 펜던트 불빛이 꺼지면서 그 뒤에 있어야 할 그림자가 한참 다르게 움직였다.",
           "fx": "shake"
         },
         {
@@ -2273,12 +2407,29 @@
         },
         {
           "speaker": "",
+          "text": "쏟아지는 빗물 때문에 우산 바깥의 말소리가 거의 들리지 않았다.",
+          "cutscene": "cg_gx_rainy_umbrella",
+          "sfx": "rain"
+        },
+        {
+          "speaker": "",
+          "text": "그날 아스카가 걸음을 늦춘 덕에, 나도 하고 싶은 말을 서두르지 않아도 됐다.",
+          "cutscene": "cg_gx_rainy_umbrella"
+        },
+        {
+          "speaker": "",
           "text": "우산 끝이 가로수에 걸릴 때마다 물이 내 신발로 떨어졌다. 다음 나무를 지날 때는 둘이서 조금씩 몸을 숙였다.",
           "cutscene": "cg_gx_rainy_umbrella"
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "폐기숙사에선 고맙다는 말도 못 했어. 기숙사에 도착하고 나서야 무슨 일이 있었는지 실감 났거든.",
+          "text": "폐기숙사에서 고맙다는 말도 못 했어.",
+          "emotion": "sad",
+          "cutscene": "cg_gx_rainy_umbrella"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "기숙사까지 걸어가서야 내가 몇 번이나 뒤를 돌아봤는지 알겠더라.",
           "emotion": "blush",
           "cutscene": "cg_gx_rainy_umbrella"
         },
@@ -2420,6 +2571,15 @@
           "emotion": "sad"
         },
         {
+          "speaker": "",
+          "text": "손에 낀 검은 장갑이 디스크 걸쇠에 걸렸다.",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "가면을 닦을 때와 달리, 이번에는 그 손이 한 번에 원하는 곳으로 가지 않았다."
+        },
+        {
           "speaker": "다크니스 후부키",
           "text": "네놈이 프로인가. 그렇다면 붉은 눈의 어둠 속에서 영원히 잠들게 해주마! 듀얼!",
           "emotion": "determined",
@@ -2427,15 +2587,17 @@
         },
         {
           "speaker": "윤",
-          "text": "간다, 다크니스!",
-          "emotion": "determined"
+          "text": "가면 뒤의 당신에게 하는 말이야. 간다, 다크니스. 듀얼!",
+          "emotion": "determined",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "",
           "text": "승부가 끝났다는 신호가 울리자 가면 위에 금이 갔다. 검은 조각 하나가 먼저 떨어졌고, 다시 눈을 뜬 남자는 아스카부터 찾았다.",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "shatter"
         },
         {
           "speaker": "",
@@ -2719,21 +2881,25 @@
         },
         {
           "speaker": "",
-          "text": "카게마루의 등 뒤로 우리아, 하몬, 라비엘—전설의 삼환마의 거대한 환영이 지하 유적 천장을 뚫을 듯 솟아올랐다."
+          "text": "카게마루의 등 뒤로 우리아, 하몬, 라비엘—전설의 삼환마의 거대한 환영이 지하 유적 천장을 뚫을 듯 솟아올랐다.",
+          "cutscene": "cg_gx_sacred_beasts_descent"
         },
         {
-          "speaker": "텐죠인 아스카",
+          "speaker": "",
           "text": "진동이 멎었는데도 출입문은 흔들리고 있었다. 아스카는 쥬다이에게 반대편 손잡이를 잡아 달라고 했다.",
-          "emotion": "shock"
+          "emotion": "shock",
+          "cutscene": "cg_gx_sacred_beasts_descent"
         },
         {
           "speaker": "윤",
           "text": "한꺼번에 넘어가려 하지 마. 저 셋이 서로 어떻게 지켜 주는지부터 확인하겠어.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_sacred_beasts_descent"
         },
         {
           "speaker": "",
-          "text": "삼환마의 포효에 지하 유적의 돌기둥들이 무너져 내릴 듯 진동했다. 쥬다이와 아스카가 내 등 뒤에서 굳은 표정으로 외쳤다."
+          "text": "삼환마의 포효에 지하 유적의 돌기둥들이 무너져 내릴 듯 진동했다. 쥬다이와 아스카가 내 등 뒤에서 굳은 표정으로 외쳤다.",
+          "cutscene": "cg_gx_sacred_beasts_descent"
         },
         {
           "speaker": "텐죠인 아스카",
@@ -2766,16 +2932,27 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "석문 틈의 얇은 돌판이 조각나 발등에 떨어졌다.",
+          "sfx": "shatter",
+          "fx": "shake"
+        },
+        {
+          "speaker": "",
+          "text": "안쪽에서 울리던 소리가 멎고 나니, 누가 숨을 쉬는지까지 들렸다."
+        },
+        {
           "speaker": "윤",
           "text": "신이라도 상관없어. 내 계산으로 완벽하게 봉인해 주지! 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "",
-          "text": "마지막 삼환마가 무너지자 돌기둥에 닿던 저음이 끊겼다. 정적 속에서 천장 틈의 작은 돌이 바닥에 닿는 소리가 들렸다.",
+          "text": "승부가 끝나자 돌기둥에 닿던 저음이 끊겼다. 정적 속에서 천장 틈의 작은 돌이 바닥에 닿는 소리가 들렸다.",
           "fx": "flash"
         },
         {
@@ -2955,8 +3132,13 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "세탁했어. 지금 돌려주면 넌 바로 입고 가 버릴 수도 있으니까, 끝나고 받아.",
+          "text": "세탁해 왔어. 주머니 안쪽까지 확인했고.",
           "emotion": "blush"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "그런데 지금 돌려주면 그냥 입고 가 버릴 것 같아. 이 판 끝나고 받아.",
+          "emotion": "smile"
         },
         {
           "speaker": "윤",
@@ -2973,10 +3155,19 @@
           "text": "그녀의 눈빛이 이전과는 완전히 달라져 있었다. 조급함도, 두려움도 없는 순수한 집중력."
         },
         {
+          "speaker": "",
+          "text": "아스카가 재킷을 난간에 걸어 두면서도 소매가 바닥에 끌리지 않게 접었다."
+        },
+        {
+          "speaker": "",
+          "text": "연습 때는 늘 내가 먼저 하던 일이었다. 오늘은 자리를 물어보지도 않았다."
+        },
+        {
           "speaker": "윤",
           "text": "와라, 아스카. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -3004,22 +3195,26 @@
         },
         {
           "speaker": "",
-          "text": "나는 디스크를 접으려다 숫자를 한 번 더 확인했다. 그리고 그녀가 대답을 기다리고 있다는 걸 뒤늦게 알아차렸다."
+          "text": "디스크 가장자리에 내려앉은 눈이 벌써 물방울로 바뀌고 있었다. 내가 대답을 늦추자 아스카가 입을 달싹였다.",
+          "cutscene": "cg_gx_first_effective_hit"
         },
         {
           "speaker": "윤",
-          "text": "완벽한 한 방이었어. 네가 내 라이프를 절반 밑으로 밀어 넣은 건 오늘이 처음이야, 아스카.",
-          "emotion": "smile"
+          "text": "오늘은 네가 고른 수였어. 내가 줄곧 어디를 보는지도 알아냈고.",
+          "emotion": "smile",
+          "cutscene": "cg_gx_first_effective_hit"
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "정말……?!",
-          "emotion": "blush"
+          "text": "……알아봤어? 나만 기억하고 있을까 봐 물어보려던 참이었어.",
+          "emotion": "shock",
+          "cutscene": "cg_gx_first_effective_hit"
         },
         {
           "speaker": "윤",
-          "text": "그래. 이제야 시작선에 섰군. 2학년이 되어도 밤 시간은 비워둘 테니, 계속 덤벼라.",
-          "emotion": "smile"
+          "text": "알아봤어. 다음엔 내가 먼저 순서를 바꿔 볼게. 봄에도 밤 시간은 남겨 둘 테니까.",
+          "emotion": "smile",
+          "cutscene": "cg_gx_first_effective_hit"
         },
         {
           "speaker": "텐죠인 아스카",
@@ -3063,7 +3258,7 @@
         }
       ],
       "fieldObjective": "아스카와 겨울 스파링",
-      "choiceAfterLine": 9,
+      "choiceAfterLine": 10,
       "choices": [
         {
           "stance": "Challenge",
@@ -3162,6 +3357,17 @@
         {
           "speaker": "텐죠인 아스카",
           "text": "배가 좀 늦었지? 오늘은 두 판만 하자. 그 전에 이거 마셔.",
+          "sceneMap": "spot_forest_duel_ground"
+        },
+        {
+          "speaker": "",
+          "text": "아스카가 캔을 따 주고 나서야 손끝에 감각이 돌아왔다.",
+          "sceneMap": "spot_forest_duel_ground",
+          "sfx": "can_open"
+        },
+        {
+          "speaker": "",
+          "text": "목이 데일 만큼 뜨거웠는데 그날은 둘 다 식을 때까지 기다릴 생각이 없었다.",
           "sceneMap": "spot_forest_duel_ground"
         },
         {
@@ -3316,6 +3522,15 @@
         },
         {
           "speaker": "",
+          "text": "바깥의 학생들이 먼저 통로에 몰리자 안내원의 목소리가 잘렸다.",
+          "sfx": "crowd"
+        },
+        {
+          "speaker": "",
+          "text": "타로를 쥔 손만 사람들 어깨 위로 잠깐 보였다가 사라졌다."
+        },
+        {
+          "speaker": "",
           "text": "배편 안내 방송이 울렸다. 사람들이 한꺼번에 움직이는 사이, 사이오는 타로 한 장을 뒤집고도 곧바로 덮지 않았다."
         }
       ],
@@ -3419,9 +3634,18 @@
           "fx": "flash"
         },
         {
+          "speaker": "",
+          "text": "에드는 장갑을 한 번 벗었다 다시 꼈다."
+        },
+        {
+          "speaker": "",
+          "text": "안내 데스크 쪽을 보지 않는 건 이 판만큼은 설명할 상대가 나 하나면 된다는 뜻이었다."
+        },
+        {
           "speaker": "윤",
-          "text": "듀얼.",
-          "emotion": "determined"
+          "text": "듀얼!",
+          "emotion": "determined",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -3638,6 +3862,16 @@
         },
         {
           "speaker": "",
+          "text": "포장지가 테이블 가장자리에서 들썩였다. 아스카가 내 쪽 빵으로 모서리를 눌렀다.",
+          "cutscene": "cg_gx_asuka_terrace_lunch"
+        },
+        {
+          "speaker": "",
+          "text": "그늘이 두 사람 몫이 되는 동안, 굳이 자리에서 일어날 이유가 생기지 않았다.",
+          "cutscene": "cg_gx_asuka_terrace_lunch"
+        },
+        {
+          "speaker": "",
           "text": "아스카가 종이 포장을 둘 사이에 펴 놓고 빵을 나눴다. 덱 케이스는 식탁 모서리에 둔 채, 이번엔 카드보다 빵 속에 뭐가 들었는지 이야기했다.",
           "cutscene": "cg_gx_asuka_terrace_lunch"
         },
@@ -3748,10 +3982,20 @@
           "fx": "shake"
         },
         {
+          "speaker": "",
+          "text": "아스카는 대답을 기다리는 동안 디스크를 켜지 않았다.",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "내가 고개를 끄덕이자 뒤늦게, 걸쇠를 잡은 손의 힘부터 풀었다."
+        },
+        {
           "speaker": "윤",
           "text": "알았어. 끝나도 오늘은 내가 먼저 자리를 뜨지 않을게. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -3950,12 +4194,26 @@
         },
         {
           "speaker": "텐죠인 아스카 (빛의 결사)",
-          "text": "세뇌가 아니야. 난 그저 눈을 떴을 뿐이야. 이제 당신의 동정도, 밤의 스파링도 필요 없어.",
+          "text": "세뇌가 아니야. 난 그저 눈을 떴을 뿐이야.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "텐죠인 아스카 (빛의 결사)",
+          "text": "숲에서 더 기다리지 마. 그리로 갈 일은 없으니까.",
+          "emotion": "hurt"
         },
         {
           "speaker": "",
           "text": "아스카가 위층 통로로 몸을 돌렸다. 소매 끝에서 늘 달고 다니던 기숙사 배지가 반쯤 가려져 있었다."
+        },
+        {
+          "speaker": "",
+          "text": "계단에 울리던 굽 소리가 문 하나를 지나자 뚝 끊겼다.",
+          "sfx": "footstep"
+        },
+        {
+          "speaker": "",
+          "text": "나는 소리가 끊긴 자리를 올려다봤다. 거기 서 있던 학생들은 내 쪽을 보지 않았다."
         },
         {
           "speaker": "유우키 쥬다이",
@@ -4052,10 +4310,19 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "만죠메가 비켜설 만큼 넓은 계단이었다."
+        },
+        {
+          "speaker": "",
+          "text": "그런데도 그는 내가 올라갈 쪽으로 발을 한 칸 옮겨, 얼굴 대신 덱을 내밀었다."
+        },
+        {
           "speaker": "윤",
           "text": "……일, 십, 백, 천이라며 시끄럽게 떠들던 네가 훨씬 나았어, 만죠메. 그 꼴사나운 하얀 옷부터 벗겨주마. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -4186,9 +4453,14 @@
         },
         {
           "speaker": "텐죠인 아스카 (빛의 결사)",
-          "text": "늦은 게 다야? 당신이 숲에서 쓰던 덱에는 끝까지 안 보여 준 카드가 있었잖아. 나는 뭐가 모자란지도 몰랐어.",
-          "emotion": "hurt",
+          "text": "늦은 게 다야? 거기선 끝내 안 꺼낸 카드가 있었잖아.",
+          "emotion": "angry",
           "fx": "shake"
+        },
+        {
+          "speaker": "텐죠인 아스카 (빛의 결사)",
+          "text": "나는 네가 뭘 남겨 뒀는지도 알고 싶었는데.",
+          "emotion": "hurt"
         },
         {
           "speaker": "",
@@ -4229,10 +4501,20 @@
           "fx": "flash"
         },
         {
+          "speaker": "",
+          "text": "아스카는 내 패를 한 번 보고 디스크로 눈을 내렸다.",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "부두에서 봤던 버릇이 잠깐 돌아온 것 같아, 하려던 말을 한 박자 늦췄다."
+        },
+        {
           "speaker": "텐죠인 아스카 (빛의 결사)",
-          "text": "헛소리! 1학년 때부터 분석해 온 당신의 모든 전술은 내 손안에 있어! 듀얼!",
+          "text": "헛소리! 첫날부터 당신의 전술을 분석해 왔어. 내가 얼마나 멀리 갔는지 똑똑히 봐. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -4307,7 +4589,7 @@
         }
       ],
       "fieldObjective": "위층 코트에서 아스카 찾기",
-      "choiceAfterLine": 10,
+      "choiceAfterLine": 11,
       "choices": [
         {
           "stance": "Challenge",
@@ -4438,16 +4720,25 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "코트에 나오기 전에 아스카가 병실 창문을 닫아 달라고 했다."
+        },
+        {
+          "speaker": "",
+          "text": "막상 바깥에 서니, 후부키도 창 쪽에 앉을 자리가 없는지 한 번 돌아봤다."
+        },
+        {
           "speaker": "윤",
           "text": "그래요. 아스카, 오래 안 걸릴 거야. 듀얼!",
           "emotion": "smile",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "텐죠인 후부키",
-          "text": "아이고, 마지막 한 장 더 쥐고 있으면 어쩌자고. 아스카 앞에서는 내 차례가 한 번 더 있었다고 해 줄래?",
+          "text": "아이고, 끝났구나. 잠깐만. 아스카 앞에서는 내가 먼저 축하했다고 해 줘.",
           "emotion": "smile"
         },
         {
@@ -4618,6 +4909,16 @@
         },
         {
           "speaker": "",
+          "text": "산책로 난간에서 막 손을 떼니 손바닥에 찬 기운이 남았다.",
+          "cutscene": "cg_gx_sunset_boardwalk"
+        },
+        {
+          "speaker": "",
+          "text": "아스카의 발소리가 계단 아래로 사라지고 나서야, 나는 뒷주머니의 디스크가 울리는 걸 들었다.",
+          "cutscene": "cg_gx_sunset_boardwalk"
+        },
+        {
+          "speaker": "",
           "text": "아스카와 갈라진 뒤 디스크에 메시지 하나가 도착했다. 발신인은 료. 화산 결투장에 있으니 오늘 밤 옛 승부의 답을 보여 주겠다는 내용이었다."
         }
       ],
@@ -4698,10 +4999,21 @@
           "emotion": "sad"
         },
         {
+          "speaker": "",
+          "text": "목걸이의 짧은 경고음이 한 차례 더 났다.",
+          "sfx": "alarm",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "료는 전원 쪽을 보지 않았다. 나는 철망 건너 전선을 먼저 확인했다."
+        },
+        {
           "speaker": "윤",
-          "text": "전원을 끄면 승부도 끝나겠지. 끝날 때까지 나는 여기 있을게. 끝나고 그 목걸이부터 풀어. 듀얼.",
+          "text": "전원을 끄면 승부도 끝나겠지. 끝날 때까지 나는 여기 있을게. 끝나고 그 목걸이부터 풀어. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -4858,7 +5170,12 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "새로 넣은 카드도 있어요. 그런데 가장 많이 연습한 건, 첫 수가 막혔을 때 덜 급해지는 거였어요.",
+          "text": "새로 넣은 카드도 있어요. 아까 들어오기 전에 두 번이나 확인했어요.",
+          "emotion": "smile"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "그런데 이번엔 첫 수가 막히면, 막힌 데서부터 다시 생각하려고요.",
           "emotion": "determined"
         },
         {
@@ -4872,10 +5189,20 @@
           "fx": "flash"
         },
         {
+          "speaker": "",
+          "text": "손바닥을 펴 보니 덱 모서리 자국이 남아 있었다.",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "세레나가 선심 쓰듯 기다려 주는 게 싫어서, 손을 감추는 대신 천천히 덱을 들었다."
+        },
+        {
           "speaker": "텐죠인 아스카",
-          "text": "네. 저도 볼게요. 듀얼.",
+          "text": "네. 저도 볼게요. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -4924,26 +5251,32 @@
         },
         {
           "speaker": "",
-          "text": "시상대에 올라 트로피를 받았다. 사람들 사이에서 윤을 찾자, 그는 내가 내려오기를 기다리고 있었다."
+          "text": "시상대에 올라 트로피를 받았다. 사람들 사이에서 윤을 찾자, 그는 내가 내려오기를 기다리고 있었다.",
+          "cutscene": "cg_gx_genex_finals_victory",
+          "sfx": "crowd"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "아까 내가 먼저 덱을 놓은 거 봤어? 입학식 날에도 이렇게 놓으려고 했는데 손이 자꾸 미끄러졌어.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_genex_finals_victory"
         },
         {
           "speaker": "윤",
           "text": "봤어. 이번엔 네가 제대로 됐는지 확인하러 내 쪽을 보지도 않더라.",
           "emotion": "smile",
-          "fx": "heartbeat"
+          "fx": "heartbeat",
+          "cutscene": "cg_gx_genex_finals_victory"
         },
         {
           "speaker": "",
-          "text": "나는 손에 든 트로피를 윤에게 들어 보였다. 숨은 아직 찼지만 웃음이 멈추지 않았다."
+          "text": "트로피를 들어 보이자 윤이 난간에서 몸을 내밀었다. 불꽃이 터져 말은 들리지 않았지만, 그 사람도 웃고 있었다.",
+          "cutscene": "cg_gx_genex_finals_victory"
         },
         {
           "speaker": "",
-          "text": "관중이 자리에서 일어나 박수를 보냈다. 나는 트로피를 품에 안고 빈 손으로 윤의 손을 꼭 잡았다."
+          "text": "얼굴을 바로 앞에서 본 건 내가 시상대를 내려온 뒤였다. 트로피를 품에 안고, 빈손을 윤에게 내밀었다.",
+          "cutscene": "cg_gx_genex_finals_victory"
         },
         {
           "speaker": "텐죠인 아스카",
@@ -5089,6 +5422,16 @@
           "cutscene": "cg_gx_genex_harbor_fireworks"
         },
         {
+          "speaker": "",
+          "text": "마지막 불꽃 뒤에는 한참 동안 아무 소리도 나지 않았다.",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
+        },
+        {
+          "speaker": "",
+          "text": "아스카는 화면에 비친 빛이 빠지고 나서야 촬영 버튼을 눌렀다.",
+          "cutscene": "cg_gx_genex_harbor_fireworks"
+        },
+        {
           "speaker": "텐죠인 아스카",
           "text": "집에 들어가기 전에 사진 한 장만 찍자. 이번엔 트로피 빼고.",
           "emotion": "blush",
@@ -5188,10 +5531,19 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "쥬다이는 예전에 건네받았던 카드와 오늘 들고 온 덱을 잠깐 나란히 놓았다."
+        },
+        {
+          "speaker": "",
+          "text": "먼저 꺼내 보일 쪽을 고를 때 나는 입을 다물고 기다렸다."
+        },
+        {
           "speaker": "유우키 쥬다이",
           "text": "네오스도 기다렸을걸! 시작하자, 형. 듀얼!",
           "emotion": "smile",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -5301,7 +5653,12 @@
         },
         {
           "speaker": "윤",
-          "text": "취소 명령이 잠겨 있어. 저 디스크가 제어 장치에 연결돼 있다면, 듀얼로 끊을 수 있겠군.",
+          "text": "취소 명령은 잠겼어. 손으로 눌러서는 안 돼.",
+          "emotion": "shock"
+        },
+        {
+          "speaker": "윤",
+          "text": "하지만 저 제어 장치가 반응하는 디스크는 하나 더 있어. 거기서 끊겠어.",
           "emotion": "determined"
         },
         {
@@ -5335,17 +5692,29 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "경고등이 꺼진 뒤에도 낮은 경고음은 끊기지 않았다.",
+          "sfx": "alarm",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "사이오는 숫자를 보는 대신 내 디스크를 들여다봤다. 남은 시간이 어느 쪽 것인지 확인하려는 것처럼."
+        },
+        {
           "speaker": "사이오 타쿠마",
           "text": "운명에 거역하는 대가를 치르게 해주마! 아르카나 포스의 힘으로! 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "",
-          "text": "아르카나 포스 EX가 부서졌다. 그런데도 잠깐 경고음이 이어져 나는 디스크를 내리지 못했다. 마지막 음이 끊긴 뒤 화면의 숫자가 꺼졌다.",
-          "fx": "flash"
+          "text": "종료 신호가 켜졌는데도 경고음이 이어져 나는 디스크를 내리지 못했다. 마지막 음이 끊긴 뒤 화면의 숫자가 꺼졌다.",
+          "fx": "flash",
+          "sfx": "alarm"
         },
         {
           "speaker": "사이오 타쿠마",
@@ -5423,7 +5792,7 @@
         }
       ],
       "fieldObjective": "사이오의 제어실로 가기",
-      "choiceAfterLine": 8,
+      "choiceAfterLine": 9,
       "choices": [
         {
           "stance": "Challenge",
@@ -5599,6 +5968,16 @@
         },
         {
           "speaker": "",
+          "text": "붉은 재킷을 입은 아이가 모자를 주우러 갔다가 하늘이 울리는 소리에 주저앉았다.",
+          "sfx": "thunder",
+          "fx": "shake"
+        },
+        {
+          "speaker": "",
+          "text": "우리가 짐을 지붕 아래로 옮기는 동안 짐은 줄이 팽팽해질 때마다 배와 선착장 사이를 살폈다."
+        },
+        {
+          "speaker": "",
           "text": "환영식이 끝나기 전부터 부두의 계류줄이 바짝 당겼다. 바람이 먼저 멎고, 한참 뒤에 배가 흔들렸다."
         }
       ],
@@ -5672,16 +6051,25 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "요한의 목소리를 따라 옆을 보니 방금까지 말이 향하던 자리가 비어 있었다."
+        },
+        {
+          "speaker": "",
+          "text": "그는 그곳을 한 번 더 보고 내 쪽으로 돌아섰다."
+        },
+        {
           "speaker": "윤",
           "text": "좋아. 페가수스가 맡긴 보옥수라니 나도 궁금하군. 듀얼!",
           "emotion": "smile",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "요한 안데르센",
-          "text": "잠깐. 루비가 마지막에 안 돌아오려고 했는데, 형 쪽에 뭐가 남아 있었어?",
+          "text": "잠깐. 루비가 안 돌아가고 네 앞을 보고 있네. 나도 좀 볼게. 방금 어디서 흐름이 바뀌었는지 말이야.",
           "emotion": "smile"
         },
         {
@@ -5771,17 +6159,19 @@
       "preDialogues": [
         {
           "speaker": "",
-          "text": "흰 빛이 사라졌을 때 얼굴이 모래에 닿아 있었다. 먼저 들려야 할 파도 소리를 기다리다가 내 숨소리만 몇 번 더 들었다.",
-          "fx": "flash"
+          "text": "하늘 한가운데 보랏빛 금이 났다. 금이 바다에 닿자 수평선이 사라지고, 섬 위로 붉은빛이 쏟아졌다.",
+          "fx": "flash",
+          "cutscene": "cg_gx_dimension_sky_shatter",
+          "sfx": "shatter"
         },
         {
           "speaker": "",
-          "text": "백사장 끝을 지나면 물이 있어야 했다. 붉은 모래가 수평선까지 이어졌고, 익숙한 기숙사 지붕만 황야 위에 그대로 남아 있었다.",
+          "text": "정신이 들었을 때 얼굴이 뜨거운 모래에 닿아 있었다. 파도 소리 대신 붉은 모래만 수평선까지 이어졌고, 기숙사 지붕은 황야 위에 그대로 남아 있었다.",
           "fx": "shake"
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "윤, 먼저 손 짚고 일어나. 나갈 수 있으면 본관으로 가. 누가 다쳤는지 여기선 안 보여.",
+          "text": "윤, 내 손 보여? 잠깐 여기 짚어.",
           "emotion": "shock",
           "stage": [
             {
@@ -5793,6 +6183,11 @@
               "action": "focus"
             }
           ]
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "걸을 수 있으면 본관부터 가자. 누가 다쳤는지 여기선 안 보여.",
+          "emotion": "determined"
         },
         {
           "speaker": "유우키 쥬다이",
@@ -5862,6 +6257,16 @@
           "speaker": "윤",
           "text": "그래. 다친 사람은 본관으로 옮겨. 아무도 혼자 움직이지 마.",
           "emotion": "determined"
+        },
+        {
+          "speaker": "",
+          "text": "교내 방송의 짧은 경보가 끊긴 뒤 스피커에서는 잡음만 났다.",
+          "sfx": "alarm",
+          "fx": "flash"
+        },
+        {
+          "speaker": "",
+          "text": "아스카가 명단을 받아 적는 사이 나는 이름을 하나씩 아주 또렷이 불렀다."
         },
         {
           "speaker": "",
@@ -5937,10 +6342,19 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "오브라이언은 물통을 자기 옆이 아니라 문지방 가까이에 놓았다."
+        },
+        {
+          "speaker": "",
+          "text": "그제야 이 판을 보러 온 학생들이 물을 받으러 왔다가 남았다는 걸 알았다."
+        },
+        {
           "speaker": "윤",
           "text": "받아주지. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -6115,10 +6529,20 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "협곡으로 이어지는 길에서 돌 두 개가 굴러 내려왔다.",
+          "sfx": "footstep"
+        },
+        {
+          "speaker": "",
+          "text": "짐은 덱을 올려 둔 채 그 소리가 몇 걸음째에서 멎는지 세었다."
+        },
+        {
           "speaker": "윤",
           "text": "좋아, 짐. 주저할 시간은 없어. 전력으로 와라! 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -6268,6 +6692,16 @@
         },
         {
           "speaker": "",
+          "text": "종이를 넘기려던 아스카가 등불의 심지를 조금 눌렀다.",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
+        },
+        {
+          "speaker": "",
+          "text": "그제야 수첩 앞장을 가리고 있던 내 손의 그림자가 작아졌다.",
+          "cutscene": "cg_gx_dimension_sparring_notebook"
+        },
+        {
+          "speaker": "",
           "text": "아스카가 빈 장의 모서리를 접어두었다. 마침 협곡 쪽에서 짐의 등불이 두 번 깜빡였다.",
           "cutscene": "cg_gx_dimension_sparring_notebook"
         }
@@ -6341,10 +6775,19 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "아몬이 뒤에 아무도 없다는 걸 확인하고서야 디스크를 내 쪽으로 돌렸다."
+        },
+        {
+          "speaker": "",
+          "text": "돌아갈 사람이 있는지 물으려다 그가 답할 때까지 기다릴 수 있는 곳인가부터 생각했다."
+        },
+        {
           "speaker": "윤",
           "text": "사람을 제물로 삼는 일이 더는 없게 하지. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -6452,8 +6895,13 @@
         },
         {
           "speaker": "윤",
-          "text": "너랑 같이 가고 싶어. 그런데 넘어선 뒤에 어디서 다칠지 모르니까 내가 먼저 정하고 싶었어.",
+          "text": "너랑 같이 가고 싶어. 말은 그렇게 했는데.",
           "emotion": "sad"
+        },
+        {
+          "speaker": "윤",
+          "text": "어디서 다칠지 모르니까, 지킬 수 있는 자리부터 내가 정해 버렸어.",
+          "emotion": "hurt"
         },
         {
           "speaker": "텐죠인 아스카",
@@ -6465,16 +6913,25 @@
           "text": "아스카는 내가 덱을 확인하는 동안 재촉하지 않았다. 카드 사이를 넘기는 내 손이 한 자리에서 멈췄다."
         },
         {
+          "speaker": "",
+          "text": "서로의 등불이 바닥에 그린 원이 닿았다."
+        },
+        {
+          "speaker": "",
+          "text": "아스카는 먼저 불을 치워 길을 내는 대신, 내 옆의 빈 바닥에 자기 것을 놓았다."
+        },
+        {
           "speaker": "윤",
           "text": "알았어. 이번에는 나도 가진 수를 전부 쓸게. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "",
-          "text": "승부가 끝났는데도 아스카는 디스크를 바로 내리지 않았다. 언제나 막던 첫 수를 오늘은 일부러 보내 줬다는 게, 뒤늦게 떠올랐다.",
+          "text": "승부가 끝났는데도 아스카는 디스크를 바로 내리지 않았다. 평소처럼 다음 판을 먼저 얘기할 줄 알았는데, 오늘은 내가 입을 열 때까지 기다렸다.",
           "fx": "flash"
         },
         {
@@ -6548,7 +7005,7 @@
         }
       ],
       "fieldObjective": "아스카와 최심부 진입 준비",
-      "choiceAfterLine": 7,
+      "choiceAfterLine": 8,
       "choices": [
         {
           "stance": "Challenge",
@@ -6602,7 +7059,8 @@
         },
         {
           "speaker": "",
-          "text": "쥬다이 뒤로 성문에 새겨진 문양이 맥박처럼 깜빡였다. 그가 한 걸음 움직일 때마다 검은 빛이 디스크 쪽으로 모였다."
+          "text": "쥬다이 뒤로 성문에 새겨진 문양이 맥박처럼 깜빡였다. 그가 한 걸음 움직일 때마다 검은 빛이 디스크 쪽으로 모였다.",
+          "cutscene": "cg_gx_supreme_king_clash"
         },
         {
           "speaker": "텐죠인 아스카",
@@ -6613,22 +7071,26 @@
               "action": "enter",
               "actor": 107
             }
-          ]
+          ],
+          "cutscene": "cg_gx_supreme_king_clash"
         },
         {
           "speaker": "윤",
           "text": "아스카, 문 쪽을 봐 줘. 쥬다이는 내가 붙잡을게.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_supreme_king_clash"
         },
         {
           "speaker": "패왕 쥬다이",
           "text": "그 이름으로 부르지 마라. 요한을 되찾는 데 필요한 건 초융합이다.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_supreme_king_clash"
         },
         {
           "speaker": "윤",
           "text": "그 카드에 힘을 더 주면 요한을 찾을 거라 믿는 거냐? 네가 여기서 동료하고 싸우는 걸 보면 요한이 뭐라고 할까?",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_supreme_king_clash"
         },
         {
           "speaker": "",
@@ -6640,10 +7102,20 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "갑옷 안에서 한 번 길게 숨을 들이마시는 소리가 났다.",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "쥬다이는 우리가 알던 목소리로 한마디 할 만큼 가까웠는데도 입을 열지 않았다."
+        },
+        {
           "speaker": "윤",
-          "text": "레드 식당 앞에서 넌 지고도 패부터 펼쳤지. 오늘은 네가 뭐가 나오길 기다리는지 내가 볼게. 듀얼.",
+          "text": "레드 식당 앞에서 넌 지고도 패부터 펼쳤지. 오늘은 네가 뭐가 나오길 기다리는지 내가 볼게. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -6660,7 +7132,8 @@
               "action": "enter",
               "actor": 119
             }
-          ]
+          ],
+          "sfx": "shatter"
         },
         {
           "speaker": "유우키 쥬다이",
@@ -6778,10 +7251,21 @@
           "text": "나는 요한과 우리가 들어온 계단 사이를 한 번 오가며 보았다. 아스카와 눈이 마주치자 그녀가 쥬다이를 한 칸 가까이 당겼다."
         },
         {
+          "speaker": "",
+          "text": "계단 한 장이 밑에서부터 갈라졌다. 돌아갈 수 있는 쪽은 저기뿐이었다.",
+          "sfx": "shatter",
+          "fx": "shake"
+        },
+        {
+          "speaker": "",
+          "text": "나는 아스카가 뒤돌아 확인할 때까지 유벨에게서 눈을 떼지 않았다."
+        },
+        {
           "speaker": "윤",
           "text": "아스카, 쥬다이랑 왔던 길을 막아 줘. 유벨, 내 앞에서 요한의 덱을 내려놔. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -6808,34 +7292,41 @@
         {
           "speaker": "",
           "text": "계단 쪽으로 세 사람을 밀었다. 한 발로 버텨 보려는데 바닥이 기울었다. 발목을 놓아주지 않는 힘이 아래에서 나를 끌었다.",
-          "fx": "flash"
+          "fx": "flash",
+          "cutscene": "cg_gx_pro_sacrifice_darkness",
+          "sfx": "shatter"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "윤, 여기 봐. 손이 닿아. 한 번만 더 올려 봐!",
-          "emotion": "hurt",
-          "fx": "shake"
+          "emotion": "shock",
+          "fx": "shake",
+          "cutscene": "cg_gx_pro_sacrifice_darkness"
         },
         {
           "speaker": "",
-          "text": "내 발밑의 돌조각마저 검은 틈 아래로 사라졌다. 딛고 다시 올라설 곳이 없었다."
+          "text": "내 발밑의 돌조각마저 검은 틈 아래로 사라졌다. 딛고 다시 올라설 곳이 없었다.",
+          "cutscene": "cg_gx_pro_sacrifice_darkness"
         },
         {
           "speaker": "",
-          "text": "재킷이 계단 모서리에 걸렸다. 소매에서 팔을 빼자 잠깐 두 손이 자유로워졌다. 그때 아스카의 손이 바로 눈앞에 있었다."
+          "text": "재킷이 계단 모서리에 걸렸다. 소매에서 팔을 빼자 잠깐 두 손이 자유로워졌다. 그때 아스카의 손이 바로 눈앞에 있었다.",
+          "cutscene": "cg_gx_pro_sacrifice_darkness"
         },
         {
           "speaker": "",
-          "text": "아스카의 손가락 끝과 내 손끝이 스쳤다. 잡을 수 있다고 생각한 바로 다음에, 틈이 둘 사이에서 한 뼘 더 벌어졌다."
+          "text": "아스카의 손끝이 내 손에 닿았다. 그대로 잡아당기면 그녀도 무너지는 끝에 발을 디딜 것 같아, 손등을 안쪽으로 밀었다.",
+          "cutscene": "cg_gx_pro_sacrifice_darkness"
         },
         {
           "speaker": "윤",
-          "text": "아스카, 물러서. 계단은 무너지면 안 돼!",
-          "emotion": "sad"
+          "text": "아스카, 한 걸음만 뒤로. 네가 서 있으면 난 돌아갈 데가 있어.",
+          "emotion": "determined",
+          "cutscene": "cg_gx_pro_sacrifice_darkness"
         },
         {
           "speaker": "",
-          "text": "틈이 닫힐 때까지 몸을 일으킬 수 없었다. 다시 손가락을 움직여 보려는 순간, 웃음소리가 났다. 내 목소리인데 내가 낸 소리가 아니었다.",
+          "text": "아스카가 한 번 더 내 이름을 불렀다. 괜찮다고 말하려고 입을 열었는데, 어둠 속에서 내 목소리로 누군가 웃었다.",
           "fx": "flash",
           "stage": [
             {
@@ -6972,6 +7463,15 @@
         },
         {
           "speaker": "",
+          "text": "계단 아래로 내려가는 굽 소리가 한 번 울리고 멎었다.",
+          "sfx": "footstep"
+        },
+        {
+          "speaker": "",
+          "text": "쥬다이는 이름을 부르지 않고, 빛이 닿지 않는 다음 계단을 향해 등불을 앞으로 내밀었다."
+        },
+        {
+          "speaker": "",
           "text": "쥬다이가 등불을 높이 들었다. 아스카는 빛이 닿는 데까지 내려가 한 번 돌아봤다. 스스로 계단 한 칸을 더 디디자 뒤에 남은 불빛이 보이지 않았다."
         }
       ],
@@ -7022,7 +7522,12 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "그 사람이라면 내가 마지막 계단을 내려설 때까지 디스크를 안 들었을 거야. 너는 내가 어디 있는지도 안 봤지.",
+          "text": "그 사람이라면 내가 계단 끝에 닿을 때까지 기다렸을 거야.",
+          "emotion": "hurt"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "너는 내가 어디 있는지도 안 봤지. 그래서 한 발 더 내려온 거야.",
           "emotion": "determined"
         },
         {
@@ -7060,15 +7565,25 @@
           "fx": "flash"
         },
         {
+          "speaker": "",
+          "text": "그가 내 이름을 부르자 반사적으로 한 발 가까이 갔다.",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "목소리만 믿었으면 닿을 거리였다. 나는 그 자리에 발을 내려놓고 디스크를 들었다."
+        },
+        {
           "speaker": "텐죠인 아스카",
-          "text": "그 카드부터 꺼내. 내가 왜 기다렸는지 보여 줄게. 듀얼.",
-          "emotion": "determined"
+          "text": "그 카드부터 꺼내. 내가 왜 기다렸는지 보여 줄게. 듀얼!",
+          "emotion": "determined",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "",
-          "text": "마지막 카드를 내기까지 유벨은 한 번도 내 손을 기다리지 않았다. 그때마다 똑같은 목소리를 듣고도 이제 겁이 나진 않았다.",
+          "text": "승부가 끝날 때까지 유벨은 한 번도 내 손을 기다리지 않았다. 그때마다 똑같은 목소리를 듣고도 이제 겁이 나진 않았다.",
           "fx": "flash"
         },
         {
@@ -7172,7 +7687,7 @@
         }
       ],
       "fieldObjective": "아스카로 윤을 구하기",
-      "choiceAfterLine": 11,
+      "choiceAfterLine": 12,
       "choices": [
         {
           "stance": "Challenge",
@@ -7327,6 +7842,16 @@
           "cutscene": "cg_gx_asuka_tag_signals"
         },
         {
+          "speaker": "",
+          "text": "바람이 멎자 신청서가 책상 위에 가만히 놓였다.",
+          "cutscene": "cg_gx_asuka_tag_signals"
+        },
+        {
+          "speaker": "",
+          "text": "옆칸도 비워 두면서 내 이름부터 적어 놓았다는 말은 굳이 하지 않았다.",
+          "cutscene": "cg_gx_asuka_tag_signals"
+        },
+        {
           "speaker": "텐죠인 아스카",
           "text": "그럼 대회 신청서에도 내 이름을 같이 써도 돼? 이번엔 네 맞은편 말고 옆자리에 서 보고 싶어.",
           "cutscene": "cg_gx_asuka_tag_signals"
@@ -7414,10 +7939,19 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "크로노스 교수가 평가표를 뒤집어서 책상에 내놓았다."
+        },
+        {
+          "speaker": "",
+          "text": "지난번과 달리 이 기록은 내 차례가 다 끝날 때까지 아무도 볼 수 없었다."
+        },
+        {
           "speaker": "크로노스 데 메디치",
           "text": "그 마음을 앤틱 기어 앞에서도 보여주시게. 이제 마지막 수업을 시작하겠노라네! 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -7577,10 +8111,20 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "대기석 뒤에서 우리 순서를 부르는 학생들이 일어섰다.",
+          "sfx": "crowd"
+        },
+        {
+          "speaker": "",
+          "text": "나는 아스카와 맞춰 둔 신호를 한 번만 확인하고 필드 쪽으로 시선을 돌렸다."
+        },
+        {
           "speaker": "유우키 쥬다이",
           "text": "좋았어! 이제 형이랑 내 차례야. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -7727,6 +8271,15 @@
         },
         {
           "speaker": "",
+          "text": "탭이 짧게 울렸다. 아스카가 내 몫은 따지 않고 건넸다.",
+          "sfx": "can_open"
+        },
+        {
+          "speaker": "",
+          "text": "손안에서 그 소리를 한 번 더 낼 때까지, 아무도 다음 이야기를 꺼내지 않았다."
+        },
+        {
+          "speaker": "",
           "text": "두 번째 캔이 떨어지는 소리가 나도 나는 벤치에서 일어나지 않았다. 아스카가 제 것까지 꺼내 와 옆자리부터 채웠다."
         }
       ],
@@ -7781,10 +8334,19 @@
           "emotion": "smile"
         },
         {
+          "speaker": "",
+          "text": "만죠메는 원서를 뒤집어 덱 케이스 아래에 넣었다."
+        },
+        {
+          "speaker": "",
+          "text": "이름을 가려 둬도 이제 내가 나갈 곳을 안다는 듯, 먼저 거리를 벌리고 섰다."
+        },
+        {
           "speaker": "만죠메 쥰",
           "text": "일! 십! 백! 천! 만죠메 썬더! 간다, 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -8016,6 +8578,16 @@
           "emotion": "determined"
         },
         {
+          "speaker": "",
+          "text": "철문 너머에서 대피 경보가 한 번 울리고, 안개 속으로 끊어졌다.",
+          "sfx": "alarm",
+          "fx": "shake"
+        },
+        {
+          "speaker": "",
+          "text": "아스카가 비어 버린 쪽으로 손을 들었다. 저기에 사람이 있었다는 걸 잊지 말라는 손짓이었다."
+        },
+        {
           "speaker": "윤",
           "text": "아스카, 뒤쪽 길을 봐 줘. 후부키, 우리 둘이서 네 친구에게 다가가자.",
           "emotion": "determined"
@@ -8105,10 +8677,19 @@
           ]
         },
         {
+          "speaker": "",
+          "text": "후부키가 이름을 부를 때마다 발밑에 있던 얇은 막이 안쪽에서 오그라들었다."
+        },
+        {
+          "speaker": "",
+          "text": "소리가 통하는 길을 확인하고, 나는 그쪽을 등지지 않도록 몸을 돌렸다."
+        },
+        {
           "speaker": "윤",
           "text": "후부키, 한 번 더 불러 줘. 내가 저 막을 열어 볼게. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
@@ -8218,7 +8799,12 @@
         },
         {
           "speaker": "윤",
-          "text": "부두에서 이미 누가 내 이름을 불렀어. 그때는 내가 못 들은 척했지. 지금은 들려.",
+          "text": "부두에서 이미 누가 내 이름을 불렀어. 그땐 못 들은 척했지.",
+          "emotion": "sad"
+        },
+        {
+          "speaker": "윤",
+          "text": "지금은 들려. 안개가 더 짙어져도 돌아볼 수 있어.",
           "emotion": "determined"
         },
         {
@@ -8244,32 +8830,51 @@
               "action": "enter",
               "actor": 119
             }
-          ]
+          ],
+          "cutscene": "cg_gx_darkness_final_stand"
         },
         {
           "speaker": "",
-          "text": "안개가 짙어질 때마다 서로의 윤곽이 흐려졌다. 그래도 한 사람이 이름을 부르면 그쪽으로 다시 돌아볼 수 있었다."
+          "text": "안개가 짙어질 때마다 서로의 윤곽이 흐려졌다. 그래도 한 사람이 이름을 부르면 그쪽으로 다시 돌아볼 수 있었다.",
+          "cutscene": "cg_gx_darkness_final_stand"
         },
         {
           "speaker": "텐죠인 후부키",
           "text": "학교 애들 이름, 잊힐 때마다 하나씩 불러 보자. 난 유스케부터 부를게.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_darkness_final_stand"
         },
         {
           "speaker": "유우키 쥬다이",
           "text": "난 레이부터! 형은 듀얼에 집중해. 우리가 계속 부르고 있을게.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_darkness_final_stand"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "여기서 계속 부를게. 뒤를 돌아봐야 할 때는 내 목소리부터 찾아.",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_darkness_final_stand"
+        },
+        {
+          "speaker": "",
+          "text": "창문 같던 표면에 금이 번졌다. 아직도 안쪽에서는 발소리가 들렸다.",
+          "sfx": "shatter",
+          "fx": "shake",
+          "cutscene": "cg_gx_darkness_final_stand"
+        },
+        {
+          "speaker": "",
+          "text": "뒤에서 이름을 부르는 목소리에 맞춰, 금이 가는 쪽으로 반 걸음 다가갔다.",
+          "cutscene": "cg_gx_darkness_final_stand"
         },
         {
           "speaker": "윤",
           "text": "좋아. 한 명도 빠뜨리지 말고 부르는 거야. 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk",
+          "cutscene": "cg_gx_darkness_final_stand"
         }
       ],
       "postWinDialogues": [
@@ -8403,8 +9008,14 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "방금 짐 다 싸고 오는 길이야. 아까 말한 거, 내일 졸업식 끝나고 숲속 듀얼장에서 만나자는 얘기였어.",
-          "emotion": "determined",
+          "text": "방금 짐 다 싸고 오는 길이야. 메모 남기려다 그냥 왔어.",
+          "emotion": "smile",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "내일 졸업식 끝나고 숲에서 만나자는 말, 직접 해 두려고.",
+          "emotion": "blush",
           "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
@@ -8423,6 +9034,17 @@
           "speaker": "윤",
           "text": "알았어. 덱 케이스는 아직 책상 위에 있어.",
           "emotion": "determined",
+          "cutscene": "cg_gx_graduation_eve_doorstep"
+        },
+        {
+          "speaker": "",
+          "text": "상자에 묻혀 문을 두드리는 소리를 두 번이나 놓쳤다.",
+          "cutscene": "cg_gx_graduation_eve_doorstep",
+          "sfx": "door_knock"
+        },
+        {
+          "speaker": "",
+          "text": "세 번째 소리가 들리자 들고 있던 초청장을 상자에 넣지 않고 가지고 나갔다.",
           "cutscene": "cg_gx_graduation_eve_doorstep"
         },
         {
@@ -8534,15 +9156,25 @@
           "fx": "flash"
         },
         {
+          "speaker": "",
+          "text": "그날 밤 처음 만났던 돌바닥보다 이쪽은 미끄러웠다.",
+          "fx": "heartbeat"
+        },
+        {
+          "speaker": "",
+          "text": "윤이 구두로 바닥을 짚어 보길래, 먼저 걱정한 사람이 내 쪽만은 아니구나 싶었다."
+        },
+        {
           "speaker": "윤",
           "text": "듀얼!",
-          "emotion": "determined"
+          "emotion": "determined",
+          "sfx": "duel_disk"
         }
       ],
       "postWinDialogues": [
         {
           "speaker": "",
-          "text": "윤은 예전처럼 끝까지 패를 숨겼다. 나도 이번엔 남은 카드를 다 보여 주지 않았다. 그가 먼저 한 장을 내려놓을 때까지 기다렸다.",
+          "text": "승리 표시가 들어오고 나서야 윤이 디스크에서 손을 뗐다. 예전 같으면 바로 복기하자고 했을 텐데, 오늘은 숨을 고르고 내 쪽을 먼저 봤다.",
           "fx": "shake"
         },
         {
@@ -8570,7 +9202,12 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "윤, 내가 네 앞에서 아직 못 한 말 있어. 너 좋아해. 내일 배 시간까지 기다리면 또 그때는 늦었다고 할 것 같아서.",
+          "text": "윤, 내가 네 앞에서 아직 못 한 말 있어.",
+          "emotion": "determined"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "너 좋아해. 내일 배 앞에 가면 출발 시간만 보다가 또 말을 놓칠 것 같았어.",
           "emotion": "blush"
         },
         {
@@ -8712,38 +9349,56 @@
               "actor": 104,
               "action": "focus"
             }
-          ]
+          ],
+          "cutscene": "cg_gx_yami_yugi_legend"
         },
         {
           "speaker": "어둠의 유우기",
           "text": "아까 보니 덱을 섞는 얼굴부터 즐거워 보이더군. 자네가 지금 하는 듀얼을 나도 만나 보고 싶네.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_yami_yugi_legend"
         },
         {
           "speaker": "윤",
           "text": "이곳에서 듀얼을 하는 건 오랜만인데, 지켜보는 사람이 있을 줄은 몰랐습니다.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_yami_yugi_legend"
         },
         {
           "speaker": "텐죠인 아스카",
           "text": "정말 유우기 씨구나. 윤, 나는 저쪽에 앉아 있을게. 끝나고 나면 부르기만 해.",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_yami_yugi_legend"
         },
         {
           "speaker": "어둠의 유우기",
           "text": "괜찮다면 잠깐 시간을 빌려도 되겠나?",
-          "emotion": "smile"
+          "emotion": "smile",
+          "cutscene": "cg_gx_yami_yugi_legend"
         },
         {
           "speaker": "윤",
           "text": "영광입니다. 제가 먼저 디스크를 켜도 될까요?",
-          "emotion": "determined"
+          "emotion": "determined",
+          "cutscene": "cg_gx_yami_yugi_legend"
+        },
+        {
+          "speaker": "",
+          "text": "유우기는 오래 써서 닳은 디스크를 잠깐 고쳐 맸다.",
+          "cutscene": "cg_gx_yami_yugi_legend"
+        },
+        {
+          "speaker": "",
+          "text": "그 소리가 나기 전까지 내가 덱을 너무 꼭 쥐고 있었다는 걸 몰랐다.",
+          "cutscene": "cg_gx_yami_yugi_legend"
         },
         {
           "speaker": "어둠의 유우기",
-          "text": "좋아, 전력으로 오너라! 듀얼!!",
+          "text": "좋아, 전력으로 오너라! 듀얼!",
           "emotion": "determined",
-          "fx": "flash"
+          "fx": "flash",
+          "sfx": "duel_disk",
+          "cutscene": "cg_gx_yami_yugi_legend"
         }
       ],
       "postWinDialogues": [
@@ -8857,7 +9512,12 @@
         },
         {
           "speaker": "텐죠인 아스카",
-          "text": "부두에도 한번 가자. 네가 첫 답장에 식당 이름만 적어 보내 줬잖아. 그 엽서 아직 있어.",
+          "text": "부두에도 한번 가자. 네가 보낸 첫 엽서 아직 있어.",
+          "emotion": "smile"
+        },
+        {
+          "speaker": "텐죠인 아스카",
+          "text": "뒷장에는 편지 대신 식당 이름만 적어 놨잖아. 이번엔 가서 같이 먹자.",
           "emotion": "smile"
         },
         {
@@ -8894,6 +9554,17 @@
           "speaker": "윤",
           "text": "그래. 대신 프라이팬은 물에 좀 담가 둬. 혹시 모르니까.",
           "emotion": "smile",
+          "cutscene": "cg_gx_epilogue_friendly_duel"
+        },
+        {
+          "speaker": "",
+          "text": "두 디스크가 켜지고 나니 덜 접힌 종이 승선권의 모서리가 바람에 들렸다.",
+          "cutscene": "cg_gx_epilogue_friendly_duel",
+          "sfx": "duel_disk"
+        },
+        {
+          "speaker": "",
+          "text": "나는 캔을 표 위에 올려 두고, 아스카가 펼치는 패를 보았다.",
           "cutscene": "cg_gx_epilogue_friendly_duel"
         },
         {

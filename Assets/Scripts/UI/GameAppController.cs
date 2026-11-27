@@ -370,10 +370,16 @@ namespace YGOPortable.UI
             _storyMode.OpenFieldEpisode(index);
         }
 
-        internal void ReturnToRpgField(string message = "")
+        internal void ReturnToRpgField(string message = "", bool afterStoryEvent = false)
         {
-            ShowScreen(AppScreen.TagForceWorld);
-            _tagForceWorld.ShowStatus(message);
+            if (afterStoryEvent && _tagForceWorld.BeginGxStoryReturn(ShowField)) return;
+            ShowField();
+
+            void ShowField()
+            {
+                ShowScreen(AppScreen.TagForceWorld);
+                _tagForceWorld.ShowStatus(message);
+            }
         }
 
         internal TagForceWorldUI RpgField => _tagForceWorld;
@@ -812,6 +818,14 @@ namespace YGOPortable.UI
 
             if (_session == null)
             {
+                if ((_screen is AppScreen.StoryMode or AppScreen.TagForceWorld) && _tagForceWorld.RpgInterludeActive)
+                {
+                    if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) ||
+                        Input.GetKeyDown(KeyCode.KeypadEnter) || _menuPadInput.Read(Time.unscaledTime).Submit)
+                        _tagForceWorld.SkipRpgInterludeTitle();
+                    _tagForceWorld.UpdateRpgInterlude(Time.unscaledDeltaTime);
+                    return;
+                }
                 if (_screen == AppScreen.StoryMode) _storyMode?.Update(Time.unscaledDeltaTime);
                 if (_screen == AppScreen.Tournament) _tournament?.Update(Time.unscaledDeltaTime);
                 if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
@@ -1062,6 +1076,7 @@ namespace YGOPortable.UI
             bool tagForce = _screen == AppScreen.TagForceWorld;
             bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story || tournament || ranked || tagForce));
             if (!frame.HasInput && !cancel) return;
+            if (story && !cloudSave && !_menuPad.HasPopup && frame.Submit && _storyMode.RestoreHiddenDialogue()) return;
 
             GameObject scope = cloudSave ? _saveSyncMenu.Root : _screen switch
             {

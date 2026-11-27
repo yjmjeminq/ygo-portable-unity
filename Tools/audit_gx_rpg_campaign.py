@@ -12,6 +12,21 @@ ROOT = Path(__file__).resolve().parents[1] / "Assets" / "StreamingAssets"
 ART = ROOT / "TagForce" / "GX"
 BRANCHES = ("preDialogues", "postWinDialogues", "postLoseDialogues")
 EMOTIONS = {"smile", "blush", "sad", "determined", "shock", "hurt", "angry"}
+STORY_SFX = {"duel_disk", "footstep", "crowd", "rain", "thunder", "can_open", "door_knock", "shatter", "alarm"}
+NEW_SCENE_CG = {
+    "prologue_lonely_champion": ("gx_cutscene_00_prologue", "preDialogues"),
+    "asuka_first_defeat": ("gx_ep_02", "postWinDialogues"),
+    "abandoned_dorm_rescue": ("gx_ep_07", "preDialogues"),
+    "sacred_beasts_descent": ("gx_ep_09", "preDialogues"),
+    "first_effective_hit": ("gx_ep_10", "postWinDialogues"),
+    "genex_finals_victory": ("gx_ep_17", "postWinDialogues"),
+    "dimension_sky_shatter": ("gx_cutscene_05_dimension_shift", "preDialogues"),
+    "supreme_king_clash": ("gx_ep_25", "preDialogues"),
+    "pro_sacrifice_darkness": ("gx_ep_26", "postWinDialogues"),
+    "darkness_final_stand": ("gx_ep_32", "preDialogues"),
+    "yami_yugi_legend": ("gx_ep_34", "preDialogues"),
+}
+META_PERIOD = re.compile(r"(?<![0-9])(?:[1-4]\s*기(?![가-힣])|2024\s*년)")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 # TYPE_TOKEN, TYPE_SYNCHRO, TYPE_XYZ, TYPE_PENDULUM and TYPE_LINK
 FORBIDDEN_CARD_TYPES = 0x4000 | 0x2000 | 0x800000 | 0x1000000 | 0x4000000
@@ -131,7 +146,10 @@ def main():
             require(count <= 3, f"{number}: {name} has {count} copies across its zones.")
 
     cg = set()
+    new_cg = {"cg_gx_" + key: destination for key, destination in NEW_SCENE_CG.items()}
     used_actors = set()
+    cues = Counter()
+    quoted_lines = {}
     first_appearance = {}
     lines_read = 0
     for index, episode in enumerate(episodes):
@@ -150,6 +168,8 @@ def main():
             require(deck_id in decks and decks[deck_id]["episodeId"] == chapter and decks[deck_id]["charId"] == character,
                     f"{chapter}: deck does not match its episode and actor.")
             pre = episode["preDialogues"]
+            require(pre and pre[-1]["text"].endswith("듀얼!"), f"{chapter}: the duel declaration must close the scene.")
+            require(2 <= len(episode.get("postLoseDialogues") or []) <= 3, f"{chapter}: keep the retry beat to two or three lines.")
             choice = episode.get("choiceAfterLine", 0)
             position_valid = type(choice) is int and 1 <= choice < len(pre)
             require(position_valid and pre[choice - 1].get("speaker") and
@@ -175,7 +195,15 @@ def main():
                     used_actors.add(names[speaker])
                     if branch != "postLoseDialogues":
                         first_appearance.setdefault(names[speaker], index)
-                require(isinstance(line.get("text"), str) and line["text"].strip(), f"{label}: empty dialogue.")
+                text = (line.get("text") or "").strip()
+                require(text, f"{label}: empty dialogue.")
+                require(not META_PERIOD.search(text), f"{label}: production-era label in the script.")
+                if len(text) > 20:
+                    require(text not in quoted_lines, f"{label}: repeated dialogue from {quoted_lines.get(text)}.")
+                    quoted_lines[text] = label
+                if cue := line.get("sfx"):
+                    require(cue in STORY_SFX, f"{label}: unknown story sound {cue}.")
+                    cues[cue] += 1
                 require(not line.get("emotion") or line["emotion"] in EMOTIONS, f"{label}: unknown expression.")
                 require(not line.get("fx") or line["fx"] in {"shake", "flash", "heartbeat", "fade"},
                         f"{label}: unknown dialogue effect.")
@@ -186,8 +214,10 @@ def main():
                             f"{label}: a time transition requires a short caption and a narration fade.")
                 if line.get("sceneMap"):
                     require(line["sceneMap"] in scenes or line["sceneMap"] in regions, f"{label}: invalid scenery reference.")
-                if line.get("cutscene"):
-                    cg.add(line["cutscene"])
+                if art := line.get("cutscene"):
+                    cg.add(art)
+                    if art in new_cg:
+                        require(new_cg[art] == (chapter, branch), f"{label}: {art} is wired to the wrong scene.")
                 if line.get("memoryTitle"):
                     require(bool(line.get("cutscene")), f"{label}: a replayable memory lacks its CG.")
                 for action in line.get("stage") or []:
@@ -208,9 +238,17 @@ def main():
                         require(all(isinstance(action.get(axis), (int, float)) and 0 <= action[axis] <= 1
                                     for axis in ("x", "y")), f"{label}: invalid stage mark.")
 
-    require(len(cg) == 28, f"Expected 28 distinct CGs, found {len(cg)}.")
+    require(set(cues) == STORY_SFX, f"Missing story sound coverage: {sorted(STORY_SFX - cues.keys())}.")
+    require(new_cg.keys() <= cg, f"Missing new CG references: {sorted(new_cg.keys() - cg)}.")
+    require(len(cg) == 39, f"Expected 39 distinct CGs, found {len(cg)}.")
     for key in sorted(cg):
-        require(KEY.fullmatch(key) and png(ART / "Cutscenes" / (key + ".png")), f"Missing or invalid CG {key}.")
+        path = ART / "Cutscenes" / (key + ".png")
+        size = png(path) if KEY.fullmatch(key) else None
+        require(size, f"Missing or invalid CG {key}.")
+        if size and key in new_cg:
+            width, height = size
+            require(width >= 1600 and abs(width / height - 16 / 9) < .005,
+                    f"{key}: new CG must be high-resolution widescreen.")
 
     roster = {actor["charId"] for actor in world["roster"]}
     require(len(roster) == len(world["roster"]), "Duplicate GX roster NPC.")
@@ -253,7 +291,7 @@ def main():
         print(f"GX data: FAIL ({len(errors)})")
         return 1
     print(f"GX data: PASS (53 sequences, {lines_read} dialogue lines, {len(decks)} decks, "
-          f"{len(regions)} fields, {len(cg)} CGs, {len(roster)} roster NPCs and {len(roster | used_actors)} distinct actors)")
+          f"{len(regions)} fields, {len(cg)} CGs, {len(cues)} SFX cues, {len(roster)} roster NPCs and {len(roster | used_actors)} distinct actors)")
     return 0
 
 

@@ -344,6 +344,7 @@
   "fieldScenes": [
     {
       "spotId": "spot_pro_tournament",
+      "name": "프로 리그 경기장",
       "mapPath": "TagForce/GX/Maps/spot_pro_tournament.png",
       "walkPolygon": [
         {"x": 0.065, "y": 0.16}, {"x": 0.2, "y": 0.1}, {"x": 0.8, "y": 0.1},
@@ -356,6 +357,7 @@
     },
     {
       "spotId": "spot_pro_backstage",
+      "name": "프로 리그 대기실",
       "mapPath": "TagForce/GX/Maps/spot_pro_backstage.png",
       "walkPolygon": [
         {"x": 0.06, "y": 0.105}, {"x": 0.92, "y": 0.105}, {"x": 0.94, "y": 0.52},

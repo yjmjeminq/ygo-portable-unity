@@ -144,11 +144,12 @@ namespace YGOPortable.UI
         private bool AdvanceAutomaticRpgScene()
         {
             if (!AutomaticRpgScenePending) return false;
-            if (_rpgDialogueCast != null || _rpgPendingRegion >= 0 ||
+            if (RpgInterludeActive || _rpgDialogueCast != null || _rpgPendingRegion >= 0 ||
                 _rpgTravelFade != null && _rpgTravelFade.gameObject.activeSelf) return true;
             int next = RpgClears;
             int region = CampaignRegionForEpisode(next + 1);
-            if (_rpgLocation != region) BeginRpgTravel(region, RpgArrival);
+            if (IsGxCampaign) StartGxFieldInterlude(region, RpgArrival);
+            else if (_rpgLocation != region) BeginRpgTravel(region, RpgArrival);
             else if (_player != null) _app.OpenRpgFieldEpisode(next);
             return true;
         }

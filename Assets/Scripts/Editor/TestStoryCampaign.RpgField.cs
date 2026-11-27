@@ -290,6 +290,17 @@ namespace YGOPortable.Editor
                     "GX campaign inputs are incomplete.");
                 Require(gxScript.protagonist == "윤", "The GX protagonist name did not load.");
                 VerifyDialogueBounds(gxScript, "GX");
+                var authoredSound = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
+                    .Concat(episode.postLoseDialogues)).Select(line => line.sfx).Where(cue => !string.IsNullOrEmpty(cue)).ToHashSet();
+                Require(authoredSound.SetEquals(new[] { "duel_disk", "footstep", "crowd", "rain", "thunder",
+                    "can_open", "door_knock", "shatter", "alarm" }), "GX story sound tags did not load.");
+                foreach (string cue in authoredSound.Append("transition"))
+                {
+                    var clip = DuelAudio.GetStorySfx(cue);
+                    Require(clip != null && clip.samples > 0 && DuelAudio.GetStorySfx(cue) == clip, $"Missing GX sound {cue}.");
+                }
+                Require(DuelAudio.GetStorySfx("unknown-cue") == null && DuelAudio.GetStorySfx(null) == null,
+                    "An unknown GX cue should be ignored.");
                 var dialogue = typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
                 var dialogueType = typeof(StoryModeUI.StoryDialogueView);
                 var audioType = typeof(DuelAudio);
@@ -315,7 +326,7 @@ namespace YGOPortable.Editor
                 var expectedCg = gxScript.episodes.SelectMany(episode => episode.preDialogues.Concat(episode.postWinDialogues)
                     .Concat(episode.postLoseDialogues)).Select(line => line.cutscene)
                     .Where(id => !string.IsNullOrEmpty(id)).Distinct().ToArray();
-                Require(expectedCg.Length == 28 && expectedCg.All(id =>
+                Require(expectedCg.Length == 39 && expectedCg.All(id =>
                     File.Exists(Path.Combine(streaming, "TagForce/GX/Cutscenes", id + ".png"))), "Missing GX event CG.");
 
                 try
@@ -336,6 +347,7 @@ namespace YGOPortable.Editor
                     Require(gxMenu.IsInteractable(), "The GX campaign entry was unavailable on the main menu.");
                     gxMenu.onClick.Invoke();
                     Require(world.Root.activeSelf && world.RpgCampaignId == gx && !world.CanWalk, "GX prologue did not start automatically.");
+                    VerifyGxOpeningInterlude(gxScript.episodes[0]);
                     int scenes = 0, duels = 0, pov = 0, defeats = 0, retries = 0;
                     for (int index = 0; index < gxScript.episodes.Length; index++)
                     {
@@ -346,14 +358,14 @@ namespace YGOPortable.Editor
                             world.CampaignRegion(location).IsOpen(index), $"Unreachable GX destination for {episode.id}.");
                         if (episode.isCutsceneOnly)
                         {
-                            for (int frame = 0; frame < 12 && !storyRoot.gameObject.activeInHierarchy; frame++)
+                            for (int frame = 0; frame < 18 && !storyRoot.gameObject.activeInHierarchy; frame++)
                                 world.Update(.18f);
                             Require(storyRoot.gameObject.activeInHierarchy && !world.CanWalk && !WorldInputRestored() &&
                                 FieldScene().Find("DialogueCast") != null && Get("_session") == null,
                                 $"Automatic cutscene did not lock controls at {episode.id}.");
                             VerifyGxWalkerSizes();
                             Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
-                                .text == "오토 켜짐", $"Automatic playback is off for {episode.id}.");
+                                .text == "오토 꺼짐" && AutoSpeed() == 0, $"Autoplay started without permission at {episode.id}.");
                             VerifyDialogueStart(episode.preDialogues, episode.id);
                             if (index == 0)
                             {
@@ -361,17 +373,18 @@ namespace YGOPortable.Editor
                                 Require(menu.MenuRoot.activeSelf && !world.Root.activeSelf && !storyRoot.gameObject.activeInHierarchy &&
                                     world.RpgClears == 0, "Esc restarted or cleared the mandatory GX prologue instead of leaving it.");
                                 gxMenu.onClick.Invoke();
-                                for (int frame = 0; frame < 12 && !storyRoot.gameObject.activeInHierarchy; frame++)
+                                for (int frame = 0; frame < 18 && !storyRoot.gameObject.activeInHierarchy; frame++)
                                     world.Update(.18f);
                                 VerifyDialogueStart(episode.preDialogues, episode.id);
                                 Require(FieldScene().Find("RpgCompanion") == null, "The GX prologue spawned a partner.");
                                 VerifyGxPrologue(episode);
+                                VerifyGxManualDialogue(episode);
                                 VerifyGxAutoReadTime(episode);
                                 story.Update(.75f);
                                 CaptureGx("01-opening");
                                 Press(storyRoot, "Scene/DialogueTools/Auto/Button");
                                 Require(storyRoot.Find("Scene/DialogueTools/Auto/Button").GetComponentInChildren<Text>()
-                                    .text == "오토 2배", "The cutscene did not switch to double speed.");
+                                    .text == "오토 2x" && AutoSpeed() == 2, "The cutscene did not switch to double speed.");
                             }
                             if (episode.id == "gx_cutscene_02_season2_arrival")
                             {
@@ -380,9 +393,10 @@ namespace YGOPortable.Editor
                             }
                             if (index == 0) VerifyGxSaveRecovery(index, () => ReadDialogue(episode));
                             else ReadDialogue(episode);
-                            Require(world.RpgClears == index + 1 && WorldInputRestored() && Get("_session") == null &&
-                                FieldScene().Find("DialogueCast") == null && world.HandleFieldInput(default) == world.CanWalk,
-                                $"A cutscene did not restore the field or its input at {episode.id}.");
+                            FinishGxInterlude();
+                            Require(world.RpgClears == index + 1 && Get("_session") == null,
+                                $"A cutscene did not complete at {episode.id}.");
+                            VerifyGxFieldOrNextScene(episode.id);
                             if (index == 0)
                             {
                                 CollectionProgress.Load(isolatedSave);
@@ -408,7 +422,7 @@ namespace YGOPortable.Editor
                                 "GX memories were visible before their episodes were cleared.");
                             world.Back();
                             Press(panel, "FieldHud/QuestTrack");
-                            for (int tick = 0; tick < 10 && !world.CanStartRpgEpisode(index); tick++) world.Update(.18f);
+                            VerifyGxTravelSkip(episode, location);
                             Require(world.CanStartRpgEpisode(index) && WorldInputRestored(),
                                 "The GX objective banner did not travel directly from the harbor.");
                             VerifyGxDeckReturn(location, startingDeck, alternateDeck);
@@ -416,7 +430,7 @@ namespace YGOPortable.Editor
                             PressRpgNavigation("Map");
                             CaptureGx("03-world-map");
                             Press(panel, "TravelToGoal");
-                            for (int tick = 0; tick < 10 && !world.CanStartRpgEpisode(index); tick++) world.Update(.18f);
+                            FinishGxInterlude();
                             Require(world.CanStartRpgEpisode(index) && WorldInputRestored(),
                                 "The one-click map objective did not arrive or left field input locked.");
                         }
@@ -473,6 +487,7 @@ namespace YGOPortable.Editor
                         {
                             VerifyGxGuestArt(episode.preDialogues, "크로노스 데 메디치", 133);
                             VerifySpeaker(episode.preDialogues, "윤", player: true);
+                            VerifyGxHiddenDialogue(episode);
                         }
                         if (isPov)
                         {
@@ -653,7 +668,7 @@ namespace YGOPortable.Editor
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
                     Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master wins, 34 surrender/retry routes, 19 lockouts, 12 grounded fields and three POV decks passed.");
                     Debug.Log("[VERIFY GX RESIDENTS] Rescue, recovery, changed forms, missing characters and story-only patrol restrictions passed.");
-                    Debug.Log("[VERIFY GX OBJECTIVES] Field guidance, marker approach, pre-duel choices and automatic reading time passed.");
+                    Debug.Log("[VERIFY GX OBJECTIVES] Field guidance, marker approach, direct preparation and optional reading time passed.");
                     Debug.Log("[VERIFY GX QOL] One-click travel, NPC prompts, running, deck swaps and editor return, save recovery and three aspect ratios passed.");
                 }
                 finally
@@ -667,8 +682,165 @@ namespace YGOPortable.Editor
                     PlayerPrefs.Save();
                 }
 
+                int AutoSpeed() => (int)dialogueType.GetField("_autoSpeed", flags).GetValue(dialogue);
+
+                Transform Curtain() => canvas.transform.Find("GxSceneInterlude");
+
+                void FinishGxInterlude()
+                {
+                    for (int tick = 0; tick < 30 && world.RpgInterludeActive; tick++) world.Update(.10f);
+                    Require(!world.RpgInterludeActive && Curtain() == null, "The GX interlude left its curtain active.");
+                }
+
+                void VerifyGxOpeningInterlude(StoryEpisodeData episode)
+                {
+                    world.Update(0f);
+                    var curtain = Curtain();
+                    Require(curtain != null && !WorldInputRestored() && !world.CanWalk,
+                        "The automatic GX scene did not lock input during its interlude.");
+                    var group = curtain.GetComponent<CanvasGroup>();
+                    var card = curtain.Find("TitleCard");
+                    Require(card.Find("Location").GetComponentInChildren<Text>().text == "프로 리그 경기장" &&
+                        card.Find("Episode").GetComponentInChildren<Text>().text == episode.title,
+                        "The interlude omitted the upcoming location or title.");
+                    world.Update(.20f);
+                    Require(group.alpha is > 0f and < 1f && !storyRoot.gameObject.activeInHierarchy,
+                        "The opening cut away before the fade-out completed.");
+                    world.Update(.21f);
+                    world.Update(1.12f);
+                    Require(group.alpha == 1f && card.GetComponent<CanvasGroup>().alpha == 1f &&
+                        !storyRoot.gameObject.activeInHierarchy && !WorldInputRestored(),
+                        "The opening title did not hold over black before opening dialogue.");
+                    CaptureGx("00-interlude-title");
+                    world.Update(.40f);
+                    Require(group.alpha is > 0f and < 1f && !storyRoot.gameObject.activeInHierarchy,
+                        "The opening did not wait for its fade-in.");
+                    FinishGxInterlude();
+                    Require(storyRoot.gameObject.activeInHierarchy && AutoSpeed() == 0 && CurrentLine() == 0,
+                        "The story was not opened at its first manual line after the final fade.");
+                }
+
+                void VerifyGxTravelSkip(StoryEpisodeData episode, int destination)
+                {
+                    var curtain = Curtain();
+                    var originalField = FieldScene();
+                    Require(curtain != null && !WorldInputRestored() && !world.CanWalk,
+                        "GX travel began without a curtain and input lock.");
+                    Require(curtain.Find("TitleCard/Location").GetComponentInChildren<Text>().text == world.CampaignRegion(destination).Name &&
+                        curtain.Find("TitleCard/Episode").GetComponentInChildren<Text>().text == episode.title,
+                        "GX travel showed the wrong destination title.");
+                    world.Update(.30f);
+                    Require(FieldScene() == originalField, "GX travel swapped the field before black.");
+                    world.Update(.15f);
+                    Require(FieldScene() != originalField && !WorldInputRestored(), "GX travel failed to swap the covered field.");
+                    Press(canvas.transform, "GxSceneInterlude");
+                    world.Update(.20f);
+                    Require(world.RpgInterludeActive && curtain.GetComponent<CanvasGroup>().alpha is > 0f and < 1f &&
+                        !WorldInputRestored(), "Click should skip the title and preserve the fade-in and input lock.");
+                    world.Update(.21f);
+                    Require(Curtain() == null && WorldInputRestored() && world.CanWalk,
+                        "Skipping a GX interlude left the field's controls or raycasts disabled.");
+                }
+
+                void VerifyGxFieldOrNextScene(string episode)
+                {
+                    if (world.RpgClears < gxScript.episodes.Length && gxScript.episodes[world.RpgClears].isCutsceneOnly)
+                    {
+                        Require(storyRoot.gameObject.activeInHierarchy && !WorldInputRestored() &&
+                            FieldScene().Find("DialogueCast") != null && AutoSpeed() == 0 && CurrentLine() == 0,
+                            $"The next automatic scene did not open manually after {episode}.");
+                    }
+                    else Require(!storyRoot.gameObject.activeInHierarchy && WorldInputRestored() &&
+                        FieldScene().Find("DialogueCast") == null && world.HandleFieldInput(default) == world.CanWalk,
+                        $"The previous scene left the field locked after {episode}.");
+                }
+
+                void VerifyGxManualDialogue(StoryEpisodeData episode)
+                {
+                    var bind = dialogueType.GetMethod("BindLine", flags);
+                    var readTime = dialogueType.GetField("_readTime", flags);
+                    story.Update(10f);
+                    Require(CurrentLine() == 0 && AutoSpeed() == 0 && (float)readTime.GetValue(dialogue) == 0f,
+                        "A cutscene advanced after ten seconds with Auto off.");
+                    int arrival = Array.FindIndex(episode.preDialogues, line => !string.IsNullOrEmpty(line.sceneTime));
+                    Require(arrival >= 0, "The prologue lost its scripted stage transition.");
+                    bind.Invoke(dialogue, new object[] { arrival, false });
+                    story.Update(10f);
+                    Require(CurrentLine() == arrival && (float)readTime.GetValue(dialogue) == 0f,
+                        "A stage transition advanced with Auto off.");
+                    bind.Invoke(dialogue, new object[] { 0, false });
+                }
+
+                void VerifyGxHiddenDialogue(StoryEpisodeData episode)
+                {
+                    var bind = dialogueType.GetMethod("BindLine", flags);
+                    var readTime = dialogueType.GetField("_readTime", flags);
+                    var next = (Button)dialogueType.GetField("_next", flags).GetValue(dialogue);
+                    int picture = Array.FindIndex(episode.preDialogues, line => !string.IsNullOrEmpty(line.cutscene));
+                    Require(picture >= 0, "The GX exhibition duel lost its CG fixture.");
+                    bind.Invoke(dialogue, new object[] { picture, false });
+                    VerifyDisplayedText(episode.preDialogues[picture]);
+                    story.Update(10f);
+                    Require(CurrentLine() == picture && (float)readTime.GetValue(dialogue) == 0f,
+                        "A stage or CG transition advanced with Auto off.");
+                    var cg = (Image)dialogueType.GetField("_cutsceneImage", flags).GetValue(dialogue);
+                    var image = cg.sprite;
+                    Require(image != null, "The dialogue hide fixture has no CG.");
+                    var box = storyRoot.Find("Scene/DialogueBox");
+                    var heading = storyRoot.Find("Scene/Episode");
+                    var tools = storyRoot.Find("Scene/DialogueTools");
+                    var surface = storyRoot.Find("RestoreDialogue");
+                    var hide = tools.Find("Hide/Button").GetComponent<Button>();
+                    Require(((Image)hide.targetGraphic).sprite == ((Image)tools.Find("Auto/Button").GetComponent<Button>().targetGraphic).sprite,
+                        "The new hide button did not use the same RPG toolbar style.");
+                    Press(storyRoot, "Scene/DialogueTools/Auto/Button");
+                    story.Update(.4f);
+                    float elapsed = (float)readTime.GetValue(dialogue);
+                    Require(AutoSpeed() == 1 && elapsed > 0f, "The dialogue hide fixture did not activate Auto.");
+                    CaptureGx("02-exhibition-cg-dialogue");
+                    Press(storyRoot, "Scene/DialogueTools/Hide/Button");
+                    Require(box.gameObject.activeSelf && surface.gameObject.activeSelf,
+                        "The hide command removed the dialogue before its fade.");
+                    story.Update(.20f);
+                    Require(!box.gameObject.activeSelf && !heading.gameObject.activeSelf && !tools.gameObject.activeSelf &&
+                        cg.gameObject.activeInHierarchy && cg.sprite == image, "Hide did not leave the CG free of dialogue UI.");
+                    CaptureGx("02-exhibition-cg-hidden");
+                    story.Update(10f);
+                    Require(CurrentLine() == picture && (float)readTime.GetValue(dialogue) == elapsed,
+                        "Auto advanced or lost its reading time while the dialogue was hidden.");
+                    ExecuteEvents.Execute<IPointerClickHandler>(surface.gameObject, new PointerEventData(EventSystem.current)
+                        { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+                    next.onClick.Invoke();
+                    story.Update(.20f);
+                    Require(box.gameObject.activeSelf && heading.gameObject.activeSelf && tools.gameObject.activeSelf &&
+                        !surface.gameObject.activeSelf && CurrentLine() == picture && (float)readTime.GetValue(dialogue) == elapsed,
+                        "A click advanced the dialogue while restoring it.");
+
+                    var view = (StoryModeUI.StoryDialogueView)dialogue;
+                    Require(view.HandleDisplayInput(toggle: true), "H/right-click could not hide dialogue.");
+                    story.Update(.20f);
+                    Require(view.HandleDisplayInput(restore: true), "Space did not restore dialogue.");
+                    story.Update(.20f);
+                    Require(box.gameObject.activeSelf && CurrentLine() == picture, "Space advanced the hidden dialogue.");
+                    view.HandleDisplayInput(toggle: true);
+                    story.Update(.20f);
+                    story.Back();
+                    story.Update(.20f);
+                    Require(box.gameObject.activeInHierarchy && CurrentLine() == picture,
+                        "Escape closed or advanced the story instead of restoring its dialogue.");
+                    story.Update(.1f);
+                    Require((float)readTime.GetValue(dialogue) > elapsed, "Auto did not resume after the dialogue was restored.");
+                    Press(storyRoot, "Scene/DialogueTools/Auto/Button");
+                    Press(storyRoot, "Scene/DialogueTools/Auto/Button");
+                    Require(AutoSpeed() == 0, "Auto did not return to its off setting.");
+                    bind.Invoke(dialogue, new object[] { 0, false });
+                    Debug.Log("[VERIFY GX PRESENTATION] Manual cutscenes, curtain timing and skipping, CG viewing and input restoration passed.");
+                }
+
                 void VerifyGxAutoReadTime(StoryEpisodeData episode)
                 {
+                    Press(storyRoot, "Scene/DialogueTools/Auto/Button");
+                    Require(AutoSpeed() == 1, "Auto required more than one press to enable.");
                     const int shortLine = 2;
                     var bind = dialogueType.GetMethod("BindLine", flags);
                     bind.Invoke(dialogue, new object[] { shortLine, false });
@@ -698,23 +870,17 @@ namespace YGOPortable.Editor
 
                 void StartGxDuelThroughDialogue(StoryEpisodeData episode, UserDeck deck)
                 {
-                    int choiceLine = episode.choiceAfterLine - 1;
                     var next = (Button)dialogueType.GetField("_next", flags).GetValue(dialogue);
                     var choices = storyRoot.Find("Scene/Choices");
-                    for (int line = 0; line <= choiceLine; line++)
-                        AdvanceLine(episode.preDialogues[line], line);
-
-                    Require(choices.gameObject.activeInHierarchy && Get("_session") == null && CurrentLine() == choiceLine,
-                        $"The dialogue skipped its pre-duel choice at {episode.id}.");
-                    Press(choices, "Choice_1/Button");
-                    var spoken = (StoryDialogueLine[])dialogueType.GetField("_dialogue", flags).GetValue(dialogue);
-                    Require(spoken.Length == episode.preDialogues.Length + 2 &&
-                        spoken[choiceLine + 1].text == episode.choices[1].text &&
-                        spoken[choiceLine + 2].text == episode.choices[1].response &&
-                        spoken[choiceLine + 2].speaker == episode.preDialogues[choiceLine].speaker &&
-                        ReferenceEquals(spoken[choiceLine + 3], episode.preDialogues[choiceLine + 1]),
-                        $"The choice did not return to the right speaker and scripted line at {episode.id}.");
-                    for (int line = choiceLine + 1; line < spoken.Length; line++) AdvanceLine(spoken[line], line);
+                    for (int line = 0; line < episode.preDialogues.Length; line++)
+                    {
+                        Require(!choices.gameObject.activeSelf && Get("_session") == null,
+                            $"A three-answer prompt interrupted the GX dialogue at {episode.id}/{line}.");
+                        Require(CurrentLine() == line, $"Unexpected GX dialogue order at {episode.id}.");
+                        story.Update(2f);
+                        VerifyDisplayedText(episode.preDialogues[line]);
+                        next.onClick.Invoke();
+                    }
 
                     Require(storyRoot.Find("DeckSelection").gameObject.activeInHierarchy && Get("_session") == null,
                         $"The dialogue did not reach deck preparation at {episode.id}.");
@@ -740,13 +906,6 @@ namespace YGOPortable.Editor
                     Require(Get("_session") is DuelSession { NativePtr: var handle } && handle != IntPtr.Zero,
                         $"The quest dialogue could not reach a duel at {episode.id}.");
 
-                    void AdvanceLine(StoryDialogueLine entry, int expectedIndex)
-                    {
-                        Require(CurrentLine() == expectedIndex, $"Unexpected GX dialogue order at {episode.id}.");
-                        story.Update(2f);
-                        VerifyDisplayedText(entry);
-                        next.onClick.Invoke();
-                    }
                 }
 
                 void VerifyGxResidentTimeline(StoryEpisodeData episode, int location)
@@ -857,6 +1016,7 @@ namespace YGOPortable.Editor
                         choice.GetComponentInChildren<Text>().text == "진행도 다시 저장",
                         "A failed GX save closed the result or advanced to the next scene.");
                     Press(storyRoot, "Scene/Choices/Choice_0/Button");
+                    FinishGxInterlude();
                     Require(world.RpgClears == progress + 1 && WorldInputRestored(),
                         "The GX campaign did not recover after the profile became writable.");
                 }
@@ -942,11 +1102,12 @@ namespace YGOPortable.Editor
 
                 void VerifyGxFieldWalker(int id)
                 {
-                    var art = FieldScene().Find("Player/Sprite").GetComponent<Image>();
+                    var scene = FieldScene();
+                    var art = (scene.Find("Player/Sprite") ?? scene.Find("DialogueCast/Player/Sprite"))?.GetComponent<Image>();
                     var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
                     string key = id == 0 ? "protagonist" : id.ToString();
                     var expected = images.Get($"TagForce/GX/WalkCycles/sd_{key}_field.png");
-                    Require(expected != null && art.sprite != null && art.sprite.texture == expected.texture,
+                    Require(expected != null && art != null && art.sprite != null && art.sprite.texture == expected.texture,
                         $"The field did not switch to the GX walker {key}.");
                 }
 
@@ -974,6 +1135,13 @@ namespace YGOPortable.Editor
 
                 void VerifyGxReturn(Vector2 position, string episode)
                 {
+                    FinishGxInterlude();
+                    if (storyRoot.gameObject.activeInHierarchy && world.RpgClears < gxScript.episodes.Length &&
+                        gxScript.episodes[world.RpgClears].isCutsceneOnly)
+                    {
+                        VerifyGxFieldOrNextScene(episode);
+                        return;
+                    }
                     var player = FieldScene()?.Find("Player") as RectTransform;
                     var hud = panel.Find("FieldHud");
                     Require(world.Root.activeSelf && !storyRoot.gameObject.activeInHierarchy && WorldInputRestored() &&
@@ -1151,6 +1319,16 @@ namespace YGOPortable.Editor
                         Require((int)dialogueType.GetField("_index", flags).GetValue(view) == 1 &&
                             (int)visible.GetValue(view) < "대사 입력 확인".Length,
                             "The next valid GX input did not start the next line.");
+
+                        Require(view.HandleDisplayInput(toggle: true), "Could not hide the dialogue before closing.");
+                        view.Update(.2f);
+                        Require(!root.Find("Scene/DialogueBox").gameObject.activeSelf, "The close/reset fixture was still visible.");
+                        view.Close();
+                        Open(lines.ToArray());
+                        Require(root.Find("Scene/DialogueBox").gameObject.activeInHierarchy && group.interactable &&
+                            group.blocksRaycasts && !root.Find("RestoreDialogue").gameObject.activeSelf &&
+                            (int)dialogueType.GetField("_autoSpeed", flags).GetValue(view) == 0,
+                            "Reopening dialogue inherited hidden UI or autoplay.");
                     }
                     finally
                     {
@@ -1183,7 +1361,7 @@ namespace YGOPortable.Editor
                     int academy = world.CampaignRegionForEpisode(2);
                     Press(field, $"Exploration/Exit_{academy}");
                     for (int i = 0; i < 20 && FieldScene() == field; i++) world.Update(.20f);
-                    world.Update(.4f);
+                    FinishGxInterlude();
                     Require(FieldScene() != field && world.CanStartRpgEpisode(1),
                         "The grounded harbor exit did not reach the academy.");
                     VerifyGxGrounded(academy);
@@ -1365,7 +1543,9 @@ namespace YGOPortable.Editor
                 {
                     var lines = episode.preDialogues;
                     var checkedScenes = new HashSet<string>();
-                    for (int tick = 0; tick < lines.Length * 5 + 5 && storyRoot.gameObject.activeInHierarchy; ++tick)
+                    if (AutoSpeed() == 0) Press(storyRoot, "Scene/DialogueTools/Auto/Button");
+                    for (int tick = 0; tick < lines.Length * 5 + 5 && storyRoot.gameObject.activeInHierarchy &&
+                        !world.RpgInterludeActive; ++tick)
                     {
                         string scene = lines[CurrentLine()].cutscene;
                         if (!string.IsNullOrEmpty(scene) && checkedScenes.Add(scene))

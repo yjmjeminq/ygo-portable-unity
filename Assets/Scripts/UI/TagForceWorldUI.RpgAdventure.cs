@@ -50,6 +50,14 @@ namespace YGOPortable.UI
         private StoryModeUI.StoryDialogueView _rpgIntroDialogue;
         private RectTransform _rpgCompanion, _rpgCompanionArt, _rpgGreeting, _rpgTravelBanner, _rpgRankBanner;
         private Image _rpgTravelFade;
+        private const float InterludeFade = .40f, InterludeHold = 1.35f;
+        private enum InterludePhase { FadeOut, Title, FadeIn }
+        private CanvasGroup _rpgInterlude, _rpgInterludeTitle;
+        private InterludePhase _interludePhase;
+        private float _interludeTime;
+        private bool _skipInterludeTitle;
+        private Action _revealInterludeDestination, _finishInterlude;
+        internal bool RpgInterludeActive => _rpgInterlude != null;
         private Vector2 _rpgCompanionPoint;
         private readonly List<Vector2> _rpgFollowerPath = new(12);
         private float _rpgGreetingTime, _rpgTravelTime, _rpgRankTime, _rpgBondTime;
@@ -276,9 +284,9 @@ namespace YGOPortable.UI
         {
             _rpgAnnounceArrival = false;
             _rpgTravelTime = 0f;
+            if (IsGxCampaign) return;
             _rpgTravelFade = DuelUiKit.AddImage(DuelUiKit.FillRect("TravelFade", _body).gameObject,
                 DuelUiKit.WhiteSprite, new Color(.012f, .023f, .040f, 1f), false, false);
-            if (IsGxCampaign) return;
             _rpgTravelBanner = Area(_body, "RegionBanner", .27f, .108f, .73f, .201f);
             RpgUiStyle.Panel(_rpgTravelBanner, accent: true);
             HudLabel(_rpgTravelBanner, CampaignRegions[_rpgLocation].Name, 27, DuelUiKit.GoldAccent,
@@ -313,13 +321,129 @@ namespace YGOPortable.UI
 
         private void BeginRpgTravel(int region, Vector2 arrival)
         {
-            if (_rpgPendingRegion >= 0 || !CampaignRegions[region].IsOpen(RpgClears)) return;
+            if (RpgInterludeActive || _rpgPendingRegion >= 0 || !CampaignRegions[region].IsOpen(RpgClears)) return;
+            if (IsGxCampaign)
+            {
+                StartGxFieldInterlude(region, arrival);
+                return;
+            }
             _rpgPendingRegion = region;
             _rpgPendingArrival = arrival;
             _rpgTravelTime = 0f;
             if (_rpgTravelFade != null) _rpgTravelFade.gameObject.SetActive(false);
             _rpgTravelFade = DuelUiKit.AddImage(DuelUiKit.FillRect("TravelOut", _body).gameObject,
                 DuelUiKit.WhiteSprite, new Color(.012f, .023f, .04f, 0f), false, true);
+        }
+
+        private void StartGxFieldInterlude(int region, Vector2 arrival)
+        {
+            int index = RpgClears;
+            var episode = CurrentRpgEpisode != null && CampaignRegionForEpisode(index + 1) == region ? CurrentRpgEpisode : null;
+            BeginGxInterlude(region, episode, () => TravelRpgRegion(region, arrival),
+                episode?.isCutsceneOnly == true ? () => _app.OpenRpgFieldEpisode(index) : null);
+        }
+
+        internal bool BeginGxStoryReturn(Action returnToField)
+        {
+            if (!IsGxCampaign || CurrentRpgEpisode is not { } episode) return false;
+            if (RpgInterludeActive) return true;
+            int index = RpgClears;
+            int region = episode.isCutsceneOnly ? CampaignRegionForEpisode(index + 1) : _rpgLocation;
+            BeginGxInterlude(region, episode, () =>
+            {
+                if (_rpgLocation != region) StoreRpgRegion(region, RpgArrival);
+                returnToField();
+            }, episode.isCutsceneOnly ? () => _app.OpenRpgFieldEpisode(index) : null);
+            return true;
+        }
+
+        private void BeginGxInterlude(int region, StoryEpisodeData episode, Action reveal, Action finish)
+        {
+            // A sibling above both screens survives the covered world rebuild.
+            var curtain = DuelUiKit.FillRect("GxSceneInterlude", _screen.parent);
+            curtain.SetAsLastSibling();
+            var shade = DuelUiKit.AddImage(curtain.gameObject, DuelUiKit.WhiteSprite, Color.black);
+            var skip = curtain.gameObject.AddComponent<Button>();
+            skip.targetGraphic = shade;
+            skip.transition = Selectable.Transition.None;
+            skip.navigation = new Navigation { mode = Navigation.Mode.None };
+            skip.onClick.AddListener(SkipRpgInterludeTitle);
+            _rpgInterlude = curtain.gameObject.AddComponent<CanvasGroup>();
+            _rpgInterlude.alpha = 0f;
+
+            var card = Area(curtain, "TitleCard", .13f, .32f, .87f, .68f);
+            _rpgInterludeTitle = card.gameObject.AddComponent<CanvasGroup>();
+            _rpgInterludeTitle.interactable = _rpgInterludeTitle.blocksRaycasts = false;
+            _rpgInterludeTitle.alpha = 0f;
+            var openingMap = episode?.preDialogues?.FirstOrDefault()?.SceneMapPath;
+            string place = openingMap != null && _rpgSceneTerrain.TryGetValue(openingMap, out var scene) &&
+                !string.IsNullOrWhiteSpace(scene.Spot.name) ? scene.Spot.name : CampaignRegions[region].Name;
+            HudLabel(Area(card, "Location", .02f, .55f, .98f, .86f), place, 28,
+                DuelUiKit.GoldAccent, align: TextAnchor.MiddleCenter, heading: true);
+            if (!string.IsNullOrWhiteSpace(episode?.title))
+                HudLabel(Area(card, "Episode", .02f, .16f, .98f, .55f), episode.title, 38, Color.white,
+                    align: TextAnchor.MiddleCenter, heading: true);
+
+            _interludePhase = InterludePhase.FadeOut;
+            _interludeTime = 0f;
+            _skipInterludeTitle = false;
+            _revealInterludeDestination = reveal;
+            _finishInterlude = finish;
+            _moving = _manualWalk = false;
+            _onArrival = null;
+            _worldInput.interactable = _worldInput.blocksRaycasts = false;
+            UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(null);
+        }
+
+        internal void SkipRpgInterludeTitle()
+        {
+            if (RpgInterludeActive && _interludePhase == InterludePhase.Title) _skipInterludeTitle = true;
+        }
+
+        internal bool UpdateRpgInterlude(float delta)
+        {
+            if (!RpgInterludeActive) return false;
+            _interludeTime += delta;
+            if (_interludePhase == InterludePhase.FadeOut)
+            {
+                _rpgInterlude.alpha = Mathf.SmoothStep(0f, 1f, _interludeTime / InterludeFade);
+                if (_interludeTime < InterludeFade) return true;
+                _interludeTime -= InterludeFade;
+                _interludePhase = InterludePhase.Title;
+                if (Application.isPlaying) DuelAudio.PlayStorySfx("transition");
+                var reveal = _revealInterludeDestination;
+                _revealInterludeDestination = null;
+                reveal?.Invoke();
+                UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(null);
+                if (!RpgInterludeActive) return true;
+            }
+            if (_interludePhase == InterludePhase.Title)
+            {
+                _rpgInterludeTitle.alpha = Mathf.SmoothStep(0f, 1f, _interludeTime / .25f);
+                if (!_skipInterludeTitle && _interludeTime < InterludeHold) return true;
+                _interludeTime = _skipInterludeTitle ? delta : _interludeTime - InterludeHold;
+                _interludePhase = InterludePhase.FadeIn;
+            }
+            _rpgInterlude.alpha = Mathf.SmoothStep(1f, 0f, _interludeTime / InterludeFade);
+            if (_interludeTime >= InterludeFade)
+            {
+                var finish = _finishInterlude;
+                ClearRpgInterlude();
+                finish?.Invoke();
+            }
+            return true;
+        }
+
+        private void ClearRpgInterlude()
+        {
+            if (!RpgInterludeActive) return;
+            var curtain = _rpgInterlude.gameObject;
+            _rpgInterlude = _rpgInterludeTitle = null;
+            _revealInterludeDestination = _finishInterlude = null;
+            curtain.SetActive(false);
+            if (Application.isPlaying) UnityEngine.Object.Destroy(curtain);
+            else UnityEngine.Object.DestroyImmediate(curtain);
+            _worldInput.interactable = _worldInput.blocksRaycasts = _rpgDialogueCast == null;
         }
 
         private void UpdateRpgPresentation(float delta)

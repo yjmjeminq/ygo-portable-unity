@@ -236,7 +236,8 @@ namespace YGOPortable.Editor
                             body.font == Resources.Load<Font>("StoryFonts/GowunDodum-Regular") &&
                             scene.Find("DialogueBox").GetComponent<Image>() is { type: Image.Type.Sliced } panel &&
                             panel.sprite.name == "RPG dialogue glass" &&
-                            scene.Find("DialogueTools").GetComponentsInChildren<Button>().Length == 4 &&
+                            scene.Find("DialogueTools").GetComponentsInChildren<Button>().Length == 5 &&
+                            scene.Find("DialogueTools/Hide/Button").GetComponentInChildren<Text>().text == "창 숨김" &&
                             ((Image)next.targetGraphic).color.a == 0f &&
                             string.IsNullOrEmpty(next.GetComponentInChildren<Text>().text) &&
                             badge.GetComponentInChildren<Text>(true).font == Resources.Load<Font>("StoryFonts/Paperlogy-7Bold") &&
