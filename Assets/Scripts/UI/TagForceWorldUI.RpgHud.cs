@@ -246,8 +246,9 @@ namespace YGOPortable.UI
             var episode = cleared < episodes.Length ? episodes[cleared] : null;
             var mission = Area(_rpgFieldHud, "QuestTrack", .025f, .818f, .354f, .972f);
             RpgUiStyle.Panel(mission);
-            RpgUiStyle.Display(HudLabel(Area(mission, "RegionName", .056f, .627f, .95f, .942f),
+            RpgUiStyle.Display(HudLabel(Area(mission, "RegionName", .056f, .627f, GxCampusActive ? .71f : .95f, .942f),
                 CampaignRegions[_rpgLocation].Name, 29, Color.white));
+            if (GxCampusActive && _page == Page.Field) BuildCampusClock(mission);
             Tint(Area(mission, "Divider", .056f, .602f, .946f, .609f), new Color(.46f, .63f, .80f, .32f));
             bool travel = episode != null && targetRegion != _rpgLocation;
             string objective = episode == null ? episodes.Length > 0 ? "자유 탐험" : "이야기를 불러오지 못했습니다" :

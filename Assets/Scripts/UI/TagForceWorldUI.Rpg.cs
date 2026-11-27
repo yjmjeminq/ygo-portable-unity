@@ -82,7 +82,7 @@ namespace YGOPortable.UI
         private readonly List<RectTransform> _questMarkers = new();
         private readonly Dictionary<int, RectTransform> _rpgResidents = new();
         private RectTransform _rpgNavigation;
-        private readonly RectTransform[] _rpgNavItems = new RectTransform[4];
+        private readonly RectTransform[] _rpgNavItems = new RectTransform[5];
         private RectTransform _rpgFieldHud;
         private StoryScriptRoot _rpgCampaign;
         private Dictionary<int, PresetDeckInfo> _rpgWorldDecks;
@@ -164,6 +164,7 @@ namespace YGOPortable.UI
                 else _app.OpenTagForceDeckEditor();
             });
             Add(3, "Menu", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu));
+            Add(4, "Schedule", "아카데미아 일정", () => Show(Page.GxCampus));
             return bar;
 
             void Add(int index, string id, string caption, Action action)
@@ -187,11 +188,14 @@ namespace YGOPortable.UI
             _rpgNavigation.anchorMin = field ? new Vector2(.777f, .113f) : new Vector2(.05f, .027f);
             _rpgNavigation.anchorMax = field ? new Vector2(.973f, .409f) : new Vector2(.95f, .101f);
             _rpgNavItems[2].GetComponentInChildren<Text>().text = field && IsGxCampaign ? "내 덱" : "덱 편집";
+            bool campusSchedule = field && GxCampusActive;
+            float fieldRow = campusSchedule ? .202f : .254f;
             for (int i = 0; i < _rpgNavItems.Length; i++)
             {
-                _rpgNavItems[i].gameObject.SetActive(true);
-                _rpgNavItems[i].anchorMin = field ? new Vector2(0f, .773f - .254f * i) : new Vector2(.255f * i, 0f);
-                _rpgNavItems[i].anchorMax = field ? new Vector2(1f, 1f - .254f * i) : new Vector2(.235f + .255f * i, 1f);
+                _rpgNavItems[i].gameObject.SetActive(i < 4 || campusSchedule);
+                int row = campusSchedule && i >= 3 ? (i == 4 ? 3 : 4) : i;
+                _rpgNavItems[i].anchorMin = field ? new Vector2(0f, 1.027f - fieldRow * (row + 1)) : new Vector2(.255f * i, 0f);
+                _rpgNavItems[i].anchorMax = field ? new Vector2(1f, 1f - fieldRow * row) : new Vector2(.235f + .255f * i, 1f);
             }
         }
 
@@ -230,7 +234,7 @@ namespace YGOPortable.UI
         {
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(page is not
-                (Page.Field or Page.Talk or Page.Prologue or Page.Guide or Page.ResortWardrobe or Page.SummerEpilogue or Page.GxDecks));
+                (Page.Field or Page.Talk or Page.Prologue or Page.Guide or Page.ResortWardrobe or Page.SummerEpilogue or Page.GxDecks or Page.GxCampus));
             _header.text = $"{(IsGxCampaign ? "GX" : "5D's")} RPG 월드 · {CampaignRegions[_rpgLocation].Name}";
             DuelAudio.PlayRpgFieldMusic(IsGxCampaign ? GxFieldMusic(CampaignFieldTheme) : MusicForRpgRegion(_rpgLocation));
             switch (page)
@@ -250,6 +254,7 @@ namespace YGOPortable.UI
                 case Page.Talk: BuildRpgTalk(); break;
                 case Page.Duel: BuildRpgPractice(); break;
                 case Page.GxDecks: BuildGxDecks(); break;
+                case Page.GxCampus: BuildGxCampus(); break;
                 case Page.Ledger: BuildRpgQuestJournal(); break;
                 case Page.ResortWardrobe: BuildRpgResortWardrobe(); break;
                 case Page.SummerEpilogue: BuildRpgSummerEpilogue(); break;
@@ -329,7 +334,13 @@ namespace YGOPortable.UI
             var opening = AutomaticRpgScenePending && _rpgLocation == CampaignRegionForEpisode(RpgClears + 1)
                 ? CurrentRpgEpisode.preDialogues[0].SceneMapPath : null;
             _rpgTerrain = TerrainForScene(opening);
-            var floor = BuildRpgCamera(GetRpgDialogueScenery(opening));
+            string spot = CampaignRegions[_rpgLocation].Id;
+            bool evening = opening == null && IsCampusEvening(spot);
+            var eveningArt = evening ? CampusEveningArt(spot) : null;
+            _campusActorTint = evening ? new Color(.85f, .89f, 1f) : Color.white;
+            var floor = BuildRpgCamera(eveningArt ?? GetRpgDialogueScenery(opening));
+            if (evening && eveningArt == null)
+                floor.color *= new Color(.76f, .82f, .97f);
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
@@ -466,13 +477,18 @@ namespace YGOPortable.UI
             var quest = _rpgQuestResident;
             string name = quest == null ? _resident.opponentName : RpgQuestName(quest);
             int speaker = quest?.Giver ?? _resident.charId;
+            bool campus = quest == null && GxCampusActive && IsCampusFriend(speaker);
             var panel = BuildRpgConversation(name, quest != null ? RpgQuestDialogue(quest) : RpgResidentLine(speaker, daily: false),
                 out var conversation, speaker);
             var actions = new List<(string Id, string Label, Action Select)>
             {
-                ("TalkDaily", "일상 대화", () => StartTypingDialogue(conversation, quest != null
-                    ? RpgQuestDialogue(quest) : RpgResidentLine(speaker, daily: true))),
+                ("TalkDaily", "일상 대화", () =>
+                {
+                    if (campus) TalkAboutCampus(speaker, conversation);
+                    else StartTypingDialogue(conversation, quest != null ? RpgQuestDialogue(quest) : RpgResidentLine(speaker, daily: true));
+                }),
             };
+            if (campus) AddCampusGiftAction(panel, speaker, conversation, actions);
             if (quest == null && _rpgWorldDecks.ContainsKey(_resident.deckId)) actions.Add(("Practice", "연습 듀얼", () => Show(Page.Duel)));
             else if (quest != null) AppendRpgQuestActions(quest, actions);
             actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));

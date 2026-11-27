@@ -20,3 +20,18 @@
 - 캠페인 무결성 검사에서 53시퀀스, 필드 12개, 덱 37개와 CG 39개를 확인했다. 고정 듀얼 회귀는 8건 통과했다.
 - 기존 AI와 캠페인 데이터를 사용하는 별도 Git 체크아웃에서 `VerifyAllHeadless`, `TestStoryCampaign.Run`, `TestDuelAiTactics.RunHeadless`, `TestStoryTactics.Run`을 통과했다. 초기 전체 검사에서 실패한 링크 전개 두 건은 최종 전체 재실행에서 통과했다.
 - 실제 iPhone의 60FPS, 프레임별 메모리와 발열은 측정하지 않았다.
+
+## 아카데미아 자유시간
+
+시범 경기와 아스카의 초반 에피소드를 마치면 필드의 시간 표시와 메뉴에서 일정을 열 수 있다. 일정에서 아침과 방과 후, 저녁을 바꾸고 저녁에는 오시리스 레드 기숙사 앞에서 다음 날까지 쉴 수 있다. 시간 변경은 메인 사건 진행도를 바꾸거나 획득한 일회성 아이템을 다시 생성하지 않는다.
+
+본관 매점에서 멜론빵을 사면 DP와 소지 수량이 함께 저장된다. 아스카와 쥬다이의 대화와 선물은 친밀도에 반영된다. 이미 선물한 날에는 빵을 소모하지 않으며, 휴식 뒤 저장을 다시 열어도 지난 선물에 대한 대사가 나온다.
+
+GX 자동 검증에 일정 변경과 NPC 이동, 구매와 중복 선물 방지, 기숙사 휴식, 저장 재로드, 이전 태그 포스 일정 데이터, 화면 전환 후 주민 불투명도 검사를 추가했다. 16:9과 19.5:9 화면을 숨김 모드에서 렌더링했다. 최신 시각 자료는 `qa/screenshots/gx-campus-release/`에 있다.
+
+새 에셋은 내장 이미지 생성으로 제작했다. 멜론빵은 RGBA 투명 이미지를 356px로 줄였다. 저녁 기숙사에 기존 보행 구역과 카메라를 적용하고 원본 낮 배경도 사용한다.
+
+- `Assets/StreamingAssets/TagForce/GX/Items/campus_melon_bread.png` 프롬프트
+  > Create an original inventory sprite for a polished Korean illustrated academy RPG. One fresh round Japanese melon-pan bun, golden honey-brown domed crust with the distinctive shallow diamond cookie scoring, a soft pale base, lightly dusted fine sugar, viewed from a slightly elevated three-quarter angle. Painterly cel-rendered food illustration with clean soft edges and subtle warm highlights, strong readable silhouette at 100 px. Center the entire single bun with a small clear margin. Genuinely transparent alpha background. No plate, no wrapper, no backdrop, no lettering, no branding, no floating particles.
+- `Assets/StreamingAssets/TagForce/GX/Maps/spot_red_dorm_evening.png` 프롬프트
+  > Lighting and time-of-day edit ONLY for the supplied original 2.5D RPG map. The source is the exact required playable geometry. Preserve the full 16:9 framing, camera, line art, coordinate layout, silhouettes, and pixel positions of every porch beam, step, deck rail, shoreline, tree, courtyard paving and red circular crest. No zoom, crop, camera movement, layout changes, people or new objects. Render the exact scene as coastal blue hour shortly after sundown. Dim amber light should glow from the existing windows and the two existing porch lamps, gently reflecting near the front door. Change the sky and sea to deep blue with a faint soft warm strip on the distant horizon. Keep courtyard walkable surfaces and step edges readable, and preserve the cel-illustrated rendering and details.

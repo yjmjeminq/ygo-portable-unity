@@ -59,7 +59,7 @@ namespace YGOPortable.UI
                 float glow = 1f - Mathf.Clamp01(RpgArtDirection(position - lamp).magnitude / .25f);
                 tint = Color.Lerp(tint, new Color32(255, 202, 148, 255), glow * .13f);
             }
-            return tint;
+            return tint * _campusActorTint;
         }
 
         private void BuildRpgFieldEffects()

@@ -404,6 +404,7 @@ namespace YGOPortable.Core
         internal const int AffinityVersion = 1;
         public int affinityVersion;
         public int day = 1, time;
+        public int campusDay = 1, campusTime;
         public string spotId;
         public string partnerId, inviteId, inviteSpot;
         public string grandPrixPartner;
@@ -414,14 +415,18 @@ namespace YGOPortable.Core
         public List<int> bags = new();
         public List<string> seenMail = new();
         public List<string> conversations = new();
+        public List<string> campusConversations = new();
 
         internal void Normalize()
         {
             day = Math.Max(day, 1);
             time = Mathf.Clamp(time, 0, TagForceData.TimeKeys.Length - 1);
+            campusDay = Math.Max(campusDay, 1);
+            campusTime = Mathf.Clamp(campusTime, 0, TagForceData.TimeKeys.Length - 1);
             grandPrixRound = Mathf.Clamp(grandPrixRound, 0, 2);
             relations ??= new(); items ??= new(); pickups ??= new(); bags ??= new();
             seenMail ??= new(); conversations ??= new();
+            campusConversations ??= new();
             relations.RemoveAll(relation => string.IsNullOrEmpty(relation?.personaId));
             items.RemoveAll(item => string.IsNullOrEmpty(item?.id) || item.count <= 0);
             foreach (var relation in relations)
@@ -495,6 +500,8 @@ namespace YGOPortable.Core
         public List<int> clearedBonds = new();
         public bool masterReward;
         public bool wonGrandPrix;
+        public int campusGiftDay;
+        public int campusThankedGiftDay;
         internal int Hearts => affinity / (MaxAffinity / HeartCount);
     }
 

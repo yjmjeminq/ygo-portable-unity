@@ -217,6 +217,7 @@ namespace YGOPortable.UI
             if (!partner)
             {
                 actions.Add(("OpenCardShop", "카드 팩 보기", _app.OpenRpgCardShop));
+                if (GxCampusActive) AddCampusBreadOffer(panel, conversation, actions);
                 if (!IsGxCampaign) actions.Add(("ResortShop", "여름 리조트 의상", () => OpenRpgResortWardrobe(fromShop: true)));
             }
             int hearts = CollectionProgress.RpgAffinity / CollectionProgress.RpgAffinityPerHeart;
@@ -357,7 +358,7 @@ namespace YGOPortable.UI
             return true;
         }
 
-        private void BeginGxInterlude(int region, StoryEpisodeData episode, Action reveal, Action finish)
+        private void BeginGxInterlude(int region, StoryEpisodeData episode, Action reveal, Action finish, string title = null)
         {
             // A sibling above both screens survives the covered world rebuild.
             var curtain = DuelUiKit.FillRect("GxSceneInterlude", _screen.parent);
@@ -381,8 +382,9 @@ namespace YGOPortable.UI
                 !string.IsNullOrWhiteSpace(scene.Spot.name) ? scene.Spot.name : CampaignRegions[region].Name;
             RpgUiStyle.Type(HudLabel(Area(card, "Location", .08f, .57f, .92f, .82f), place, 28,
                 RpgUiStyle.Gold, align: TextAnchor.MiddleCenter, heading: true), strong: true);
-            if (!string.IsNullOrWhiteSpace(episode?.title))
-                RpgUiStyle.Display(HudLabel(Area(card, "Episode", .08f, .19f, .92f, .55f), episode.title, 38, Color.white,
+            title ??= episode?.title;
+            if (!string.IsNullOrWhiteSpace(title))
+                RpgUiStyle.Display(HudLabel(Area(card, "Episode", .08f, .19f, .92f, .55f), title, 38, Color.white,
                     align: TextAnchor.MiddleCenter, heading: true));
 
             _interludePhase = InterludePhase.FadeOut;

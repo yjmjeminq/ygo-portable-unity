@@ -234,6 +234,7 @@ namespace YGOPortable.Editor
                             Require(world.CanStartRpgEpisode(index) && WorldInputRestored(),
                                 "The one-click map objective did not arrive or left field input locked.");
                         }
+                        if (episode.id == "gx_ep_03") VerifyGxCampusRoutine();
                         Require(world.EnterRpgRegion(location) && world.CanStartRpgEpisode(index) &&
                             FieldScene().Find("Scenery").GetComponent<Image>().sprite != null &&
                             panel.Find("FieldHud/FieldDetails/GxOpponentTier/Value/Label") != null,
@@ -907,6 +908,109 @@ namespace YGOPortable.Editor
                     CaptureGx("04-mobile-safe-area");
                     Debug.Log("[VERIFY GX TOUCH] 19.5:9 safe area, pointer isolation, grounded movement and release passed.");
 
+                }
+
+                void VerifyGxCampusRoutine()
+                {
+                    const string friend = "campus/107", bun = "gx_melon_bread";
+                    var original = CollectionProgress.GetTagForceProgress(gx).Copy();
+                    int balance = CollectionProgress.Balance;
+                    int academy = world.CampaignRegionForEpisode(2), dorm = world.CampaignRegionForEpisode(4);
+                    int chapter = world.RpgClears;
+                    try
+                    {
+                        var legacy = original.Copy();
+                        legacy.day = 23;
+                        legacy.time = 2;
+                        legacy.conversations.Add("legacy/visit");
+                        Require(CollectionProgress.TrySaveTagForce(gx, legacy, 0, out string setupError), setupError);
+                        Require(world.EnterRpgRegion(academy), "Could not open the campus morning.");
+                        Require(FieldScene().Find("Resident_107") != null && FieldScene().Find("Resident_119") == null,
+                            "Morning campus residents were incorrect.");
+                        PressRpgNavigation("Schedule");
+                        CaptureGx("campus-schedule");
+                        Press(panel, "CampusPlans/Advance");
+                        Require(world.RpgInterludeActive && !WorldInputRestored(), "Campus time did not lock field input during the curtain.");
+                        FinishGxInterlude();
+                        Require(WorldInputRestored() && Campus().campusTime == 1 && FieldScene().Find("Resident_119") != null,
+                            "The afternoon did not restore input and bring Jaden to the academy.");
+
+                        Approach("RpgCardMerchant");
+                        var offer = panel.Find("ResidentChoices/CampusBreadOffer/Bread").GetComponent<Image>();
+                        Require(offer.sprite != null && offer.sprite != RpgUiStyle.Glyph(RpgUiStyle.Symbol.Star),
+                            "The cafeteria did not load its illustrated melon bread.");
+                        Press(panel, "ResidentChoices/BuyCampusBread");
+                        Press(panel, "ResidentChoices/BuyCampusBread");
+                        world.Update(3f);
+                        Require(Campus().Count(bun) == 2 && CollectionProgress.Balance == balance - 80,
+                            "A cafeteria purchase did not atomically spend DP and stock the bread.");
+                        CaptureGx("campus-bread");
+
+                        world.Back();
+                        Approach("Resident_107");
+                        Press(panel, "ResidentChoices/TalkDaily");
+                        Press(panel, "ResidentChoices/TalkDaily");
+                        Press(panel, "ResidentChoices/GiveCampusBread");
+                        Press(panel, "ResidentChoices/GiveCampusBread");
+                        Require(Campus().Count(bun) == 1 && Campus().Relationship(friend).affinity == 560,
+                            "Campus conversation or gifting rewarded the same action twice.");
+                        world.Back();
+
+                        OpenSchedule();
+                        Press(panel, "CampusPlans/Advance");
+                        FinishGxInterlude();
+                        Require(Campus().campusTime == 2 && FieldScene().Find("Resident_107") == null,
+                            "Asuka did not leave the academy for the evening.");
+                        OpenSchedule();
+                        Press(panel, "CampusPlans/Advance");
+                        FinishGxInterlude();
+                        var restPoint = FieldScene().Find("CampusDormStation") as RectTransform;
+                        Require(restPoint != null && CurrentTerrain().Contains(restPoint.anchorMin) && FieldScene().Find("Resident_107") != null,
+                            "Evening travel did not expose the dorm rest point and visiting friend.");
+                        world.Update(.5f);
+                        var residentArt = FieldScene().Find("Resident_107/SD").GetComponent<Image>();
+                        Require(residentArt.color.a == 1f && residentArt.canvasRenderer.GetAlpha() == 1f,
+                            "A rebuilt resident kept the disabled tint after the evening curtain opened.");
+                        CaptureGx("campus-dorm-evening");
+                        Press(FieldScene(), "CampusDormStation");
+                        world.Update(3f);
+                        Require(panel.Find("CampusSchedule") != null, "The physical dorm station did not open the schedule.");
+                        Press(panel, "CampusPlans/Advance");
+                        FinishGxInterlude();
+                        CollectionProgress.Load(isolatedSave);
+                        Require(WorldInputRestored() && Campus().campusDay == original.campusDay + 1 && Campus().campusTime == 0 &&
+                            Campus().Count(bun) == 1 && Campus().pickups.SequenceEqual(original.pickups) && world.RpgClears == chapter,
+                            "Rest did not persist day and inventory or changed one-time pickups or story progress.");
+                        Require(Campus().day == 23 && Campus().time == 2 && Campus().conversations.Contains("legacy/visit"),
+                            "The GX campus clock altered the previous Tag Force world's saved date or conversations.");
+
+                        Require(world.EnterRpgRegion(academy), "Could not return to the academy the next morning.");
+                        Approach("Resident_107");
+                        Press(panel, "ResidentChoices/TalkDaily");
+                        world.Update(3f);
+                        Require(panel.Find("ResidentChoices/DailyLine/Label").GetComponent<Text>().text.Contains("어제 빵") &&
+                            Campus().Relationship(friend).affinity == 760,
+                            "The next-day gift conversation did not survive reloading the save.");
+                        CaptureGx("campus-next-day");
+                        Press(panel, "ResidentChoices/TalkDaily");
+                        Require(Campus().Relationship(friend).affinity == 760,
+                            "The next-day conversation could be rewarded more than once.");
+                        world.Back();
+                        Debug.Log("[VERIFY GX CAMPUS] Schedule, NPC visits, purchase, gifts, dorm rest, follow-up and persisted state passed.");
+                    }
+                    finally
+                    {
+                        Require(CollectionProgress.TrySaveTagForce(gx, original, balance - CollectionProgress.Balance, out string error), error);
+                    }
+
+                    TagForceSave Campus() => CollectionProgress.GetTagForceProgress(gx);
+                    void OpenSchedule() => Press(panel, "FieldHud/QuestTrack/CampusClock");
+                    void Approach(string actor)
+                    {
+                        Press(FieldScene(), actor + "/SD");
+                        world.Update(3f);
+                        Require(panel.Find("ResidentChoices") != null, $"Could not approach {actor}.");
+                    }
                 }
 
                 void VerifyGxNpcCamera()

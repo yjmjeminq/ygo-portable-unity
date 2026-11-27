@@ -30,6 +30,7 @@ namespace YGOPortable.UI
             RpgUiStyle.Display(HudLabel(Area(_body, "MapTitle", .013f, 1.018f, .108f, 1.127f), "월드맵", 35,
                 new Color(.93f, .97f, 1f)));
             RpgUiStyle.Reading(HudLabel(Area(_body, "MapArea", .113f, 1.022f, .575f, 1.115f),
+                GxCampusActive ? $"듀얼 아카데미아 화산섬  ·  {GxCampusSave.campusDay}일차 {CampusPeriods[GxCampusSave.campusTime]}" :
                 IsGxCampaign ? "듀얼 아카데미아 화산섬" : "새틀라이트 · 네오 도미노 시티", 23, new Color(.76f, .83f, .94f)));
             _rpgMapTime = 0f;
             _rpgMapPulses.Clear();
@@ -202,7 +203,7 @@ namespace YGOPortable.UI
                 bool open = region.IsOpen(cleared), current = index == _rpgLocation;
                 _images.BeginPage();
                 _images.Get(RpgMapArt);
-                thumb.sprite = GetRpgFieldArt(region);
+                thumb.sprite = CampusEveningArt(region.Id) ?? GetRpgFieldArt(region);
                 thumb.color = thumb.sprite == null ? new Color(.08f, .17f, .23f) : open ? Color.white : new Color(.40f, .46f, .56f);
                 if (thumb.sprite == null) { thumb.sprite = DuelUiKit.WhiteSprite; thumb.preserveAspect = false; }
                 else thumb.preserveAspect = true;

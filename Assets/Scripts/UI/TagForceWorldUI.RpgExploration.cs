@@ -77,6 +77,8 @@ namespace YGOPortable.UI
             }
             UpdateRpgExitSigns();
 
+            if (GxCampusActive && CampaignRegions[_rpgLocation].Id == CampusDorm) AddCampusDormStation();
+
             var landmark = CampaignLandmark(_rpgLocation);
             var marker = RpgFieldProp("Landmark", landmark.Position, IsGxCampaign ? new Vector2(87f, 34f) : new Vector2(146f, 31f));
             void Inspect() => MoveTo(landmark.Position, OpenRpgLandmark);

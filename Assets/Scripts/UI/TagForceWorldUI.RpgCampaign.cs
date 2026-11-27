@@ -157,7 +157,7 @@ namespace YGOPortable.UI
                 if (entry.storyOnly || entry.unlockAfter > clears || entry.charId == active?.charId ||
                     entry.charId == RpgPlayerId) continue;
                 var move = entry.storyMoves?.LastOrDefault(change => change.after <= clears);
-                if (move?.hidden == true || (move?.spotId ?? entry.spotId) != CampaignRegions[region].Id) continue;
+                if (move?.hidden == true || GxCampusResidentSpot(entry.charId, move?.spotId ?? entry.spotId) != CampaignRegions[region].Id) continue;
                 var character = DeckRepository.GetCharacter(entry.charId);
                 if (character == null) continue;
                 var duel = _rpgCampaign.episodes.FirstOrDefault(episode => !episode.isCutsceneOnly && episode.charId == entry.charId);

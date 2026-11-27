@@ -12,7 +12,7 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond, Prologue, Guide, ResortWardrobe, SummerEpilogue, GxDecks }
+        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond, Prologue, Guide, ResortWardrobe, SummerEpilogue, GxDecks, GxCampus }
 
         private readonly GameAppController _app;
         private readonly TagForceWorldImages _images = new();
@@ -147,7 +147,7 @@ namespace YGOPortable.UI
                     _rpgChoosingCompanion = false;
                     Show(Page.Talk);
                 }
-                else if (_page is Page.Map or Page.Talk or Page.Ledger or Page.GxDecks) Show(Page.Field);
+                else if (_page is Page.Map or Page.Talk or Page.Ledger or Page.GxDecks or Page.GxCampus) Show(Page.Field);
                 else if (_page == Page.Duel) Show(Page.Talk);
                 else Show(Page.Map);
                 return;
@@ -218,7 +218,7 @@ namespace YGOPortable.UI
             bool openConversation = page == Page.Talk && _page == Page.Field;
             _preserveRpgCamera = (_rpgField && _rpgSceneSpace != null && !_rpgAnnounceArrival &&
                 (openConversation || _page == Page.Talk && page is (Page.Talk or Page.Field))) ||
-                (_page == Page.GxDecks && page == Page.Field);
+                (_page is Page.GxDecks or Page.GxCampus && page == Page.Field);
             _page = page;
             UpdateRpgWorldChrome();
             ClearBody();
@@ -439,6 +439,8 @@ namespace YGOPortable.UI
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = target;
             button.transition = Selectable.Transition.None;
+            // The button can initialize under a locked curtain and leave its disabled tint on the portrait.
+            target.canvasRenderer.SetColor(Color.white);
             button.onClick.AddListener(() =>
             {
                 DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
