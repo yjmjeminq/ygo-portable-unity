@@ -32,7 +32,8 @@ namespace YGOPortable.Core
         internal sealed class Cue
         {
             public string kind, text, speaker, speakerKey, tone, key, action, assetPath, cutsceneKey, audioAccent;
-            public int line;
+            public string heroPortrait, guestPortrait;
+            public int line, speakerSide;
             public string[] clipKeys;
             public Standing[] cast;
 

@@ -29,8 +29,14 @@ namespace YGOPortable.Editor
             (35, "ep35_hand"),
             (37, "ep37_home"),
         };
+        private static readonly (int Episode, int Scene, int Line, string Left, string Right, string File)[] CastFrames =
+        {
+            (2, 3, 91, "hero", "aki_distress", "cast-02-bandage-distress"),
+            (32, 4, 146, "sherry", "zone_distant", "cast-32-rooftop"),
+            (36, 1, 56, "aki_riding", "sherry", "cast-36-duet"),
+        };
         private static BeyondDestinyCampaign _campaign;
-        private static int _storyFrame;
+        private static int _storyFrame, _castFrame;
         private static double _deadline, _next;
         private static int _phase;
         private static bool _openingDialogueCaptured, _backlashCaptured;
@@ -67,7 +73,7 @@ namespace YGOPortable.Editor
             if (!SessionState.GetBool(Active, false)) return;
             if (change == PlayModeStateChange.EnteredPlayMode)
             {
-                _deadline = EditorApplication.timeSinceStartup + 150;
+                _deadline = EditorApplication.timeSinceStartup + 220;
                 _driver = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(), searchCombos: false);
                 Application.logMessageReceived += OnRuntimeLog;
                 EditorApplication.update += Step;
@@ -185,8 +191,47 @@ namespace YGOPortable.Editor
                             throw new InvalidOperationException("Opening story or Backlash artwork did not render.");
                         Debug.Log("[Beyond Destiny Play Mode] Picker, field, opening, native duel, Backlash and episode-two resume passed.");
                         _campaign = BeyondDestinyCampaign.Load(Application.streamingAssetsPath);
-                        CaptureStoryFrame();
+                        StartRidingCheck();
                     });
+                    return;
+                }
+
+                if (_phase == 7 && Get<DuelSession>(_app, "_session") is { } riding)
+                {
+                    var display = Get<DuelFieldUI>(_app, "_duelField");
+                    if (display.IsPresenting || riding.ActivePrompt == null) return;
+                    VerifySoundscape("backlash", null);
+                    var mine = Get<Text>(display, "_mySpeed");
+                    var theirs = Get<Text>(display, "_oppSpeed");
+                    if (!mine.isActiveAndEnabled || !theirs.isActiveAndEnabled ||
+                        !mine.text.StartsWith("SPC ", StringComparison.Ordinal) ||
+                        !theirs.text.StartsWith("SPC ", StringComparison.Ordinal) ||
+                        riding.Players.Any(field => field.szone[5]?.code != StoryGimmickRuntime.SpeedWorld ||
+                            DuelFieldUI.ReadSpeedCounters(field) < 4))
+                        throw new InvalidOperationException("Episode 31's live riding HUD did not show Speed World 2.");
+                    var worlds = UnityEngine.Object.FindObjectsByType<CompositeCardView>(FindObjectsSortMode.None)
+                        .Where(view => view.CurrentCode == StoryGimmickRuntime.SpeedWorld && view.ArtworkSprite != null).ToArray();
+                    if (worlds.Length < 2 || worlds.Any(view => view.ArtworkSprite == CardArtLoader.GetFallbackArt()))
+                        throw new InvalidOperationException("The riding arena still shows missing Speed World 2 artwork.");
+                    CaptureAfter("duel-31-live-riding", 1.05, () => _phase = 8);
+                    return;
+                }
+                if (_phase == 8 && Get<DuelSession>(_app, "_session") is { } ridingDuel)
+                {
+                    if (ridingDuel.RetryCount != 0)
+                        throw new InvalidOperationException("The live riding duel rejected a response.");
+                    if (Get<DuelFieldUI>(_app, "_duelField").IsPresenting) return;
+                    if (ridingDuel.ActivePrompt is { } prompt && prompt.playerId == ridingDuel.HumanPlayerIndex)
+                        ridingDuel.SubmitResponse(_driver.ComputeResponse(ridingDuel, prompt));
+                    return;
+                }
+                if (_phase == 8 && FindButton("다음 장면") is { } ridingResult)
+                {
+                    ridingResult.onClick.Invoke();
+                    if (!Playback().Progress.resolvedEncounters.Contains("beyond_destiny_ep_31_scene_01_duel_22"))
+                        throw new InvalidOperationException("Episode 31's native riding result did not unlock its story.");
+                    Debug.Log("[Beyond Destiny Play Mode] Chapter 31 rode with live SPC through its saved story outcome.");
+                    CaptureCastFrame();
                     return;
                 }
 
@@ -194,7 +239,7 @@ namespace YGOPortable.Editor
                 {
                     if (!BeyondDestinyProgress.Load(Application.persistentDataPath, _campaign).completed)
                         throw new InvalidOperationException("The final episode did not persist completion.");
-                    Debug.Log("[Beyond Destiny Play Mode] Nine additional event CGs rendered, and the finale saved completion.");
+                    Debug.Log("[Beyond Destiny Play Mode] Nine additional event CGs, expression portraits, rooftop POV, duet and finale save passed.");
                     Finish(0);
                     return;
                 }
@@ -236,6 +281,40 @@ namespace YGOPortable.Editor
                     $"{mixer?.MusicPath} / {mixer?.AmbiencePath}.");
         }
 
+        private static void StartRidingCheck()
+        {
+            var scene = _campaign.Episodes[30].scenes[0];
+            int firstPrompt = Array.FindIndex(scene.events, cue => cue.line == 22);
+            OpenStoryCheckpoint(30, 0, firstPrompt);
+            Click("듀얼 시작");
+            _phase = 7;
+        }
+
+        private static void CaptureCastFrame()
+        {
+            _phase = 6;
+            if (_castFrame >= CastFrames.Length)
+            {
+                CaptureStoryFrame();
+                return;
+            }
+            var frame = CastFrames[_castFrame];
+            var scene = _campaign.Episodes[frame.Episode - 1].scenes[frame.Scene - 1];
+            int cue = Array.FindIndex(scene.events, item => item.line == frame.Line);
+            OpenStoryCheckpoint(frame.Episode - 1, frame.Scene - 1, cue);
+            CaptureAfter(frame.File, 1.3, () =>
+            {
+                var view = Get<StoryModeUI.StoryDialogueView>(Get<BeyondDestinyUI>(_app, "_beyondDestiny"), "_dialogue");
+                var left = Get<Image>(view, "_hero");
+                var right = Get<Image>(view, "_opponent");
+                if (!left.isActiveAndEnabled || !right.isActiveAndEnabled || left.sprite?.name != frame.Left ||
+                    right.sprite?.name != frame.Right)
+                    throw new InvalidOperationException($"Wrong live portrait for {frame.File}: {left.sprite?.name}/{right.sprite?.name}.");
+                ++_castFrame;
+                CaptureCastFrame();
+            });
+        }
+
         private static void CaptureStoryFrame()
         {
             _phase = 6;
@@ -245,13 +324,7 @@ namespace YGOPortable.Editor
             int sceneIndex = Array.FindIndex(episode.scenes, scene => scene.events.Any(cue => cue.cutsceneKey == frame.Key));
             if (sceneIndex < 0) throw new InvalidOperationException($"No manuscript anchor for {frame.Key}.");
             int cueIndex = Array.FindIndex(episode.scenes[sceneIndex].events, cue => cue.cutsceneKey == frame.Key);
-            var progress = BeyondDestinyProgress.Load(Application.persistentDataPath, _campaign);
-            progress.episodeIndex = frame.Episode - 1;
-            progress.sceneIndex = sceneIndex;
-            progress.cueIndex = cueIndex;
-            progress.Save(Application.persistentDataPath, _campaign);
-            _app.ShowScreen(AppScreen.Campaigns);
-            Click("5D’s: Beyond Destiny");
+            OpenStoryCheckpoint(frame.Episode - 1, sceneIndex, cueIndex);
             CaptureAfter($"{_storyFrame + 7:00}-{frame.Key}", 1.3, () =>
             {
                 var image = FindCutscene(frame.Key);
@@ -261,6 +334,17 @@ namespace YGOPortable.Editor
                 ++_storyFrame;
                 CaptureStoryFrame();
             });
+        }
+
+        private static void OpenStoryCheckpoint(int episode, int scene, int cue)
+        {
+            var progress = BeyondDestinyProgress.Load(Application.persistentDataPath, _campaign);
+            progress.episodeIndex = episode;
+            progress.sceneIndex = scene;
+            progress.cueIndex = cue;
+            progress.Save(Application.persistentDataPath, _campaign);
+            _app.ShowScreen(AppScreen.Campaigns);
+            Click("5D’s: Beyond Destiny");
         }
 
         private static Image FindCutscene(string key) => UnityEngine.Object.FindObjectsByType<Image>(FindObjectsSortMode.None)

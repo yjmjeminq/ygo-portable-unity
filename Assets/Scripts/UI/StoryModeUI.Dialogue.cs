@@ -668,7 +668,10 @@ namespace YGOPortable.UI
                     ShowBust(_hero, _heroPrevious, LoadStoryPortrait(line.storyHeroPortrait), ref _heroFade, ref _heroSlide);
                     ShowBust(_opponent, _opponentPrevious, LoadStoryPortrait(line.storyGuestPortrait),
                         ref _opponentFade, ref _opponentSlide);
-                    _opponentSpeaking = !narration && !_heroSpeaking && line.storyGuestPortrait != null;
+                    _heroSpeaking = line.storySpeakerSide is 1 or 3;
+                    _opponentSpeaking = line.storySpeakerSide is 2 or 3;
+                    if (_heroSpeaking && !heroPreviouslySpeaking) _heroSlide = Mathf.Max(_heroSlide, .12f);
+                    if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
                     _speakerUsesPaintedExpression = true;
                 }
                 else if (_rpg)

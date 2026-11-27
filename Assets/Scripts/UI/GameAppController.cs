@@ -748,7 +748,8 @@ namespace YGOPortable.UI
                 ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.", isTournamentDuel, isRankedDuel, isTagForceDuel);
                 return;
             }
-            if (ridingMachine != null) _session.RecordRidingLaunch(ridingMachine);
+            if (ridingMachine != null)
+                _session.RecordRidingLaunch(ridingMachine, isBeyondDestiny ? _beyondDestinyDuelist : "카이");
             if (isStoryDuel && !CollectionProgress.TryConsumeRaidSupports(_activeStoryPlan.Supports, raid.HasValue, out string error))
             {
                 ShowDuelStartFailure(isStoryDuel, error);

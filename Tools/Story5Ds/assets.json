@@ -957,6 +957,346 @@
         4
       ],
       "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
+    },
+    {
+      "path": "Characters_Standing/aki_distress.png",
+      "key": "aki_distress",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nUnmasked Aki's lips tremble, paleness, her amber rose eyes widened then looking down, one hand loosely closed by her waist. The head tilts a little, guarded pulse and shaken expression; subtle tear welling and no separate overt colored blush or painted streaks."
+    },
+    {
+      "path": "Characters_Standing/aki_casual_distress.png",
+      "key": "aki_casual_distress",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nAki in the same scarf and simple jacket, looking directly ahead hurt but determined, eyes red-rimmed naturally with restrained tears in the lower lid, brows tensed, tightly held cuffs. Keep her recognizable scarf and same coat cut, no pink cheeks."
+    },
+    {
+      "path": "Characters_Standing/aki_casual_hope.png",
+      "key": "aki_casual_hope",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nSame scarf and jacket, shoulders loosened, small warm relieved smile, open eyes with a quiet spark and body leaning forward just slightly, fingers at one side of scarf. Controlled natural expression, no blush or artificial highlights."
+    },
+    {
+      "path": "Characters_Standing/aki_riding_resolve.png",
+      "key": "aki_riding_resolve",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nSame riding suit and off-bike boots, helmet secured under elbow, controlled fierce forward determination, brows angled in focus, forward-set shoulders and one closed hand. Her visible asymmetric red hair matches the supplied portrait."
+    },
+    {
+      "path": "Characters_Standing/sherry_stern.png",
+      "key": "sherry_stern",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nSame pearl/ivory long rider coat and navy trim. Eyes nearly narrowed in suspicious concentration, jaw poised; left elbow held close and right glove tension. Sherry looks as though she sees into a rival's plan. Same gold bob length."
+    },
+    {
+      "path": "Characters_Standing/sherry_fallen_anguish.png",
+      "key": "sherry_fallen_anguish",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nSame dark coat, palette, and navy sleeves. Sherry's icy blue eyes are bright with grief, eyebrows drawn faintly upward, her mouth slightly open in disbelief, held body weight tilted one step back, one hand half-open. Spare realism, no overt scars or blush."
+    },
+    {
+      "path": "Characters_Standing/hero_haunted.png",
+      "key": "hero_haunted",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nYun's usual outfit unchanged, same short black haircut, heavy eyes with a faraway thoughtful gaze, small furrow in his brow, shoulders a little lowered and fingers curled toward the palms. Black gloves, boots and all silhouette legible."
+    },
+    {
+      "path": "Characters_Standing/devine_anger.png",
+      "key": "devine_anger",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nSame sophisticated formal costume. Lean forward slightly with a cold pointed scowl, eyebrows tighten, one closed hand and surface of gold signet ring visible, controlling anger without cartoon exaggeration, posture belligerent and theatrical but believable."
+    },
+    {
+      "path": "Characters_Standing/yusei_relief.png",
+      "key": "yusei_relief",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Create a new full-body standing portrait frame of this adult original Beyond Destiny character, in a new pose. The supplied standing sprite is character-design and art-style reference only. Remain faithful to the supplied face, eye color, hairstyle, costume, age and silhouettes exactly, same proportions; paint an authentic new performance matching the emotional direction. Commercial Korean animated story-game styling, fine brush cel shading and subtle cool highlights. Genuine transparent RGBA, clean alpha edge without a floor shadow, no painted backdrop. Full figure visible from head through both boot soles with air around them within this vertical frame. No text, symbols, sexualization, effects or watermark.\nSame work jacket with restrained orange tabs and navy panels, mechanic's carefully inked hair with honey-colored front hooks intact. Soft reassuring smile with open eyes, slight friendly lean and shoulders loose, one work glove relaxed around fabric."
+    },
+    {
+      "path": "Characters_Standing/luka.png",
+      "key": "luka",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nLuka, young sister in a pair of teen siblings, small youthful build, jade-green eyes, seafoam green soft half-length hair gathered in a loose gentle side ponytail held by one amber ribbon, original jade knit cardigan over full-length ivory mock-neck and dark navy pleated knee-length skirt with opaque dark tights, flat tidy brown shoes. Fully dressed, quietly reassuring small smile, both relaxed hands visible. Soothing pastoral tones."
+    },
+    {
+      "path": "Characters_Standing/lua.png",
+      "key": "lua",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nLua, young brother in a pair of teen siblings, seafoam green hair in short outward flaring cowlicks, jade eyes, original rust-orange hooded pullover with a dark indigo front-pocket insert, gray corduroy trousers, wears layered navy canvas shoes. Friendly active pose, eager closed-mouth grin, bright face, matching family resemblance with seafoam green tones."
+    },
+    {
+      "path": "Characters_Standing/aki_father.png",
+      "key": "aki_father",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nAki's father, Japanese middle-aged professional in his late forties. Angular composed face sharing her rose-amber eyes and restrained eye shape, brown swept side-part hair with the barest red undertones and gray at the temples. Dark blue conservative business coat, ivory collar shirt, wine colored unpatterned tie, charcoal trousers and dark clean shoes. Tired concerned brow, hands at front loosely gripping cuffs."
+    },
+    {
+      "path": "Characters_Standing/aki_mother.png",
+      "key": "aki_mother",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nAki's mother, Japanese middle-aged woman in her late forties, soft oval face and pale rose amber eyes with similar brows to her adult daughter. Dark garnet bob hair cut flush at her jaw. Soft muted beige long cardigan and cream blouse, simple gold necklace, long navy skirt, modest shoes. Elegantly dressed, arms lightly open in concern, warm hesitant expression."
+    },
+    {
+      "path": "Characters_Standing/vargas.png",
+      "key": "vargas",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nVargas, fiercely competitive adult racing duelist in his thirties, short brushed dark cobalt hair, deep brown eyes, rough stubble along jaw, strong cheekbone, olive-tan skin, worn khaki and burgundy leather racing jacket with diagonal gray webbing and charcoal riding trousers, steel boots, one fingerless glove with simple red knuckle guards. Uncomfortable looking sideways suspiciously, distinctive slanted profile."
+    },
+    {
+      "path": "Characters_Standing/kid.png",
+      "key": "kid",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nKid, young tournament duelist around 16, short narrow build, sandy-brown hair in soft small cowlicks, determined blue-gray eyes, blue-gray and ochre zip jacket over gray high collar and muted dark relaxed-fit trousers with sporty padded knees, shoes with ochre heel panels. A simple small wrist card carrier, safe everyday modest sportswear. Confident but uneasy stance."
+    },
+    {
+      "path": "Characters_Standing/arcadia_agent.png",
+      "key": "arcadia_agent",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nHostile senior Arcadia research facility agent, broad athletic adult man with a flattened short raven haircut, thin scar line in right brow, skeptical wary gray eyes, anonymous original black military-style uniform without rank markings or utility weapons. High coal collar, dark slate magnetic tabs and fitted trousers, heavy graphite work boots. Stands firmly one hand raised to a simple wrist device."
+    },
+    {
+      "path": "Characters_Standing/arcadia_officer.png",
+      "key": "arcadia_officer",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nHigh-ranking adult Arcadia research officer, narrow shrewd face, pale gray-blue eyes under heavy brows, short silvered dark bluish center part, long buttoned graphite coat with restrained steel blue collars and short rust stripe piping, matte dark shoes and tailored gloves. Cold controlled posture, holds dark thick document folio set against hip. No badges or words."
+    },
+    {
+      "path": "Characters_Standing/netherworld_commander.png",
+      "key": "netherworld_commander",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original full-body standing portrait for the Beyond Destiny interactive story. Hand-painted commercial Korean animation with crisp fine linework, layered cel rendering, grounded silhouette. Plain genuine transparent RGBA background outside subject, full figure head through soles and clear margin across frame. Natural upright proportions and 3/4 facing, soft diffuse rim light. Fully dressed neutral character sheet pose. No logo, visible writing, theatrical scenery, bloom, crowd, frame, watermark, or copied commercial game assets. Reference sprite only gives the painting style.\nCommander of a supernatural adversary faction, athletic adult male in mid-thirties, cold gold eyes, charcoal long swept-back hair, stern face under a short pointed hood pulled back enough to show hair. Floor length night-indigo coat with layers of matte dark textiles, narrow violet seam channel, weathered metallic cuffs, dark wrapped trousers, heavy boots. No weapons or channel glow, oppressive recognizable personal silhouette."
+    },
+    {
+      "path": "Characters_Standing/arcadia_operative_a.png",
+      "key": "arcadia_operative_a",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nAn adult Arcadia data operative, slender Japanese man with neatly cut dark-brown bowl-side fringe and amber glasses, black fitted suit with graphite elbow panels, plain dark trousers, subtle navy shirt, dark functional shoes, hands cradling a portable broad wrist terminal. Anxious posture, identifiable and young adult."
+    },
+    {
+      "path": "Characters_Standing/arcadia_guard.png",
+      "key": "arcadia_guard",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nArcadia guard, square-built adult Japanese man with ash-gray buzz cut, dark hairline, a dark slate uniform with high plain collar and thin horizontal breast seams, matching gray tactical trousers and robust rubber-soled boots with no printed insignia. Muscular steady stance, hands held ready, grim neutral face."
+    },
+    {
+      "path": "Characters_Standing/arcadia_captain.png",
+      "key": "arcadia_captain",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nArcadia security captain, sturdy middle-aged Northeast Asian man with black squared side-part hair and a narrow restrained chin beard, slightly longer structured dark slate coat with matte steel seams, dark undershirt, matching fitted trousers and gloves. Heavy ground-bearing boots, narrow-eyed stern scowl, clenched fist at hip. No weapons."
+    },
+    {
+      "path": "Characters_Standing/fleeing_member_a.png",
+      "key": "fleeing_member_a",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nArcadia civilian specialist caught in the evacuation. East Asian adult woman late twenties with wavy mid-length soot brown hair pulled into a short loose ponytail, distinct amber eye glasses and round face, short dark trench coat over an ivory research shirt, charcoal trousers, short flat boots, anxious posture with one hand pulled across herself."
+    },
+    {
+      "path": "Characters_Standing/fleeing_member_b.png",
+      "key": "fleeing_member_b",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nArcadia civilian administrator in evacuation, adult man of Japanese descent with receding dark gray hair and slightly untidy work shirt, old navy waistcoat across charcoal business trousers, loosened gray tie, black dress shoes. Worried brow and tentative weight shift, coat tails pulled as if about to turn. No injury."
+    },
+    {
+      "path": "Characters_Standing/netherworld_a.png",
+      "key": "netherworld_a",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nA member of a nocturnal underground sect, wiry adult man, deep brown skin, tight cropped black curls above a high dark indigo collar, muted purple asymmetric wrap jacket and canvas trousers, heavy charcoal laceless shoes, gray forearm bindings. Dismissive narrowed eye look, slight smirk, closed grounded stance."
+    },
+    {
+      "path": "Characters_Standing/netherworld_b.png",
+      "key": "netherworld_b",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nA member of a nocturnal underground sect, sturdy older Japanese adult male with center swept gray hair, substantial natural brows, heavy dark moss-indigo layered jacket, wrapped charcoal scarf, slate cargo trousers and high travel boots. Nervous side glance and braced shoulders, different recognizable outline from other faction members."
+    },
+    {
+      "path": "Characters_Standing/reporter_a.png",
+      "key": "reporter_a",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nAn adult woman sports reporter from Neo Domino, deep black short bob with side part and one jade hair clip, pale navy blazer over an ivory buttoned shirt, sand brown straight trousers, neat black low shoes, modest plain compact dark microphone held at chest with no text or branding, curious animated expression."
+    },
+    {
+      "path": "Characters_Standing/opponent_anchor.png",
+      "key": "opponent_anchor",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. One original character standing sprite for Beyond Destiny, Korean animated visual novel. Vertical full-body hand-painted frame from hair to shoes with small transparent breathing space. True RGBA clean transparency outside figure, no floor shadow. Fine contour ink, dim natural highlights and layered fabric detail, natural grounded adult proportions and posture. The supplied sprite is a reading of style and lighting only. No captions, logos, letters, pose sheet, copied game assets, visible injury or scenery.\nAdult rival duel racer in final relay seat, handsome lean athletic man early thirties, tawny dark bronze hair with small swept front, soot-blue high-collar armored racing jacket with cream piping and charcoal espresso trousers, integral dark riding boots and short muted teal gloves. Looks surprised but gripping control, carries a pale bronze plain racing helmet with no design marks tucked under arm."
+    },
+    {
+      "path": "Characters_Standing/aki_masked_resolve.png",
+      "key": "aki_masked_resolve",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New separate performance sprite in an original Beyond Destiny Korean animated visual novel. Supplied standing image is identity and costume reference only. Preserve its face shape, hair, eye color, palette, boots and costume extremely closely. Entire 8-head figure from top to shoes fully inside vertical frame with room to breathe. Crisp fine linework, careful nuanced character acting, no glow, lettering, scenery or ground shadow. Genuine clean RGBA transparent background.\nSame masked appearance with her neck-length wine red asymmetric bob and ceramic carmine eye visor. Protective combative resolve is visible in tensed jaw and slightly parted mouth; left hand clenched near waist, body angled closer toward opponent, keep visor fully on, only small posture change."
+    },
+    {
+      "path": "Characters_Standing/jack_defiant.png",
+      "key": "jack_defiant",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New separate performance sprite in an original Beyond Destiny Korean animated visual novel. Supplied standing image is identity and costume reference only. Preserve its face shape, hair, eye color, palette, boots and costume extremely closely. Entire 8-head figure from top to shoes fully inside vertical frame with room to breathe. Crisp fine linework, careful nuanced character acting, no glow, lettering, scenery or ground shadow. Genuine clean RGBA transparent background.\nThe same white formal racing coat with navy and pale purple, same bold swept blond crest and indigo stare. Irked confident expression with tightened eyebrows and strong chin, arms folded at chest, feet braced. Natural animation acting, no changes to proportions."
+    },
+    {
+      "path": "Characters_Standing/crow_grin.png",
+      "key": "crow_grin",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New separate performance sprite in an original Beyond Destiny Korean animated visual novel. Supplied standing image is identity and costume reference only. Preserve its face shape, hair, eye color, palette, boots and costume extremely closely. Entire 8-head figure from top to shoes fully inside vertical frame with room to breathe. Crisp fine linework, careful nuanced character acting, no glow, lettering, scenery or ground shadow. Genuine clean RGBA transparent background.\nSame orange hair, rust hood and olive cargo trousers. Laughing with relief, closed-lid smile and one shoulder lifted, one hand bent toward back of his head. Teeth only subtly visible and maintain youthful adult facial traits."
+    },
+    {
+      "path": "Characters_Standing/mizoguchi_concern.png",
+      "key": "mizoguchi_concern",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New separate performance sprite in an original Beyond Destiny Korean animated visual novel. Supplied standing image is identity and costume reference only. Preserve its face shape, hair, eye color, palette, boots and costume extremely closely. Entire 8-head figure from top to shoes fully inside vertical frame with room to breathe. Crisp fine linework, careful nuanced character acting, no glow, lettering, scenery or ground shadow. Genuine clean RGBA transparent background.\nSame Japanese steward with middle-age features, salt-and-pepper short hair, narrow moustache, long warm-grey and olive jacket, riding gloves. Brows gently furrowed, jaw set in concern and eyes a little lower, holds his forearm where cuffs meet."
+    },
+    {
+      "path": "Characters_Standing/misty_grief.png",
+      "key": "misty_grief",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New separate performance sprite in an original Beyond Destiny Korean animated visual novel. Supplied standing image is identity and costume reference only. Preserve its face shape, hair, eye color, palette, boots and costume extremely closely. Entire 8-head figure from top to shoes fully inside vertical frame with room to breathe. Crisp fine linework, careful nuanced character acting, no glow, lettering, scenery or ground shadow. Genuine clean RGBA transparent background.\nSame sweeping indigo hair, dark warm complexion, pale teal eyes and understated dark teal garment. She is quietly mournful, chin lowered with shadow under eyebrows and subtle gloss at eye edges, wrists loose side to side. No dramatic red or makeup changes."
+    },
+    {
+      "path": "Characters_Standing/rex_fervor.png",
+      "key": "rex_fervor",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New separate performance sprite in an original Beyond Destiny Korean animated visual novel. Supplied standing image is identity and costume reference only. Preserve its face shape, hair, eye color, palette, boots and costume extremely closely. Entire 8-head figure from top to shoes fully inside vertical frame with room to breathe. Crisp fine linework, careful nuanced character acting, no glow, lettering, scenery or ground shadow. Genuine clean RGBA transparent background.\nSame original grey tied hair, navy and ivory statesman coat, visible composed mechanical left hand. A firm dangerous conviction behind eyes and a barely visible tight smile, mechanical hand clenched gently at chest height, shoulders opened."
+    },
+    {
+      "path": "Characters_Standing/zone_distant.png",
+      "key": "zone_distant",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New separate performance sprite in an original Beyond Destiny Korean animated visual novel. Supplied standing image is identity and costume reference only. Preserve its face shape, hair, eye color, palette, boots and costume extremely closely. Entire 8-head figure from top to shoes fully inside vertical frame with room to breathe. Crisp fine linework, careful nuanced character acting, no glow, lettering, scenery or ground shadow. Genuine clean RGBA transparent background.\nSame silver hair and looming navy steel exosuit of the older man. Face turned a little to screen left looking far away with distant cold recognition, aged brows angled, one restrained hand gesture low near the abdomen. Preserve the entire exosuit geometry and color, no glows."
     }
   ],
   "cutscenes": [
@@ -1089,6 +1429,308 @@
         941
       ],
       "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed event CG for Beyond Destiny. Hand-painted commercial Korean animation with clean restrained linework, solid grounded shapes, believable complex expression and pose, layered depth, focused composition with room across bottom for subtitles. No lettering, watermark, UI, borders, or replication of any existing commercial anime or game image. Supplied sprites are only character design reference; compose a new scene.\nLow warm sunset entering a modest Neo Domino apartment, amber reflection on glass balcony doors. Yun, a lean adult Korean man of 24, short tousled jet-black side-parted hair, charcoal eyes and worn black raincoat, muted aubergine lining, gray shirt, healed faint barcode-shaped scar near left collarbone. smiles softly in a simple dark grey collar shirt by the veranda, his raincoat hung on a hook at the back. Aki, 21-year-old adult with an asymmetric neck-length wine-red bob and rose-amber eyes with an oatmeal knit pullover and burgundy apron stirs stew with a wooden spoon. Sherry, 24-year-old white French woman with sleek sun-gold shoulder-length hair with face-framing long layers, eyes a vivid icy blue, angular fine features, cool pale complexion, poised athletic build. Sherry wears a tailored cream top and warm blue apron and tastes sauce with a small spoon, smiles toward the others. Only these three adults. Show the domestic scene with warm backlight, silhouette of the estuary outside, smiles and hands believable, not posed, quietly intimate."
+    }
+  ],
+  "dialoguePortraits": {
+    "voiceOnlySpeakers": [
+      "announcer",
+      "security_radio",
+      "crowd",
+      "spectator_a",
+      "spectator_b",
+      "spectator_c",
+      "unknown_voice"
+    ],
+    "voiceOnlyAliases": [
+      "디바인의 목소리",
+      "모니터 속 디바인의 음성",
+      "미스티의 목소리"
+    ],
+    "expressions": [
+      {
+        "base": "aki",
+        "art": "aki_distress",
+        "tone": [
+          "창백",
+          "통증",
+          "자책",
+          "공포",
+          "경악",
+          "절망",
+          "오열",
+          "울먹",
+          "눈물",
+          "고통",
+          "충격",
+          "떨리",
+          "멍함"
+        ]
+      },
+      {
+        "base": "aki_masked",
+        "art": "aki_masked_resolve",
+        "tone": [
+          "격앙",
+          "냉혹",
+          "분노",
+          "결의",
+          "외침",
+          "날카롭",
+          "사납",
+          "격노",
+          "선언",
+          "차갑"
+        ]
+      },
+      {
+        "base": "aki_casual",
+        "art": "aki_casual_hope",
+        "tone": [
+          "미소",
+          "안도",
+          "행복",
+          "희망",
+          "환하",
+          "따뜻",
+          "기뻐",
+          "밝은 웃음"
+        ]
+      },
+      {
+        "base": "aki_casual",
+        "art": "aki_casual_distress",
+        "tone": [
+          "눈물",
+          "절망",
+          "심란",
+          "분노",
+          "충격",
+          "창백",
+          "고통",
+          "경악",
+          "침울",
+          "상처",
+          "불안",
+          "애절",
+          "슬프",
+          "흔들"
+        ]
+      },
+      {
+        "base": "aki_riding",
+        "art": "aki_riding_resolve",
+        "tone": [
+          "결의",
+          "의욕",
+          "단호",
+          "굳은",
+          "의지",
+          "필사",
+          "절규",
+          "외침",
+          "강렬",
+          "비장"
+        ]
+      },
+      {
+        "base": "sherry",
+        "art": "sherry_stern",
+        "tone": [
+          "날카롭",
+          "당당",
+          "냉철",
+          "굳은",
+          "경계",
+          "차갑",
+          "위압",
+          "진지",
+          "의심",
+          "냉소"
+        ]
+      },
+      {
+        "base": "sherry_fallen",
+        "art": "sherry_fallen_anguish",
+        "tone": [
+          "눈물",
+          "절규",
+          "경악",
+          "절망",
+          "충격",
+          "슬픔",
+          "애절",
+          "서러운",
+          "고통"
+        ]
+      },
+      {
+        "base": "hero",
+        "art": "hero_haunted",
+        "tone": [
+          "공허",
+          "씁쓸",
+          "과거",
+          "악몽",
+          "실험실",
+          "흉터",
+          "고통",
+          "묵직",
+          "지친"
+        ]
+      },
+      {
+        "base": "devine",
+        "art": "devine_anger",
+        "tone": [
+          "분노",
+          "격노",
+          "광기",
+          "위협",
+          "격앙",
+          "역정",
+          "발악",
+          "경악",
+          "일그러",
+          "악의",
+          "절규"
+        ]
+      },
+      {
+        "base": "yusei",
+        "art": "yusei_relief",
+        "tone": [
+          "미소",
+          "안도",
+          "따뜻",
+          "반가",
+          "부드럽",
+          "웃음"
+        ]
+      },
+      {
+        "base": "jack",
+        "art": "jack_defiant",
+        "tone": [
+          "비웃",
+          "으르렁",
+          "화난",
+          "분노",
+          "오만",
+          "불쾌",
+          "팔짱",
+          "격앙",
+          "신경질",
+          "호통",
+          "투덜"
+        ]
+      },
+      {
+        "base": "crow",
+        "art": "crow_grin",
+        "tone": [
+          "호탕",
+          "웃음",
+          "유쾌",
+          "웃으며",
+          "웃으",
+          "반가",
+          "경쾌",
+          "놀리",
+          "장난",
+          "환호"
+        ]
+      },
+      {
+        "base": "mizoguchi",
+        "art": "mizoguchi_concern",
+        "tone": [
+          "걱정",
+          "우려",
+          "복잡",
+          "당혹",
+          "급하게",
+          "당황",
+          "중후",
+          "심각",
+          "물으며",
+          "진지"
+        ]
+      },
+      {
+        "base": "misty",
+        "art": "misty_grief",
+        "tone": [
+          "눈물",
+          "회한",
+          "슬픔",
+          "비통",
+          "절망",
+          "애절",
+          "고통",
+          "흔들",
+          "울음",
+          "울먹",
+          "떨리는"
+        ]
+      },
+      {
+        "base": "rex",
+        "art": "rex_fervor",
+        "tone": [
+          "광기",
+          "광신",
+          "거만",
+          "웅장",
+          "흥분",
+          "선언",
+          "열광",
+          "거침",
+          "고고"
+        ]
+      },
+      {
+        "base": "zone",
+        "art": "zone_distant",
+        "tone": [
+          "서늘",
+          "공허",
+          "차갑",
+          "무기질",
+          "무감",
+          "공명",
+          "낮고",
+          "기계",
+          "담담",
+          "의미심장",
+          "속삭",
+          "장엄",
+          "나직",
+          "매혹"
+        ]
+      }
+    ],
+    "viewpoints": {
+      "beyond_destiny_ep_32_scene_02": "sherry",
+      "beyond_destiny_ep_32_scene_03": "sherry",
+      "beyond_destiny_ep_32_scene_04": "sherry"
+    },
+    "narrationPortraits": {
+      "beyond_destiny_ep_20:15": {
+        "actor": "rex",
+        "tone": "광기"
+      }
+    }
+  },
+  "duelCards": [
+    {
+      "code": 511090001,
+      "path": "DuelCards/speed_world_2.png",
+      "source": "ImageGen built-in",
+      "resolution": [
+        640,
+        640
+      ],
+      "prompt": "Use case: illustration-story. Square album-like card inset illustration for the original Beyond Destiny game, a compact 1:1 logo-free stylized science fiction racetrack design. Original dark futuristic orbital highway forms two luminous teal ribbons in an S curve leading into a low bronze midnight horizon with three faint brush streaks. Foreground lines of cold cyan racing infrastructure and wet asphalt; a long airy teal energy loop arches above the track at the center, subtle yellow accents at the base. No vehicles, words, lettering, logos, people, faces, card frame, reference game images, watermark, or HUD. Strong legible angular silhouette and medium contrast at postage stamp size. Painterly premium Korean game scene illustration with grounded geometry, moody cinematic soft edge. Keep the image center visually concentrated at square inset crop. Full bleed."
     }
   ]
 }

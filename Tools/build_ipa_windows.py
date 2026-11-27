@@ -385,7 +385,15 @@ def main():
         parser.error("--local-cutins와 --local-interface는 카드 데이터 ZIP을 함께 만들 때 사용할 수 있습니다.")
     if sys.version_info < (3, 9):
         raise BuildError("Python 3.9 이상이 필요합니다.")
-    print("[1/5] Unity iOS 모듈과 GitHub 연결을 확인합니다.")
+    print("[1/5] 5D’s 캠페인 데이터, Unity iOS 모듈과 GitHub 연결을 확인합니다.")
+    for script, arguments in (
+        ("build_5ds_story_json.py", ("--check", "--require-all-maps")),
+        ("build_5ds_story_decks.py", ("--check",)),
+    ):
+        result = subprocess.run([sys.executable, "-X", "utf8", str(PROJECT / "Tools" / script), *arguments],
+                                cwd=PROJECT, check=False)
+        if result.returncode:
+            raise BuildError(f"5D’s 캠페인 데이터 검사 실패. {script}")
     editor, github, branch, revision = prepare()
     print(f"    {github.repository} / {branch} / {revision[:7]}")
     drive_folder = local_build_folder("ygo.ipaDriveFolder")

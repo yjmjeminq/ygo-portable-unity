@@ -23,6 +23,7 @@ namespace YGOPortable.UI
         public string sfx;
         public StoryStageAction[] stage;
         internal string storyHeroPortrait, storyGuestPortrait;
+        internal int storySpeakerSide;
 
         internal string SceneMapPath => !string.IsNullOrEmpty(sceneMap) &&
             sceneMap.All(c => char.IsLetterOrDigit(c) || c is '_' or '-') ? $"Maps/{sceneMap}.png" : null;

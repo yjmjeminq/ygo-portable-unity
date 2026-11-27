@@ -166,8 +166,9 @@ namespace YGOPortable.UI
                 sceneTime = index == 0 ? scene.title : null,
                 cutscene = page.Cutscene,
                 fx = page.Effect,
-                storyHeroPortrait = page.Hero,
-                storyGuestPortrait = page.Other,
+                storyHeroPortrait = page.Text.heroPortrait,
+                storyGuestPortrait = page.Text.guestPortrait,
+                storySpeakerSide = page.Text.speakerSide,
             }).ToArray();
             _dialogue.Open($"제{chapter.number}화 · {chapter.title}", "주인공", (OpponentCharacter)null, lines, () =>
             {
@@ -253,7 +254,10 @@ namespace YGOPortable.UI
             {
                 "hero_anti_synchro" or "rescue" => "hero",
                 "ghost" => "ghost_a",
+                "wrpg_anchor" => "opponent_anchor",
                 "aki" when _playback.Episode.number == 1 => "aki_masked",
+                "aki" when _playback.Episode.number is >= 22 and <= 31 => "aki_riding",
+                "sherry" when _playback.Episode.number is 34 or 35 => "sherry_fallen",
                 _ => key,
             };
             return _art.GetBust(WorldArt + "Characters_Standing/" + actor + ".png");

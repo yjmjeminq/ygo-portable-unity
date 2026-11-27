@@ -21,18 +21,16 @@ namespace YGOPortable.Core
         {
             internal readonly int Index;
             internal readonly BeyondDestinyCampaign.Cue Text;
-            internal readonly string Map, Hero, Other, Cutscene, Effect;
+            internal readonly string Map, Cutscene, Effect;
             internal readonly BeyondDestinyCampaign.Cue[] Audio;
 
-            internal Page(int index, BeyondDestinyCampaign.Cue text, string map, string hero, string other,
-                string cutscene, string effect, BeyondDestinyCampaign.Cue[] audio)
+            internal Page(int index, BeyondDestinyCampaign.Cue text, string map,
+                string effect, BeyondDestinyCampaign.Cue[] audio)
             {
                 Index = index;
                 Text = text;
                 Map = map;
-                Hero = hero;
-                Other = other;
-                Cutscene = cutscene;
+                Cutscene = text.cutsceneKey;
                 Effect = effect;
                 Audio = audio;
             }
@@ -90,8 +88,6 @@ namespace YGOPortable.Core
             var scene = Scene;
             var pages = new List<Page>();
             var audio = new List<BeyondDestinyCampaign.Cue>();
-            var poses = new Dictionary<string, string>(StringComparer.Ordinal);
-            var outfits = new Dictionary<string, string>(StringComparer.Ordinal);
             BeyondDestinySoundscape initialAudio = default;
             for (int chapter = 0; chapter <= Progress.episodeIndex; ++chapter)
             {
@@ -99,10 +95,7 @@ namespace YGOPortable.Core
                 int sceneCount = chapter == Progress.episodeIndex ? Progress.sceneIndex : previous.scenes.Length;
                 for (int prior = 0; prior < sceneCount; ++prior)
                     foreach (var priorCue in previous.scenes[prior].events)
-                    {
-                        RememberCast(priorCue, poses: null, outfits);
                         initialAudio = initialAudio.After(priorCue);
-                    }
             }
             string map = scene.backgroundPath;
             string effect = null;
@@ -123,9 +116,6 @@ namespace YGOPortable.Core
                         map = cue.assetPath;
                         if (index >= start) audio.Add(cue);
                         break;
-                    case "standing":
-                        RememberCast(cue, poses, outfits);
-                        break;
                     case "direction":
                         if (index >= start) effect = VisualEffect(cue.text) ?? effect;
                         break;
@@ -136,17 +126,7 @@ namespace YGOPortable.Core
                         break;
                 }
                 if (!cue.IsReadable || index < start) continue;
-                var actor = cue.speakerKey;
-                string cast = actor == "hero" ? null : Portrait(actor, outfits.GetValueOrDefault(actor ?? ""));
-                if (cast == null)
-                {
-                    foreach (var stageActor in poses)
-                        if (stageActor.Key != "hero") cast = Portrait(stageActor.Key, outfits.GetValueOrDefault(stageActor.Key));
-                }
-                string heroOutfit = Scene.id == "beyond_destiny_ep_01_scene_05" && cue.text.Contains("흉터")
-                    ? "scar" : outfits.GetValueOrDefault("hero");
-                pages.Add(new Page(checkpoint, cue, map, Portrait("hero", heroOutfit),
-                    cast, cue.cutsceneKey, effect, audio.ToArray()));
+                pages.Add(new Page(checkpoint, cue, map, effect, audio.ToArray()));
                 checkpoint = index + 1;
                 audio.Clear();
                 effect = null;
@@ -212,33 +192,6 @@ namespace YGOPortable.Core
             values.Add(value);
             return true;
         }
-
-        private static void RememberCast(BeyondDestinyCampaign.Cue cue, Dictionary<string, string> poses,
-            Dictionary<string, string> outfits)
-        {
-            foreach (var member in cue.cast ?? Array.Empty<BeyondDestinyCampaign.Standing>())
-            {
-                if (poses != null) poses[member.speakerKey] = member.pose;
-                string outfit = Outfit(member.speakerKey, member.pose);
-                if (outfit != null) outfits[member.speakerKey] = outfit;
-            }
-        }
-
-        private static string Outfit(string actor, string pose)
-        {
-            if (string.IsNullOrEmpty(pose)) return null;
-            bool everyday = pose.Contains("일상") || pose.Contains("평상복") || pose.Contains("사복");
-            if (actor == "aki" && pose.Contains("가면"))
-                return pose.Contains("없") || pose.Contains("벗") || pose.Contains("해제") ? "" : "masked";
-            if (actor == "aki" && pose.Contains("라이딩 슈트")) return "riding";
-            if (actor == "aki" && everyday) return "casual";
-            if (actor == "sherry" && pose.Contains("타락")) return "fallen";
-            if (actor == "sherry" && (everyday || pose.Contains("평소 복장") || pose.Contains("드레스 코트"))) return "";
-            return null;
-        }
-
-        private static string Portrait(string actor, string outfit) => string.IsNullOrWhiteSpace(actor) ? null :
-            "Characters_Standing/" + actor + (string.IsNullOrEmpty(outfit) ? "" : "_" + outfit);
 
         private static string VisualEffect(string text) =>
             text.Contains("흔들") || text.Contains("진동") ? "shake" :

@@ -20,6 +20,7 @@ namespace YGOPortable.Editor
                 var campaign = BeyondDestinyCampaign.Load(Application.streamingAssetsPath);
                 VerifyScriptAndEncounters(campaign);
                 VerifyAudio(campaign);
+                VerifyPortraits(campaign);
                 VerifyIndependentProgress(campaign);
                 VerifyPlayback(campaign);
                 VerifyNativeDuelOpenings(campaign);
@@ -62,6 +63,33 @@ namespace YGOPortable.Editor
                 campaign.DeckById(boss.opponentDeckId).sigCard == 73580471 &&
                 campaign.DeckById(boss.playerDeckId).main.Length == 40,
                 "Episode 31 must preserve its original result and use the correct riding decks.");
+        }
+
+        private static void VerifyPortraits(BeyondDestinyCampaign campaign)
+        {
+            var scenes = campaign.Episodes.SelectMany(episode => episode.scenes).ToArray();
+            var pages = scenes.SelectMany(scene => scene.events).Where(cue => cue.IsReadable).ToArray();
+            string root = Path.Combine(Application.streamingAssetsPath, "TagForce", BeyondDestinyCampaign.AssetFolder);
+            Require(pages.All(cue => cue.heroPortrait != null && cue.speakerSide is >= 0 and <= 3 &&
+                ((cue.speakerSide & 2) == 0 || cue.guestPortrait != null)),
+                "A page has no left portrait or assigns an empty speaker lane.");
+            var paths = pages.SelectMany(cue => new[] { cue.heroPortrait, cue.guestPortrait })
+                .Where(path => path != null).Distinct().ToArray();
+            Require(paths.Length >= 49 && paths.All(path => File.Exists(Path.Combine(root, path + ".png"))),
+                "A named cast or portrait variant points at missing artwork.");
+
+            BeyondDestinyCampaign.Cue At(int episode, int scene, int line) =>
+                campaign.Episodes[episode - 1].scenes[scene - 1].events.Single(cue => cue.line == line);
+            Require(At(2, 3, 91).guestPortrait == "Characters_Standing/aki_distress" &&
+                At(20, 1, 15).guestPortrait == "Characters_Standing/rex_fervor", "Early distress or the narrated opponent lost their painted pose.");
+            Require(At(3, 3, 156).guestPortrait == null && At(3, 3, 156).speakerSide == 0,
+                "An off-camera intercepted voice incorrectly put its speaker in the room.");
+            var rooftop = At(32, 4, 146);
+            Require(rooftop.heroPortrait == "Characters_Standing/sherry" && rooftop.guestPortrait == "Characters_Standing/zone_distant" &&
+                rooftop.speakerSide == 2, "The rooftop cutaway must stage Sherry and Z-ONE as the active cast.");
+            var both = At(36, 1, 56);
+            Require(both.heroPortrait == "Characters_Standing/aki_riding" && both.guestPortrait == "Characters_Standing/sherry" &&
+                both.speakerSide == 3, "The synchronized dialogue must highlight both characters.");
         }
 
         private static void VerifyAudio(BeyondDestinyCampaign campaign)
@@ -169,8 +197,8 @@ namespace YGOPortable.Editor
                     readable += segment.Pages.Length;
                     foreach (var page in segment.Pages)
                     {
-                        wardrobe.Add(page.Hero);
-                        wardrobe.Add(page.Other);
+                        wardrobe.Add(page.Text.heroPortrait);
+                        wardrobe.Add(page.Text.guestPortrait);
                     }
                     playback.Finish(segment);
                     if (segment.Duel == null) continue;

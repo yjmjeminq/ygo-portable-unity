@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import re
+import struct
 import wave
 from pathlib import Path
 
@@ -288,6 +289,132 @@ def bind_cutscenes(scenes, manifest):
     return len(keys)
 
 
+def bind_portraits(episodes, manifest):
+    art_dir = "Characters_Standing"
+    portraits = {}
+    for entry in manifest["characters"]:
+        path = entry["path"]
+        if not path.startswith(art_dir + "/"):
+            continue
+        key = Path(path).stem
+        if not re.fullmatch(r"Characters_Standing/[a-z0-9_]+\.png", path) or key in portraits:
+            raise ValueError(f"Invalid or duplicate Beyond Destiny portrait: {path}")
+        source = ASSET_ROOT / path
+        with source.open("rb") as image:
+            header = image.read(26)
+        if len(header) != 26 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[25] != 6:
+            raise ValueError(f"Beyond Destiny portrait lacks RGBA alpha: {path}")
+        width, height = struct.unpack(">II", header[16:24])
+        if [width, height] != entry["resolution"] or height <= width:
+            raise ValueError(f"Invalid Beyond Destiny portrait dimensions: {path}")
+        portraits[key] = path.removesuffix(".png")
+
+    design = manifest["dialoguePortraits"]
+    voice_only = set(design["voiceOnlySpeakers"])
+    duet = "aki_sherry"
+    if not voice_only <= SPEAKERS.keys() or "hero" in voice_only or duet in voice_only:
+        raise ValueError("The Beyond Destiny voice-only cast contains an unknown or staged speaker")
+    actors = SPEAKERS.keys() - voice_only - {duet}
+    if missing := actors - portraits.keys():
+        raise ValueError(f"Missing Beyond Destiny cast portraits: {sorted(missing)}")
+    voice_aliases = set(design["voiceOnlyAliases"])
+    if not voice_aliases <= {alias for actor in actors for alias in SPEAKERS[actor]}:
+        raise ValueError("Unknown Beyond Destiny voice-only alias")
+    expressions = {}
+    expression_art = set()
+    for rule in design["expressions"]:
+        base, image, words = rule["base"], rule["art"], rule["tone"]
+        if base not in portraits or image not in portraits or image in expression_art or not all(words) or not words:
+            raise ValueError(f"Unbound Beyond Destiny expression: {rule}")
+        expressions.setdefault(base, []).append((image, words))
+        expression_art.add(image)
+
+    # Wardrobe is durable across scenes, while viewpoint and visible cast are local to a scene.
+    wardrobe = {}
+    viewpoints, narration = design["viewpoints"], design["narrationPortraits"]
+    scene_keys = {scene["id"] for episode in episodes for scene in episode["scenes"]}
+    if not viewpoints.keys() <= scene_keys or not set(viewpoints.values()) <= actors:
+        raise ValueError("Unknown Beyond Destiny scene or actor in viewpoint overrides")
+    used_narration = set()
+
+    def remember_wardrobe(actor, pose):
+        everyday = any(word in pose for word in ("일상", "평상복", "사복"))
+        if actor == "aki":
+            if "가면" in pose:
+                wardrobe[actor] = "aki" if any(word in pose for word in ("없", "벗", "해제")) else "aki_masked"
+            if "라이딩 슈트" in pose:
+                wardrobe[actor] = "aki_riding"
+            elif everyday:
+                wardrobe[actor] = "aki_casual"
+        elif actor == "sherry":
+            if "타락" in pose:
+                wardrobe[actor] = "sherry_fallen"
+            elif everyday or any(word in pose for word in ("평소 복장", "드레스 코트")):
+                wardrobe[actor] = "sherry"
+
+    used = set()
+
+    def likeness(actor, tone=""):
+        base = wardrobe.get(actor, actor)
+        image = next((image for image, words in expressions.get(base, ())
+                      if any(word in tone for word in words)), base)
+        used.add(image)
+        return portraits[image]
+
+    for episode in episodes:
+        for scene in episode["scenes"]:
+            stage = {}
+            focal_actor = viewpoints.get(scene["id"], "hero")
+            for cue in scene["events"]:
+                if cue["kind"] == "standing":
+                    for member in cue["cast"]:
+                        actor, pose = member["speakerKey"], member["pose"]
+                        if actor not in actors:
+                            continue
+                        remember_wardrobe(actor, pose)
+                        stage.pop(actor, None)
+                        if "퇴장" not in cue["text"]:
+                            stage[actor] = pose
+                if cue["kind"] not in {"dialogue", "thought", "narration", "system", "prose"}:
+                    continue
+                actor = cue.get("speakerKey")
+                tone = cue.get("tone", "")
+                if actor == duet:
+                    cue.update(heroPortrait=likeness("aki", tone), guestPortrait=likeness("sherry", tone), speakerSide=3)
+                    continue
+                if focal_actor == "hero" and scene["id"] == "beyond_destiny_ep_01_scene_05" and "흉터" in cue["text"]:
+                    cue["heroPortrait"] = portraits["hero_scar"]
+                    used.add("hero_scar")
+                else:
+                    focal_tone = tone if actor == focal_actor else stage.get(focal_actor, "")
+                    if focal_actor == "hero" and cue["kind"] == "thought":
+                        focal_tone += " " + cue["text"]
+                    cue["heroPortrait"] = likeness(focal_actor, focal_tone)
+                if actor in voice_only or cue.get("speaker") in voice_aliases or "도청기 너머" in tone or "통신기 너머" in tone:
+                    continue
+                if actor in actors:
+                    if actor == focal_actor:
+                        cue["speakerSide"] = 1
+                    else:
+                        cue.update(guestPortrait=likeness(actor, tone or stage.get(actor, "")), speakerSide=2)
+                if cue.get("guestPortrait") is None:
+                    key = f"{episode['id']}:{cue['line']}"
+                    if frame := narration.get(key):
+                        if cue["kind"] != "narration" or frame["actor"] not in actors:
+                            raise ValueError(f"Invalid Beyond Destiny narrator portrait at {key}")
+                        used_narration.add(key)
+                        cue["guestPortrait"] = likeness(frame["actor"], frame["tone"])
+                    else:
+                        guest = next((member for member in reversed(stage) if member != focal_actor), None)
+                        if guest:
+                            cue["guestPortrait"] = likeness(guest, stage[guest])
+    if used_narration != narration.keys():
+        raise ValueError("A Beyond Destiny narrator portrait does not match the manuscript")
+    if missing := expression_art - used:
+        raise ValueError(f"Painted expressions have no manuscript cue: {sorted(missing)}")
+    return len(actors), len(expression_art)
+
+
 def bind_audio(episodes, catalog, manifest):
     if manifest.get("version") != 1:
         raise ValueError("Unknown Beyond Destiny audio manifest")
@@ -381,11 +508,16 @@ def build(source, *, require_all_maps=False):
         raise ValueError("Unknown Beyond Destiny asset manifest")
     mapped_count = bind_backgrounds(scenes, catalog["backgrounds"], manifest, require_all_maps)
     cutscenes = bind_cutscenes(scenes, manifest)
+    cards = {item["code"]: item["path"] for item in manifest["duelCards"]}
+    if cards != {511090001: "DuelCards/speed_world_2.png"} or not all((ASSET_ROOT / path).is_file() for path in cards.values()):
+        raise ValueError("Speed World 2 must have original standalone card artwork")
     audio = bind_audio(episodes, catalog, json.loads(AUDIO_MANIFEST.read_text(encoding="utf-8")))
+    portraits, expressions = bind_portraits(episodes, manifest)
     return {"schemaVersion": 1, "id": "beyond_destiny", "title": "5D's: Beyond Destiny",
             "linear": True, "sourceBibleSha256": hashes["5d_s_story_bible.md"],
             "speakers": SPEAKERS, "cueCatalog": catalog, "mappedBackgrounds": mapped_count,
-            "mappedCutscenes": cutscenes, "mappedAudioClips": audio, "episodes": episodes}
+            "mappedCutscenes": cutscenes, "mappedAudioClips": audio, "portraitActors": portraits,
+            "portraitExpressions": expressions, "episodes": episodes}
 
 
 def main():
@@ -409,6 +541,7 @@ def main():
     print(f"{EPISODE_COUNT} episodes, {SCENE_COUNT} scenes, {CHARACTER_COUNT:,} characters verified")
     print(f"{data['mappedBackgrounds']}/{len(data['cueCatalog']['backgrounds'])} background cues bound to artwork")
     print(f"{data['mappedCutscenes']} event CGs bound to manuscript line ranges")
+    print(f"{data['portraitActors']} speaking roles and {data['portraitExpressions']} painted expressions bound to dialogue")
     print(f"{len(data['cueCatalog']['music'])} BGM keys and {len(data['cueCatalog']['sounds'])} SFX cues bound to {data['mappedAudioClips']} audio clips")
 
 

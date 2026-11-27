@@ -49,6 +49,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate the Beyond Destiny campaign
+        run: |
+          python3 Tools/build_5ds_story_json.py --check --require-all-maps
+          python3 Tools/build_5ds_story_decks.py --check
+
       - name: Read build settings
         id: settings
         env:

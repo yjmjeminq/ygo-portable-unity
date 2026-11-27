@@ -82,10 +82,34 @@ end
 -- These scenes begin partway through their respective riding rounds.
 local function beyondDestinyOpening(counters)
     return function(human)
+        local function anotherFieldSpell(card)
+            return card and card:IsType(TYPE_FIELD) and not card:IsCode(511090001)
+        end
+        for player=0,1 do
+            -- Speed World remains the track while the usual Monster and Spell/Trap Zones work normally.
+            story.playerRule(player,EFFECT_CANNOT_ACTIVATE,function(_,effect)
+                return effect:IsHasType(EFFECT_TYPE_ACTIVATE) and anotherFieldSpell(effect:GetHandler())
+            end)
+            story.playerRule(player,EFFECT_CANNOT_SSET,1,nil,function(_,card)
+                return anotherFieldSpell(card)
+            end)
+        end
         story.onEvent(human,EVENT_STARTUP,function()
             for player=0,1 do
                 local field=Duel.GetFieldCard(player,LOCATION_FZONE,0)
                 if field and field:IsCode(511090001) then
+                    local function protect(code,value)
+                        local effect=Effect.CreateEffect(field)
+                        effect:SetType(EFFECT_TYPE_SINGLE)
+                        effect:SetCode(code)
+                        effect:SetProperty(EFFECT_FLAG_CANNOT_DISABLE|EFFECT_FLAG_UNCOPYABLE)
+                        effect:SetValue(value)
+                        field:RegisterEffect(effect)
+                    end
+                    protect(EFFECT_IMMUNE_EFFECT,function(_,incoming)
+                        return incoming:GetHandler()~=field
+                    end)
+                    protect(EFFECT_CANNOT_BE_EFFECT_TARGET,1)
                     field:AddCounter(0x0091,counters)
                 end
             end

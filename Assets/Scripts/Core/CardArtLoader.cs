@@ -29,6 +29,8 @@ namespace YGOPortable.Core
         private const int PackagedDuelArtPackId = -4;
         private const int SourceOverframePackId = -5;
         private const int PackagedSourceOverframePackId = -6;
+        private const int StoryTrackArtId = -7;
+        private const string StoryTrackArtFile = "TagForce/5DS/DuelCards/speed_world_2.png";
         private const int BundledArtwork = -1;
         internal const int SourceOverframeFace = -2;
         private static readonly Dictionary<uint, (uint Code, int Variant)[]> ArtworkChoicesByFamily = new();
@@ -87,6 +89,9 @@ namespace YGOPortable.Core
                 Debug.LogWarning($"[CardArtLoader] Missing or invalid {idxPath}");
             ReadArtIndex(Path.Combine(streamingAssetsPath, TokenArtFileName));
             ReadArtIndex(Path.Combine(streamingAssetsPath, SupplementalArtFileName));
+            var storyTrack = new FileInfo(Path.Combine(Application.streamingAssetsPath, StoryTrackArtFile));
+            if (storyTrack.Exists && storyTrack.Length is > 0 and < int.MaxValue)
+                _index[StoryGimmickRuntime.SpeedWorld] = new ArtEntry { packId = StoryTrackArtId, length = (uint)storyTrack.Length };
             ReadDuelArtIndex(Path.Combine(ActiveDuelVisualsPath, DuelArtFileName), DuelArtPackId);
             ReadDuelArtIndex(Path.Combine(PackagedDuelVisualsPath, DuelArtFileName), PackagedDuelArtPackId);
             ReadDuelArtIndex(Path.Combine(ActiveDuelVisualsPath, SourceOverframeFileName), SourceOverframePackId);
@@ -486,6 +491,7 @@ namespace YGOPortable.Core
                     {
                         TokenArtPackId => Path.Combine(_streamingDir, TokenArtFileName),
                         SupplementalArtPackId => Path.Combine(_streamingDir, SupplementalArtFileName),
+                        StoryTrackArtId => Path.Combine(Application.streamingAssetsPath, StoryTrackArtFile),
                         _ => Path.Combine(_streamingDir, $"cardart_{entry.packId}.pack"),
                     };
                     if (!File.Exists(packPath)) return null;
