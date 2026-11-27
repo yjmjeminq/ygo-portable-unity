@@ -409,6 +409,7 @@ namespace YGOPortable.UI
             var previousScreen = _screen;
             bool fieldStory = screen == AppScreen.StoryMode && _storyMode.FromRpgField;
             bool fieldStoryDeckEditor = screen == AppScreen.DeckEditor && _storyDeckEditorOpen && _storyMode.FromRpgField;
+            bool beyondDestinyDuel = screen == AppScreen.Duel && _activeBeyondDestiny != null;
             _screen = screen;
             _menuPad?.Clear();
             _menuPadInput.Reset();
@@ -426,7 +427,7 @@ namespace YGOPortable.UI
             if (screen != AppScreen.Tournament) _tournament.Close();
             if (screen != AppScreen.Ranked) _ranked.Close();
             if (screen is not (AppScreen.Campaigns or AppScreen.BeyondDestiny)) _beyondDestiny?.Close();
-            if (screen != AppScreen.BeyondDestiny) StopBeyondDestinyAudio();
+            if (screen != AppScreen.BeyondDestiny && !beyondDestinyDuel) StopBeyondDestinyAudio();
             if (fieldStoryDeckEditor) _tagForceWorld.Root.SetActive(false);
             else if (screen != AppScreen.TagForceWorld && !fieldStory) _tagForceWorld?.Close();
             if (screen == AppScreen.DeckEditor && _storyDeckEditorOpen) _storyMode.SuspendForDeckEditor();
@@ -438,11 +439,12 @@ namespace YGOPortable.UI
 
             if (screen == AppScreen.Duel)
             {
-                DuelAudio.PlayDuelBgm();
+                if (!beyondDestinyDuel) DuelAudio.PlayDuelBgm();
             }
             else
             {
-                if (screen != AppScreen.TagForceWorld && !fieldStory && !fieldStoryDeckEditor) DuelAudio.PlayMenuBgm();
+                if (screen == AppScreen.BeyondDestiny) DuelAudio.StopBgm();
+                else if (screen != AppScreen.TagForceWorld && !fieldStory && !fieldStoryDeckEditor) DuelAudio.PlayMenuBgm();
                 _activeStoryEpisode = null;
                 _activeTournament = null;
                 _activeRanked = null;
@@ -668,6 +670,7 @@ namespace YGOPortable.UI
                 ShowDuelStartFailure(isStoryDuel, reason, isTournamentDuel, isRankedDuel, isTagForceDuel);
                 return;
             }
+            if (!isBeyondDestiny) _activeBeyondDestiny = null;
             _activeOppChar = oppChar;
             _activeOppDeck = oppDeck;
             _activeMyDeck = myDeck;

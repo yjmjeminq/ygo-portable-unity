@@ -19,6 +19,7 @@ namespace YGOPortable.Editor
             {
                 var campaign = BeyondDestinyCampaign.Load(Application.streamingAssetsPath);
                 VerifyScriptAndEncounters(campaign);
+                VerifyAudio(campaign);
                 VerifyIndependentProgress(campaign);
                 VerifyPlayback(campaign);
                 VerifyNativeDuelOpenings(campaign);
@@ -61,6 +62,45 @@ namespace YGOPortable.Editor
                 campaign.DeckById(boss.opponentDeckId).sigCard == 73580471 &&
                 campaign.DeckById(boss.playerDeckId).main.Length == 40,
                 "Episode 31 must preserve its original result and use the correct riding decks.");
+        }
+
+        private static void VerifyAudio(BeyondDestinyCampaign campaign)
+        {
+            var all = campaign.Episodes.SelectMany(episode => episode.scenes).SelectMany(scene => scene.events).ToArray();
+            var music = all.Where(cue => cue.kind == "music").ToArray();
+            var sounds = all.Where(cue => cue.kind == "sound").ToArray();
+            Require(music.Length == 208 && sounds.Length == 412 && all.Count(cue => cue.kind == "audio") == 10 &&
+                music.All(cue => cue.action is "fadeOut" or "stop" || cue.assetPath != null) &&
+                sounds.All(cue => cue.action == "silence" || cue.assetPath != null),
+                "The authored audio directions must be mapped to playable files or an explicit stop.");
+            var paths = all.Where(cue => cue.kind is "sound" or "music" or "audio")
+                .SelectMany(cue => new[] { cue.assetPath, cue.audioAccent }).Where(path => path != null).Distinct().ToArray();
+            Require(paths.Length == 57, "The assembled score did not contain its entire audio library.");
+            string art = Path.Combine(Application.streamingAssetsPath, "TagForce", BeyondDestinyCampaign.AssetFolder);
+            foreach (string path in paths)
+            {
+                var clip = DuelVisualAssets.ReadSound(Path.Combine(art, path), path);
+                Require(clip != null && clip.channels == 2 && clip.frequency == 22050 && clip.samples > 1000,
+                    $"The shipped Unity audio reader could not decode {path}.");
+                var lead = new float[2048];
+                clip.GetData(lead, Math.Min(clip.samples - 1024, clip.frequency / 5));
+                Require(lead.All(sample => float.IsFinite(sample) && Math.Abs(sample) < .8f), $"Invalid audio samples in {path}.");
+                UnityEngine.Object.DestroyImmediate(clip);
+            }
+
+            var opening = new BeyondDestinySoundscape(null, null);
+            foreach (var cue in campaign.Episodes[0].scenes[0].events.TakeWhile(cue => !cue.IsReadable))
+                opening = opening.After(cue);
+            Require(opening.Music == "Audio/Music/rain_signal.wav" && opening.Ambience == "Audio/Ambience/storm.wav",
+                "The opening must mix the original rain theme with the storm bed.");
+            var quietRain = all.Single(cue => cue.kind == "audio" && cue.assetPath != null);
+            var after = opening.After(quietRain);
+            Require(after.Music == null && after.Ambience == "Audio/Ambience/rain.wav" && quietRain.action == "fadeOut",
+                "The manuscript's rain-only transition must fade out music and keep rain audible.");
+            Require(music.Any(cue => cue.action == "crossfade" && cue.assetPath == "Audio/Music/infiltration.wav") &&
+                music.Any(cue => cue.action == "cut" && cue.assetPath == "Audio/Music/infiltration.wav") &&
+                music.Any(cue => cue.action == "crossfade" && cue.assetPath == "Audio/Music/arcadia_low.wav"),
+                "Crossfade, hard cut or the half-step direction was lost.");
         }
 
         private static void VerifyIndependentProgress(BeyondDestinyCampaign campaign)
@@ -113,6 +153,14 @@ namespace YGOPortable.Editor
                 Require(opening.Pages.Length > 2 && opening.Pages[0].Map == "Maps/spot_neodomino_rain_alley.png" &&
                     opening.Pages[0].Audio.Any(cue => cue.clipKeys?.Contains("BGM_Dark_Alley_Loop") == true),
                     "The opening must pass its painted background and original music cue to the dialogue.");
+                string savedAudio = Path.Combine(root, "soundscape");
+                var beforeReload = new BeyondDestinyPlayback(campaign, savedAudio);
+                beforeReload.RememberPage(opening.Pages[1].Index);
+                var afterReload = new BeyondDestinyPlayback(campaign, savedAudio).Read();
+                Require(afterReload.InitialAudio.Music == "Audio/Music/rain_signal.wav" &&
+                    afterReload.InitialAudio.Ambience == "Audio/Ambience/storm.wav" &&
+                    afterReload.Pages[0].Audio.All(cue => cue.assetPath != "Audio/Ambience/storm.wav"),
+                    "Saving on a later line must recover music and ambience without replaying earlier cues.");
                 int readable = 0, duels = 0;
                 var wardrobe = new HashSet<string>();
                 while (!playback.Progress.completed)

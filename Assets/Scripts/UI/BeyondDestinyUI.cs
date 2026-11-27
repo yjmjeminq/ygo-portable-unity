@@ -118,33 +118,37 @@ namespace YGOPortable.UI
         }
         internal bool RestoreHidden() => _dialogue.HandleDisplayInput(restore: true);
 
-        private void Resume()
+        private void Resume(bool fromField = false)
         {
             _pending = null;
             if (_playback.Progress.completed)
             {
+                _app.RestoreBeyondDestinySoundscape(default);
                 ShowPanel("5D’s: Beyond Destiny", "37화의 이야기를 모두 마쳤습니다.",
                     "캠페인 선택", () => _app.ShowScreen(AppScreen.Campaigns));
                 return;
             }
             var chapter = _playback.Episode;
             var scene = _playback.Scene;
+            var segment = _playback.Read();
             string location = Path.GetFileNameWithoutExtension(scene.backgroundPath);
             if (_playback.Progress.cueIndex == 0 && location != null && !_playback.Progress.unlockedLocations.Contains(location) &&
                 _field.Open(scene.backgroundPath, scene.title, () =>
                 {
-                    if (Save(() => _playback.UnlockLocation(scene.backgroundPath))) Resume();
+                    if (Save(() => _playback.UnlockLocation(scene.backgroundPath))) Resume(fromField: true);
                 }, _playback.FieldGuest()))
             {
                 _panel.gameObject.SetActive(false);
                 _dialogue.Close();
+                var openingCues = segment.Pages.Length > 0 ? segment.Pages[0].Audio : segment.TailAudio;
+                _app.RestoreBeyondDestinySoundscape(segment.InitialAudio.After(openingCues));
                 return;
             }
-            var segment = _playback.Read();
             if (segment.Pages.Length == 0)
             {
                 if (segment.Duel != null)
                 {
+                    _app.RestoreBeyondDestinySoundscape(segment.InitialAudio.After(segment.TailAudio));
                     ShowEncounter(segment.Duel);
                     return;
                 }
@@ -152,6 +156,7 @@ namespace YGOPortable.UI
                 if (Save(() => _playback.Finish(segment))) Resume();
                 return;
             }
+            if (!fromField) _app.RestoreBeyondDestinySoundscape(segment.InitialAudio);
             _panel.gameObject.SetActive(false);
             var lines = segment.Pages.Select((page, index) => new StoryDialogueLine
             {

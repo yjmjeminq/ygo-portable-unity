@@ -1,0 +1,1821 @@
+{
+  "version": 1,
+  "source": "Original Beyond Destiny score and synthesized Foley. Arranged and rendered by Tools/render_5ds_story_audio.py.",
+  "music": {
+    "BGM_Dark_Alley_Loop": "rain_signal",
+    "BGM_Black_Rose_Witch": "black_rose",
+    "BGM_Psychic_Duel_Battle": "psychic_battle",
+    "BGM_Scars_of_the_Past": "scars",
+    "BGM_Fortune_Cup_Opening": "festival",
+    "BGM_Underground_Infiltration": "infiltration",
+    "BGM_Witch_Rampage": "black_rose",
+    "BGM_Warmth_in_the_Dark": "nocturne",
+    "BGM_Hidden_Truth": "infiltration",
+    "BGM_Crack_in_the_Night": "arcadia",
+    "BGM_Divine_Manipulation": "arcadia",
+    "BGM_Shadow_Surveillance": "infiltration",
+    "BGM_Avenger_Hideout": "nocturne",
+    "BGM_Dawn_of_Doubt": "scars",
+    "BGM_Cold_Aftermath": "rain_signal",
+    "BGM_Wavering_Heart": "nocturne",
+    "BGM_Shattered_Rose": "black_rose",
+    "BGM_Yusei_Garage_Quiet": "nocturne",
+    "BGM_Light_vs_Shadow": "arcadia",
+    "BGM_Crimson_Dragon_Echo": "overture",
+    "BGM_Crossroads_of_Fate": "nocturne",
+    "BGM_Before_the_Storm": "scars",
+    "BGM_Last_Warning": "black_rose",
+    "BGM_Storm_Approaching": "overture",
+    "BGM_Signer_Clash": "psychic_battle",
+    "BGM_Black_Rose_Awakening": "black_rose",
+    "BGM_Stardust_vs_BlackRose": "psychic_battle",
+    "BGM_Shattered_Mask": "black_rose",
+    "BGM_Shadow_Watches": "scars",
+    "BGM_After_the_Mask": "scars",
+    "BGM_Divine_Cold_Mask": "arcadia",
+    "BGM_Trap_Closes_In": "infiltration",
+    "BGM_Return_of_the_Ghost": "backlash",
+    "BGM_Confrontation_Climax": "arcadia",
+    "BGM_Broken_Chains": "black_rose",
+    "BGM_First_Defiance": "arcadia",
+    "BGM_Declaration_of_War": "backlash",
+    "BGM_Crimson_Omen": "rain_signal",
+    "BGM_Collapse_of_Paradise": "overture",
+    "BGM_Dark_Mist_Rising": "infiltration",
+    "BGM_Confrontation_Truth": "psychic_battle",
+    "BGM_Lab_of_Lies": "infiltration",
+    "BGM_Truth_Uncovered": "scars",
+    "BGM_True_Face_of_Divine": "arcadia",
+    "BGM_Vengeance_Awakens": "backlash",
+    "BGM_Duel_of_Hatred_Intro": "overture",
+    "BGM_Psychic_Vengeance_Climax": "backlash",
+    "BGM_Backlash_Overdrive": "backlash",
+    "BGM_Fall_of_the_False_God": "ruins",
+    "BGM_Embrace_in_the_Ashes": "nocturne",
+    "BGM_Hollow_Morning": "scars",
+    "BGM_Warm_Light_Reunion": "tomorrow",
+    "BGM_Empty_Sky": "rain_signal",
+    "BGM_Lonely_Hideout": "nocturne",
+    "BGM_Rain_Departure": "scars",
+    "BGM_Rain_Overpass": "scars",
+    "BGM_Catching_the_Shadow": "nocturne",
+    "BGM_Dont_Leave_Me_Alone": "tomorrow",
+    "BGM_Bonds_in_the_Rain": "nocturne",
+    "BGM_New_Shelter": "nocturne",
+    "BGM_Garage_Daily": "garage",
+    "BGM_King_vs_StrayDog": "garage",
+    "BGM_Unexpected_Warmth": "garage",
+    "BGM_Sunset_Confession": "nocturne",
+    "BGM_Earthbound_Awakening": "rain_signal",
+    "BGM_Eve_of_the_Final_Battle": "overture",
+    "BGM_Purple_Flame_Night": "nocturne",
+    "BGM_Hollow_Heart": "ruins",
+    "BGM_Live_For_Me": "violet_fire",
+    "BGM_Promise_of_Tomorrow": "tomorrow",
+    "BGM_Battlefield_of_Shadows": "psychic_battle",
+    "BGM_Hunter_Outside_the_Barrier": "overture",
+    "BGM_Cold_Blooded_Psychic": "psychic_battle",
+    "BGM_Shadow_Guardian": "backlash",
+    "BGM_To_Her_Side": "overture",
+    "BGM_Black_Rose_Atonement": "black_rose",
+    "BGM_Shattering_the_Lie": "infiltration",
+    "BGM_Rose_Flare_Climax": "backlash",
+    "BGM_After_the_Thorns": "nocturne",
+    "BGM_King_of_the_Netherworld": "psychic_battle",
+    "BGM_Standing_Against_the_Abyss": "psychic_battle",
+    "BGM_Savior_Star_Miracle": "star_miracle",
+    "BGM_Dawn_of_Bonds": "tomorrow",
+    "BGM_First_Tomorrow": "tomorrow",
+    "BGM_Phantom_Lab": "rain_signal",
+    "BGM_Peaceful_Garage": "garage",
+    "BGM_Rose_Without_Thorns": "tomorrow",
+    "BGM_Twilight_Circuit": "night_circuit",
+    "BGM_Night_Run": "night_circuit",
+    "BGM_Night_Breeze": "nocturne",
+    "BGM_Riding_Sparring": "night_circuit",
+    "BGM_Highway_Stars": "night_circuit",
+    "BGM_Scar_Pain": "ruins",
+    "BGM_Healing_Touch": "nocturne",
+    "BGM_Kiss_On_The_Scar": "scar_kiss",
+    "BGM_Iliaster_Omen": "rain_signal",
+    "BGM_Midnight_Cruise": "night_circuit",
+    "BGM_Ghost_Ambush": "infiltration",
+    "BGM_Synchro_Killer": "synchro_killer",
+    "BGM_Awakened_Beast": "rain_signal",
+    "BGM_Cold_Execution": "psychic_battle",
+    "BGM_Aftermath_of_Blood": "scars",
+    "BGM_Cold_Corridor": "scars",
+    "BGM_Fragile_Rose": "ruins",
+    "BGM_Desperate_Confession": "tomorrow",
+    "BGM_Cracks_in_the_Light": "infiltration",
+    "BGM_Shadow_Infiltration": "infiltration",
+    "BGM_Sherry_Theme": "lily_waltz",
+    "BGM_Kindred_Darkness": "ruins",
+    "BGM_Cold_Farewell": "scars",
+    "BGM_Team_Sherry_Born": "lily_waltz",
+    "BGM_Empty_Garage_Night": "nocturne",
+    "BGM_Shadow_Investigation": "infiltration",
+    "BGM_Night_Maintenance": "nocturne",
+    "BGM_Two_Shadows_Balcony": "nocturne",
+    "BGM_Dawn_Before_WRGP": "overture",
+    "BGM_Gilded_Masquerade": "lily_waltz",
+    "BGM_Broken_Lily_Night": "nocturne",
+    "BGM_Same_Scars_Promise": "nocturne",
+    "BGM_WRGP_Grand_Opening": "festival",
+    "BGM_Riding_Duel_Assault": "synchro_killer",
+    "BGM_Psychic_Control_Drive": "backlash",
+    "BGM_Fleur_Charge": "fleur_charge",
+    "BGM_Inevitable_Collision": "overture",
+    "BGM_Semifinal_Clash": "synchro_killer",
+    "BGM_Aki_Resolve": "black_rose",
+    "BGM_Rose_vs_Shadow": "mask_breaks",
+    "BGM_Black_Rose_Ignition": "synchro_killer",
+    "BGM_Thorns_and_Backlash": "backlash",
+    "BGM_Shattered_Mask_Truth": "mask_breaks",
+    "BGM_Blooming_Crimson_Will": "mask_breaks",
+    "BGM_Break_The_Darkness": "mask_breaks",
+    "BGM_After_The_Thorns": "nocturne",
+    "BGM_Jealousy_of_the_Lily": "ruins",
+    "BGM_Desperate_Fleur": "fleur_charge",
+    "BGM_Cold_Corridor_Despair": "scars",
+    "BGM_Voice_of_ZONE": "zone",
+    "BGM_Fallen_Lily_Vanish": "overture",
+    "BGM_Ark_Cradle_Descent": "overture",
+    "BGM_Cold_Scars": "scars",
+    "BGM_Warmth_of_the_Red_Rose": "nocturne",
+    "BGM_Bifrost_Charge": "bifrost",
+    "BGM_Fallen_Fleur": "zone",
+    "BGM_Despair_Fleur_Duel": "fleur_charge",
+    "BGM_Backlash_Counter": "backlash",
+    "BGM_Ark_Cradle_Collapse": "overture",
+    "BGM_Crimson_Rose_Awakening": "star_miracle",
+    "BGM_Falling_Into_Abyss": "nocturne",
+    "BGM_Hand_of_the_Red_Rose": "rescue",
+    "BGM_After_the_Storm_Smile": "garage",
+    "BGM_Road_to_ZONE": "overture",
+    "BGM_Three_Hearts_United": "bifrost",
+    "BGM_Clear_Mind_Path": "star_miracle",
+    "BGM_Dawn_of_Hope": "star_miracle",
+    "BGM_Peaceful_Tomorrow": "home",
+    "BGM_Two_Rivals_Afternoon": "garage",
+    "BGM_Light_and_Shadow_Forever": "home"
+  },
+  "sounds": {
+    "beyond_destiny_ep_01_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "storm"
+    },
+    "beyond_destiny_ep_01_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_01_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_01_scene_01_sfx_4": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_01_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_01_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_01_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_01_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_01_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_01_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_01_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_01_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_01_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_01_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_01_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_01_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_01_scene_04_sfx_4": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_01_scene_05_sfx_1": {
+      "action": "loop",
+      "clip": "rain"
+    },
+    "beyond_destiny_ep_01_scene_06_sfx_1": {
+      "action": "play",
+      "clip": "siren"
+    },
+    "beyond_destiny_ep_01_scene_06_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_01_scene_06_sfx_3": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_02_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "arena"
+    },
+    "beyond_destiny_ep_02_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_02_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_02_scene_02_sfx_1": {
+      "action": "loop",
+      "clip": "arena"
+    },
+    "beyond_destiny_ep_02_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_02_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_02_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "water_drop"
+    },
+    "beyond_destiny_ep_02_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_02_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_02_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_02_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_02_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_03_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "clock"
+    },
+    "beyond_destiny_ep_03_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_03_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_03_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_03_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_03_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_03_scene_03_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_03_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "radio"
+    },
+    "beyond_destiny_ep_03_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "radio"
+    },
+    "beyond_destiny_ep_03_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "clink"
+    },
+    "beyond_destiny_ep_03_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_04_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "machine_room"
+    },
+    "beyond_destiny_ep_04_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_5": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_6": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_7": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_8": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_9": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_10": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_11": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_12": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_13": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_14": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_15": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_04_scene_02_sfx_16": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_04_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_04_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_04_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_04_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_05_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_05_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_05_scene_01_sfx_3": {
+      "action": "loop",
+      "clip": "arena"
+    },
+    "beyond_destiny_ep_05_scene_01_sfx_4": {
+      "action": "play",
+      "clip": "clink"
+    },
+    "beyond_destiny_ep_05_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_05_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_05_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_05_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_05_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_05_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_06_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_06_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_06_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_07_scene_02_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_07_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_07_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "siren"
+    },
+    "beyond_destiny_ep_08_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_08_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_08_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_08_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_08_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_08_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_08_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_08_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_08_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_08_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_08_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_08_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_08_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_09_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_09_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_09_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_09_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_09_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_09_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_09_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_09_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_5": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_6": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_7": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_8": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_10_scene_02_sfx_9": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_10_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "siren"
+    },
+    "beyond_destiny_ep_10_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "impact",
+      "accent": "electric"
+    },
+    "beyond_destiny_ep_11_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_11_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_11_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "radio"
+    },
+    "beyond_destiny_ep_11_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "siren"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_6": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_7": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_8": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_9": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_10": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_11": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_11_scene_03_sfx_12": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_11_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_11_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_11_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_11_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_12_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_12_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_12_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_12_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_12_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_12_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_12_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_12_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_13_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_13_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_13_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_13_scene_01_sfx_4": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_13_scene_01_sfx_5": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_13_scene_01_sfx_6": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_13_scene_01_sfx_7": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_13_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_13_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_13_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_13_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_13_scene_02_sfx_5": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_6": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_7": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_13_scene_03_sfx_8": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_13_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_13_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_13_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_13_scene_06_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_14_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_14_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_14_scene_03_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_14_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_14_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_14_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_15_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "rain",
+      "accent": "steps"
+    },
+    "beyond_destiny_ep_15_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_15_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_15_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_16_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_16_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_16_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_16_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_16_scene_04_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_16_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "clink"
+    },
+    "beyond_destiny_ep_16_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_17_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_17_scene_02_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_17_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_17_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_17_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_18_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_18_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_18_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_18_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_6": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_7": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_8": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_9": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_10": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_11": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_12": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_18_scene_03_sfx_13": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_18_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_18_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_18_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_19_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_19_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_19_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_19_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_19_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_19_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_19_scene_04_sfx_4": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_19_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "swish"
+    },
+    "beyond_destiny_ep_20_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_20_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_20_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_20_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_20_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_20_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_20_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_20_scene_05_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_21_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_21_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_21_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_21_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "dishes"
+    },
+    "beyond_destiny_ep_21_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_21_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_22_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_22_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_22_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_22_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_22_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_22_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_22_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "clink"
+    },
+    "beyond_destiny_ep_22_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_22_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_22_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_22_scene_04_sfx_4": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_23_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_23_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_23_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_23_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_23_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_23_scene_04_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_23_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "swish"
+    },
+    "beyond_destiny_ep_24_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_24_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_24_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_24_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_24_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_24_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_24_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_24_scene_02_sfx_5": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_24_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "clink"
+    },
+    "beyond_destiny_ep_24_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_24_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_24_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_24_scene_04_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_24_scene_04_sfx_5": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_24_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_24_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_25_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_25_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_25_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_25_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_25_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_26_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_26_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_26_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_26_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_27_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "machine_room"
+    },
+    "beyond_destiny_ep_27_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_27_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_27_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_27_scene_04_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_27_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_28_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "arena"
+    },
+    "beyond_destiny_ep_28_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_28_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_28_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_28_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "heartbeat"
+    },
+    "beyond_destiny_ep_28_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_29_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "arena"
+    },
+    "beyond_destiny_ep_29_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "engine",
+      "accent": "device"
+    },
+    "beyond_destiny_ep_29_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_29_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_29_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_29_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_29_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_29_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_29_scene_03_sfx_6": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_29_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_29_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_29_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_29_scene_04_sfx_4": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_29_scene_04_sfx_5": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_29_scene_04_sfx_6": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_29_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_30_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_30_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_30_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_30_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_30_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_30_scene_02_sfx_5": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_30_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_30_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_30_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "radio"
+    },
+    "beyond_destiny_ep_30_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_30_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_30_scene_05_sfx_3": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_30_scene_05_sfx_4": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_31_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_31_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_31_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_31_scene_01_sfx_4": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_31_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_31_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_31_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_31_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_31_scene_02_sfx_5": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_31_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "engine",
+      "accent": "heartbeat"
+    },
+    "beyond_destiny_ep_31_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_31_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_31_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_31_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_31_scene_03_sfx_6": {
+      "action": "play",
+      "clip": "electric"
+    },
+    "beyond_destiny_ep_31_scene_03_sfx_7": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_31_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_31_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_31_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_32_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_32_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_32_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_32_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_32_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_32_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_32_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_32_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_32_scene_05_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_32_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_33_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "siren"
+    },
+    "beyond_destiny_ep_33_scene_01_sfx_2": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_33_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_33_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_33_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "steps"
+    },
+    "beyond_destiny_ep_33_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_33_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_33_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "radio"
+    },
+    "beyond_destiny_ep_33_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_33_scene_04_sfx_4": {
+      "action": "play",
+      "clip": "tire"
+    },
+    "beyond_destiny_ep_33_scene_05_sfx_1": {
+      "action": "loop",
+      "clip": "clock"
+    },
+    "beyond_destiny_ep_33_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_34_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_34_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "device"
+    },
+    "beyond_destiny_ep_34_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_34_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_34_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_34_scene_02_sfx_5": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_34_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_34_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "swish"
+    },
+    "beyond_destiny_ep_34_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_34_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_34_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_34_scene_03_sfx_6": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_34_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_34_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "glass"
+    },
+    "beyond_destiny_ep_34_scene_04_sfx_3": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_34_scene_04_sfx_4": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_34_scene_04_sfx_5": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_34_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_34_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_34_scene_05_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_35_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_35_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "paper"
+    },
+    "beyond_destiny_ep_35_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_35_scene_01_sfx_4": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_35_scene_01_sfx_5": {
+      "action": "play",
+      "clip": "summon"
+    },
+    "beyond_destiny_ep_35_scene_01_sfx_6": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_35_scene_01_sfx_7": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_35_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_35_scene_02_sfx_2": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_35_scene_02_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_35_scene_02_sfx_4": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_35_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_35_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_35_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_35_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_35_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_35_scene_05_sfx_3": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_36_scene_01_sfx_1": {
+      "action": "play",
+      "clip": "cloth"
+    },
+    "beyond_destiny_ep_36_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "fire"
+    },
+    "beyond_destiny_ep_36_scene_01_sfx_3": {
+      "action": "play",
+      "clip": "radio"
+    },
+    "beyond_destiny_ep_36_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "radio"
+    },
+    "beyond_destiny_ep_36_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "engine",
+      "accent": "impact"
+    },
+    "beyond_destiny_ep_36_scene_03_sfx_2": {
+      "action": "play",
+      "clip": "metal"
+    },
+    "beyond_destiny_ep_36_scene_03_sfx_3": {
+      "action": "play",
+      "clip": "roar"
+    },
+    "beyond_destiny_ep_36_scene_03_sfx_4": {
+      "action": "play",
+      "clip": "shockwave"
+    },
+    "beyond_destiny_ep_36_scene_03_sfx_5": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_36_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "engine"
+    },
+    "beyond_destiny_ep_36_scene_04_sfx_2": {
+      "action": "play",
+      "clip": "synchro"
+    },
+    "beyond_destiny_ep_36_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "collapse"
+    },
+    "beyond_destiny_ep_36_scene_05_sfx_2": {
+      "action": "play",
+      "clip": "impact"
+    },
+    "beyond_destiny_ep_37_scene_01_sfx_1": {
+      "action": "loop",
+      "clip": "wind"
+    },
+    "beyond_destiny_ep_37_scene_01_sfx_2": {
+      "action": "play",
+      "clip": "dishes"
+    },
+    "beyond_destiny_ep_37_scene_02_sfx_1": {
+      "action": "play",
+      "clip": "chime"
+    },
+    "beyond_destiny_ep_37_scene_03_sfx_1": {
+      "action": "play",
+      "clip": "door"
+    },
+    "beyond_destiny_ep_37_scene_04_sfx_1": {
+      "action": "play",
+      "clip": "dishes"
+    },
+    "beyond_destiny_ep_37_scene_04_sfx_2": {
+      "action": "silence"
+    },
+    "beyond_destiny_ep_37_scene_05_sfx_1": {
+      "action": "play",
+      "clip": "dishes"
+    }
+  },
+  "directions": {
+    "beyond_destiny_ep_01:229": "backlash",
+    "beyond_destiny_ep_03:97": "arcadia_low"
+  }
+}

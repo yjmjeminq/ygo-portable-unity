@@ -1,7 +1,4 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 using YGOPortable.AI;
 using YGOPortable.Core;
@@ -14,9 +11,7 @@ namespace YGOPortable.UI
         private BeyondDestinyCampaign.Encounter _activeBeyondDestiny;
         private string _beyondDestinyDuelist, _beyondDestinyBattleMap;
         private string _beyondDestinyPlayerKey, _beyondDestinyOpponentKey;
-        private Coroutine _beyondDestinyAudioRequest;
-        private AudioSource _beyondDestinyMusic, _beyondDestinyEffects;
-        private readonly List<AudioClip> _beyondDestinyLoadedAudio = new();
+        private BeyondDestinyAudio _beyondDestinyAudio;
 
         internal bool IsBeyondDestinyScreen => _screen == AppScreen.BeyondDestiny;
 
@@ -70,90 +65,22 @@ namespace YGOPortable.UI
             return true;
         }
 
+        private BeyondDestinyAudio BeyondDestinyMixer => _beyondDestinyAudio != null ? _beyondDestinyAudio :
+            _beyondDestinyAudio = gameObject.AddComponent<BeyondDestinyAudio>();
+
         internal void PlayBeyondDestinyCues(BeyondDestinyCampaign.Cue[] cues)
         {
-            if (!Application.isPlaying || cues.Length == 0) return;
-            if (_beyondDestinyAudioRequest != null) StopCoroutine(_beyondDestinyAudioRequest);
-            if (_beyondDestinyMusic == null)
-            {
-                _beyondDestinyMusic = gameObject.AddComponent<AudioSource>();
-                _beyondDestinyMusic.playOnAwake = false;
-                _beyondDestinyMusic.loop = true;
-                _beyondDestinyEffects = gameObject.AddComponent<AudioSource>();
-                _beyondDestinyEffects.playOnAwake = false;
-            }
-            _beyondDestinyAudioRequest = StartCoroutine(PlayBeyondDestinyAudio(cues));
+            if (Application.isPlaying && cues.Length != 0) BeyondDestinyMixer.Apply(cues);
         }
 
-        private IEnumerator PlayBeyondDestinyAudio(BeyondDestinyCampaign.Cue[] cues)
+        internal void RestoreBeyondDestinySoundscape(BeyondDestinySoundscape state)
         {
-            foreach (var cue in cues)
-            {
-                if (cue.kind == "audio" || cue.action is "stop" or "fadeOut")
-                {
-                    if (cue.action == "fadeOut" || cue.text.Contains("페이드 아웃"))
-                    {
-                        for (float t = 0f; t < .35f; t += Time.unscaledDeltaTime)
-                        {
-                            _beyondDestinyMusic.volume = DuelAudio.BgmVolume * (1f - t / .35f);
-                            yield return null;
-                        }
-                    }
-                    _beyondDestinyMusic.Stop();
-                    if (cue.kind == "audio") _beyondDestinyEffects.Stop();
-                    continue;
-                }
-                bool music = cue.kind == "music";
-                var ids = music ? cue.clipKeys ?? Array.Empty<string>() : new[] { cue.key };
-                foreach (string id in ids)
-                {
-                    if (string.IsNullOrEmpty(id) || id != Path.GetFileName(id)) continue;
-                    var path = Path.Combine(Application.streamingAssetsPath, "TagForce", "5DS", "Audio",
-                        music ? "Music" : "Sfx", id + ".wav");
-                    if (!File.Exists(path)) continue;
-                    var clip = DuelVisualAssets.ReadSound(path, id);
-                    if (clip == null) continue;
-                    _beyondDestinyLoadedAudio.Add(clip);
-                    if (music)
-                    {
-                        if (_beyondDestinyMusic.clip != null)
-                        {
-                            _beyondDestinyLoadedAudio.Remove(_beyondDestinyMusic.clip);
-                            Destroy(_beyondDestinyMusic.clip);
-                        }
-                        DuelAudio.StopBgm();
-                        _beyondDestinyMusic.clip = clip;
-                        _beyondDestinyMusic.volume = DuelAudio.BgmVolume;
-                        _beyondDestinyMusic.Play();
-                    }
-                    else
-                    {
-                        _beyondDestinyEffects.PlayOneShot(clip, DuelAudio.SfxVolume);
-                        StartCoroutine(ReleaseBeyondDestinyEffect(clip));
-                    }
-                }
-            }
-            _beyondDestinyAudioRequest = null;
-        }
-
-        private IEnumerator ReleaseBeyondDestinyEffect(AudioClip clip)
-        {
-            yield return new WaitForSecondsRealtime(clip.length + .1f);
-            if (_beyondDestinyLoadedAudio.Remove(clip)) Destroy(clip);
+            if (Application.isPlaying) BeyondDestinyMixer.Restore(state);
         }
 
         private void StopBeyondDestinyAudio()
         {
-            if (_beyondDestinyAudioRequest != null) StopCoroutine(_beyondDestinyAudioRequest);
-            _beyondDestinyAudioRequest = null;
-            if (_beyondDestinyMusic != null)
-            {
-                _beyondDestinyMusic.Stop();
-                _beyondDestinyMusic.clip = null;
-                _beyondDestinyEffects.Stop();
-            }
-            foreach (var clip in _beyondDestinyLoadedAudio) Destroy(clip);
-            _beyondDestinyLoadedAudio.Clear();
+            if (_beyondDestinyAudio != null) _beyondDestinyAudio.Stop();
         }
     }
 }

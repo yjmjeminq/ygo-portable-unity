@@ -1,6 +1,7 @@
 {
   "version": 1,
   "style": "Original commercial Korean animation environments, layered 2.5D depth, realistic wet industrial materials and restrained cyan lighting",
+  "audioManifest": "audio.json",
   "maps": [
     {
       "path": "Maps/spot_neodomino_rain_alley.png",

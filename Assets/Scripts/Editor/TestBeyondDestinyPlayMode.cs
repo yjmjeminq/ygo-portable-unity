@@ -122,6 +122,7 @@ namespace YGOPortable.Editor
                         Click("5D’s: Beyond Destiny");
                         CaptureAfter("01-city-field", .35, () =>
                         {
+                            VerifySoundscape("rain_signal", "storm");
                             Click("이야기 시작");
                             _phase = 1;
                         });
@@ -138,6 +139,7 @@ namespace YGOPortable.Editor
                 {
                     var field = Get<DuelFieldUI>(_app, "_duelField");
                     if (field.IsPresenting || duel.ActivePrompt == null) return;
+                    VerifySoundscape("psychic_battle", null);
                     Capture("03-first-duel");
                     _phase = 3;
                     return;
@@ -169,12 +171,16 @@ namespace YGOPortable.Editor
                 if (_phase == 5 && FindAdvance() != null)
                 {
                     _app.ShowScreen(AppScreen.Campaigns);
+                    var mixer = _app.GetComponent<BeyondDestinyAudio>();
+                    if (mixer.MusicPath != null || mixer.AmbiencePath != null || mixer.EffectsSource.isPlaying)
+                        throw new InvalidOperationException("The 5D’s soundscape leaked into the campaign picker.");
                     Click("5D’s: Beyond Destiny");
                     if (Playback().Episode.number != 2 || FindAdvance() == null)
                         throw new InvalidOperationException("Reopening the campaign did not resume episode two.");
                     FindAdvance().onClick.Invoke();
                     CaptureAfter("06-episode-02-resume", 1.30, () =>
                     {
+                        VerifySoundscape("festival", "arena");
                         if (!_openingDialogueCaptured || !_backlashCaptured)
                             throw new InvalidOperationException("Opening story or Backlash artwork did not render.");
                         Debug.Log("[Beyond Destiny Play Mode] Picker, field, opening, native duel, Backlash and episode-two resume passed.");
@@ -215,6 +221,19 @@ namespace YGOPortable.Editor
                 Debug.LogException(exception);
                 Finish(1);
             }
+        }
+
+        private static void VerifySoundscape(string music, string ambience)
+        {
+            var mixer = _app.GetComponent<BeyondDestinyAudio>();
+            string expectedAmbience = ambience == null ? null : $"Audio/Ambience/{ambience}.wav";
+            if (mixer == null || mixer.MusicPath != $"Audio/Music/{music}.wav" ||
+                mixer.MusicSource.clip?.name != music || !mixer.MusicSource.isPlaying ||
+                mixer.AmbiencePath != expectedAmbience ||
+                (ambience == null ? mixer.AmbienceSource.clip != null :
+                    mixer.AmbienceSource.clip?.name != ambience || !mixer.AmbienceSource.isPlaying))
+                throw new InvalidOperationException($"Wrong live 5D’s audio channels for {music}/{ambience}: " +
+                    $"{mixer?.MusicPath} / {mixer?.AmbiencePath}.");
         }
 
         private static void CaptureStoryFrame()

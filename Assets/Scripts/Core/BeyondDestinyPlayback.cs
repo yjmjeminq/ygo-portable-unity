@@ -44,10 +44,12 @@ namespace YGOPortable.Core
             internal readonly BeyondDestinyCampaign.Encounter Duel;
             internal readonly int EndIndex;
             internal readonly BeyondDestinyCampaign.Cue[] TailAudio;
+            internal readonly BeyondDestinySoundscape InitialAudio;
 
             internal Segment(Page[] pages, BeyondDestinyCampaign.Encounter duel, int endIndex,
-                BeyondDestinyCampaign.Cue[] tailAudio)
+                BeyondDestinyCampaign.Cue[] tailAudio, BeyondDestinySoundscape initialAudio)
             {
+                InitialAudio = initialAudio;
                 Pages = pages;
                 Duel = duel;
                 EndIndex = endIndex;
@@ -90,13 +92,17 @@ namespace YGOPortable.Core
             var audio = new List<BeyondDestinyCampaign.Cue>();
             var poses = new Dictionary<string, string>(StringComparer.Ordinal);
             var outfits = new Dictionary<string, string>(StringComparer.Ordinal);
+            BeyondDestinySoundscape initialAudio = default;
             for (int chapter = 0; chapter <= Progress.episodeIndex; ++chapter)
             {
                 var previous = _campaign.Episodes[chapter];
                 int sceneCount = chapter == Progress.episodeIndex ? Progress.sceneIndex : previous.scenes.Length;
                 for (int prior = 0; prior < sceneCount; ++prior)
                     foreach (var priorCue in previous.scenes[prior].events)
+                    {
                         RememberCast(priorCue, poses: null, outfits);
+                        initialAudio = initialAudio.After(priorCue);
+                    }
             }
             string map = scene.backgroundPath;
             string effect = null;
@@ -105,15 +111,17 @@ namespace YGOPortable.Core
             for (int index = 0; index < scene.events.Length; ++index)
             {
                 var cue = scene.events[index];
+                if (index < start) initialAudio = initialAudio.After(cue);
                 var encounter = _campaign.EncounterAt(scene.id, index == 0 ? scene.line : cue.line) ??
                     _campaign.EncounterAt(scene.id, cue.line);
                 if (index >= start && encounter?.Playable == true && !Progress.resolvedEncounters.Contains(encounter.id))
-                    return new Segment(pages.ToArray(), encounter, index, audio.ToArray());
+                    return new Segment(pages.ToArray(), encounter, index, audio.ToArray(), initialAudio);
 
                 switch (cue.kind)
                 {
                     case "background":
                         map = cue.assetPath;
+                        if (index >= start) audio.Add(cue);
                         break;
                     case "standing":
                         RememberCast(cue, poses, outfits);
@@ -143,7 +151,7 @@ namespace YGOPortable.Core
                 audio.Clear();
                 effect = null;
             }
-            return new Segment(pages.ToArray(), null, scene.events.Length, audio.ToArray());
+            return new Segment(pages.ToArray(), null, scene.events.Length, audio.ToArray(), initialAudio);
         }
 
         internal void RememberPage(int page)

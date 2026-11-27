@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import re
+import wave
 from pathlib import Path
 
 
@@ -12,6 +13,7 @@ SOURCE = ROOT / "Docs/Story5Ds"
 OUTPUT = ROOT / "Assets/StreamingAssets/story_5ds_script.json"
 SOURCE_HASHES = ROOT / "Tools/Story5Ds/source-sha256.json"
 ASSET_MANIFEST = ROOT / "Tools/Story5Ds/assets.json"
+AUDIO_MANIFEST = ROOT / "Tools/Story5Ds/audio.json"
 ASSET_ROOT = ROOT / "Assets/StreamingAssets/TagForce/5DS"
 EPISODE_COUNT = 37
 SCENE_COUNT = 182
@@ -286,6 +288,72 @@ def bind_cutscenes(scenes, manifest):
     return len(keys)
 
 
+def bind_audio(episodes, catalog, manifest):
+    if manifest.get("version") != 1:
+        raise ValueError("Unknown Beyond Destiny audio manifest")
+    music, sounds, directions = (manifest[name] for name in ("music", "sounds", "directions"))
+    for keys, label in ((music.keys(), "music"), (sounds.keys(), "sounds")):
+        if keys != catalog[label].keys():
+            missing = sorted(catalog[label].keys() - keys)
+            extra = sorted(keys - catalog[label].keys())
+            raise ValueError(f"Beyond Destiny {label} bindings differ from manuscript: missing={missing}, extra={extra}")
+
+    verified = set()
+
+    def asset(folder, name):
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9_]+", name):
+            raise ValueError(f"Invalid Beyond Destiny audio clip name: {name!r}")
+        path = f"Audio/{folder}/{name}.wav"
+        if path not in verified:
+            try:
+                with wave.open(str(ASSET_ROOT / path), "rb") as clip:
+                    if (clip.getsampwidth() != 2 or clip.getnchannels() not in (1, 2) or
+                            not 8000 <= clip.getframerate() <= 48000 or clip.getnframes() < 1000):
+                        raise ValueError(f"Unsupported PCM format for {path}")
+            except (OSError, EOFError, wave.Error) as error:
+                raise ValueError(f"Missing or invalid Beyond Destiny audio clip: {path}") from error
+            verified.add(path)
+        return path
+
+    # Validate every source key, even the outgoing key on a two-track transition.
+    music_paths = {key: asset("Music", clip) for key, clip in music.items()}
+    direction_keys = set()
+    for episode in episodes:
+        for scene in episode["scenes"]:
+            for cue in scene["events"]:
+                kind, description = cue["kind"], cue.get("text", "")
+                if kind == "music":
+                    if cue["action"] == "direction":
+                        key = f"{episode['id']}:{cue['line']}"
+                        if key not in directions:
+                            raise ValueError(f"Unbound Beyond Destiny music direction: {key}")
+                        direction_keys.add(key)
+                        cue.update(action="crossfade", assetPath=asset("Music", directions[key]))
+                    elif cue["action"] == "play":
+                        clips = cue["clipKeys"]
+                        cue["assetPath"] = music_paths[clips[-1]]
+                        if len(clips) > 1:
+                            cue["action"] = "cut" if "급정지" in description else "crossfade"
+                elif kind == "sound":
+                    match = sounds[cue["key"]]
+                    action = match["action"]
+                    if action not in ("play", "loop", "silence"):
+                        raise ValueError(f"Unknown sound action {action!r} at {cue['key']}")
+                    cue["action"] = action
+                    if action != "silence":
+                        cue["assetPath"] = asset("Ambience" if action == "loop" else "Effects", match.get("clip"))
+                    if accent := match.get("accent"):
+                        cue["audioAccent"] = asset("Effects", accent)
+                elif kind == "audio":
+                    if "빗소리만" in description:
+                        cue.update(action="fadeOut", assetPath=asset("Ambience", "rain"))
+                    else:
+                        cue["action"] = "fadeOut" if any(word in description for word in ("페이드", "서서히", "여운")) else "stop"
+    if direction_keys != directions.keys():
+        raise ValueError(f"Unused Beyond Destiny audio directions: {sorted(directions.keys() - direction_keys)}")
+    return len(verified)
+
+
 def build(source, *, require_all_maps=False):
     hashes = json.loads(SOURCE_HASHES.read_text(encoding="utf-8"))
     episode_files = [f"yugioh_5ds_ep{number}_script.txt" for number in range(1, EPISODE_COUNT + 1)]
@@ -313,10 +381,11 @@ def build(source, *, require_all_maps=False):
         raise ValueError("Unknown Beyond Destiny asset manifest")
     mapped_count = bind_backgrounds(scenes, catalog["backgrounds"], manifest, require_all_maps)
     cutscenes = bind_cutscenes(scenes, manifest)
+    audio = bind_audio(episodes, catalog, json.loads(AUDIO_MANIFEST.read_text(encoding="utf-8")))
     return {"schemaVersion": 1, "id": "beyond_destiny", "title": "5D's: Beyond Destiny",
             "linear": True, "sourceBibleSha256": hashes["5d_s_story_bible.md"],
             "speakers": SPEAKERS, "cueCatalog": catalog, "mappedBackgrounds": mapped_count,
-            "mappedCutscenes": cutscenes, "episodes": episodes}
+            "mappedCutscenes": cutscenes, "mappedAudioClips": audio, "episodes": episodes}
 
 
 def main():
@@ -340,6 +409,7 @@ def main():
     print(f"{EPISODE_COUNT} episodes, {SCENE_COUNT} scenes, {CHARACTER_COUNT:,} characters verified")
     print(f"{data['mappedBackgrounds']}/{len(data['cueCatalog']['backgrounds'])} background cues bound to artwork")
     print(f"{data['mappedCutscenes']} event CGs bound to manuscript line ranges")
+    print(f"{len(data['cueCatalog']['music'])} BGM keys and {len(data['cueCatalog']['sounds'])} SFX cues bound to {data['mappedAudioClips']} audio clips")
 
 
 if __name__ == "__main__":
