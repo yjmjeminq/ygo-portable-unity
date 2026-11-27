@@ -411,6 +411,189 @@
         941
       ],
       "prompt": "Original Beyond Destiny 2.5D map, widescreen 16:9 hand-painted Korean cinematic animation background. Fine clean outlines and painted volumetric light, realistic proportions and surface materials, slightly elevated camera. Open contiguous walkable floor spans the lower half where possible for variable-size SD character staging. Consistent visual language of a futuristic coastal city. No main figures, text, HUD, logos, copied game art, or borders. A quiet elevated coastal overlook above a futuristic city at deep blue night. Old wood-and-steel public bench to middle right, a single warm amber street lamp, wet low stone paving with a broad safe open walking floor across lower frame, low railing at edge, cool hazy skyline and bay below. Delicate light reflections and a few crisp stars, atmosphere of intimate calm without figures."
+    },
+    {
+      "path": "Maps/spot_kaiba_dome_roof.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_07_scene_02_bg_1",
+        "beyond_destiny_ep_07_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For an environment with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders, or people.\nAn exposed high curved terrace of a gigantic oval sports dome at windblown red sunset. Rooftop weather railings and sweeping curved slate architectural fins, high enough to look down on the layered city. Empty pedestrian walkway, cloud streaks and windblown paper, crimson copper sky with deep cobalt shadows."
+    },
+    {
+      "path": "Maps/spot_city_violet_storm.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_11_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For an environment with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders, or people.\nWide high view of futuristic coastal Neo Domino at night under a black cloud ceiling. Sparse electric red lightning at the distant industrial island and unsettling violet fog creeping from the far industrial docks, much of the city is dark except subtle windows. Cables and distant silhouette of broken sea bridge. Architectural establishing shot, no people."
+    },
+    {
+      "path": "Maps/spot_arcadia_tower_breach.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_11_scene_02_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For an environment with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders, or people.\nStreet-level view tilted gently up toward a very tall triangular cylindrical dark glass research skyscraper. Middle-upper windows are blown out with shards implied in the frame and violet smoke escaping, while lower doorway and futurist drab plaza remain visible in open foreground. Dark weather, occasional violet glow reflected in wet asphalt, absolutely no figures."
+    },
+    {
+      "path": "Maps/spot_arcadia_emergency_stairs.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_11_scene_04_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For an environment with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders, or people.\nInterior angle looking up across a spacious dark concrete fire escape inside a damaged research tower. Deep stairs at the side, generous lower landing in foreground, fractures across concrete and railings, only small red emergency fixtures, strange crimson mist leaking from the landing above and tracing cold edges. Subtle violet fill light and carefully layered depth."
+    },
+    {
+      "path": "Maps/spot_arcadia_ashes.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_13_scene_06_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nQuiet flat open plaza on the city's periphery at ashen blue dawn. A demolished high research tower looms at the far back through drifting powder-like black ash and thin smoke. Dust and scattered fractured glass glint on the open pavement, ruined concrete remains set well back. Grey turquoise dawn on horizon. No bodies."
+    },
+    {
+      "path": "Maps/spot_city_hospital_roof.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_14_scene_03_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nGentle daylight on the rooftop of a modern hospital, clear white clouds and a blue Neo Domino skyline. Clean flat warm grey pavement, chest-high concrete rail and brushed metal fencing, small hospital HVAC structures at far left, a tree visible beyond the rail. Quiet, breezy, emotionally peaceful."
+    },
+    {
+      "path": "Maps/spot_team5ds_garage_roof.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_16_scene_04_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nIndustrial garage rooftop at the edge of the inner city under a deep burnt-orange sunset. Low roof parapets and aged corrugated roof structures at sides, open walking area. Across the broad estuary, a disconnected and partially collapsed suspension bridge links the far industrial island to the metropolis. Detailed clouds, amber rim highlights and warm cobalt shadows."
+    },
+    {
+      "path": "Maps/spot_harbor_container_warehouse.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_26_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nLarge fog-filled harbor warehouse at night, huge worn navy freight containers stacked both sides, broad empty middle aisle of damp concrete, guard lights on hangar beams flickering cold cyan, moisture catches the light. Ground-level cinematic perspective with layered open foreground."
+    },
+    {
+      "path": "Maps/spot_harbor_server_passage.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_26_scene_02_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nBlue moonlight pours through high warehouse window panels into a broad modest server corridor. Dark industrial hardware racks with scattered dim blue status lights, cable conduit, clear broad concrete aisle, moon streaks that cut across haze and reflected cold blue metal. Small closed exit at back, no signage."
+    },
+    {
+      "path": "Maps/spot_leblanc_dwheel_hangar.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_27_scene_03_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nA hangar underground beneath a refined estate. Three distinct original futuristic motorcycles in a well-equipped large mechanic's room, a pearl white elegant racing bike and heavy bronze touring machine parked beyond the middle distance, a matte black low sleek test bike sitting on a modest service-lift well back from the open foreground. Natural shapes, stylish mechanical tubing, light from inherited art deco fixtures and cool industrial light."
+    },
+    {
+      "path": "Maps/spot_wrgp_roof_rift.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_32_scene_04_bg_1",
+        "beyond_destiny_ep_32_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nThe roof and distant curved structure of a giant futuristic stadium at the edge of a city. Time seems frozen at grey twilight, muted cold violet clouds with suspended rain fragments, metal floor and pillars. A striking enormous gold dimensional rift in the sky opens to pale violet light. Usable lower foreground floor under ominous sky."
+    },
+    {
+      "path": "Maps/spot_ark_cradle_descent.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_33_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nWide cinematic establishing shot of an enormous inverted upside-down city built into a suspended steel fortress, gears and long spines visible against almost black night sky high above a coastal futuristic city. City skyline and tiny window lights below, racing industrial setting, spare ominous purple atmospheric haze."
+    },
+    {
+      "path": "Maps/spot_signer_launch_platform.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_33_scene_02_bg_1",
+        "beyond_destiny_ep_33_scene_03_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nVast outdoor concrete launch platform at night above a coastal city, dim tall ribbed pylons line one side, open walking arena in the foreground, blue sparks and low-frequency energy carried on a breeze, several futuristic racing motorcycles parked in a neat distant row with no riders. Abstract red dragon-shaped spectral light near far end, no emblems printed on architecture."
+    },
+    {
+      "path": "Maps/spot_bifrost_riding_bridge.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_33_scene_04_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nView across a spectral seven-color luminous bridge rising across the night sky toward an immense inverted fortress. The energy ribbons form a broad clear road uninterrupted by any foreground obstacles or riders, a few very distant tiny headlight glints. Cinematic diagonal movement and dark navy void around neon spectral light. No characters or lettering."
+    },
+    {
+      "path": "Maps/spot_ark_cradle_quasar.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_36_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. New Beyond Destiny campaign background for a Unity game. Wide full-bleed 16:9. Original hand-painted commercial Korean animation with crisp fine contours, cinematic atmospheric perspective, grounded detailed futuristic coastal Japanese architecture, steel blue materials, restrained cyan highlights. For environments with a floor, keep a broad uncluttered lower foreground with stable perspective so dialogue and sprites remain readable. No readable signs, letters, UI, watermarks, borders or people.\nHigh panoramic view over the collapsing inverted steel fortress at night. Disconnected slabs recede into haze, a vivid golden comet-like dragon-shaped trail rises along the central skyline with a long near-vertical trail, freezing the fortress's descent. Deep navy contrasts with fine gold radiance and metallic debris in the sky. No figure portraits."
     }
   ],
   "characters": [
@@ -467,12 +650,115 @@
         1774
       ],
       "prompt": "Original Beyond Destiny game illustration, Korean commercial animation with clean subtle linework, dimensional believable anime anatomy and brushed cel shading, restrained dark neutral values. Keep face and full shoes inside the canvas, generous transparent margin top and bottom. No text, watermark, logos, or copied commercial character asset. Full-body 8-head standing sprite with actual transparent RGBA. An adult East Asian male junior agent of a clandestine fictional research facility, swept-back ash black medium-short hair, tired worried gray eyes, rumpled rain-damp tailored charcoal business suit, thin black necktie over an ivory shirt, short rain-gloss dress boots. Side-facing three-quarter pose with shoulders tense, palms slightly open, no weapon, no injuries. Feet grounded, full silhouette visible."
+    },
+    {
+      "path": "Characters_Standing/devine.png",
+      "key": "devine",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original 8-head full-body standing sprite in hand-painted premium commercial Korean animation style, genuine transparent RGBA. Show entire head hair and boots inside image with modest clear margins around subject, grounded shoes, slightly 3/4 camera pose, subtle cool rim lighting, no wide shadow or haze behind subject. No text, watermark, UI, or copying existing game assets. Supplied images illustrate line and shading style.\nDevine, adult male aged early forties with ash-copper hair swept smoothly back at temples, understated sideburns, amber eyes, precise predatory features and a contained professional smile. Tailored dark charcoal ankle-length suit coat with small dark copper leaf embroidery at collar and folded cuff, neatly buttoned dark waistcoat, tailored gray trousers, black polished dress boots, small gold signet ring. Stands tall and eerily calm, left hand resting near cuff. Muted cool natural finish."
+    },
+    {
+      "path": "Characters_Standing/sherry.png",
+      "key": "sherry",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Original 8-head full-body standing sprite in hand-painted premium commercial Korean animation style, genuine transparent RGBA. Show entire head hair and boots inside image with modest clear margins around subject, grounded shoes, slightly 3/4 camera pose, subtle cool rim lighting, no wide shadow or haze behind subject. No text, watermark, UI, or copying existing game assets. Supplied images illustrate line and shading style.\nSherry, 24-year-old white French woman with sleek sun-gold shoulder-length hair with face-framing long layers, eyes a vivid icy blue, angular fine features, cool pale complexion, poised athletic build. Elegant original pearl white or light ivory asymmetric tailored long riding coat, ultramarine shoulder flap with small pale gold piping, fitted navy riding trousers, pale boots with muted bronze fittings, thin navy gloves and a dark blue high collar. Calm, analytical expression, standing firmly, left hand near coat seam, pale gold hair silhouette clear on alpha."
+    },
+    {
+      "path": "Characters_Standing/yusei.png",
+      "key": "yusei",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nMechanic and quietly reassuring captain Yusei, East Asian adult male, 26, narrow round blue eyes, black hair pushed up in compact pointed locks with two warm honey-gold streaks near bangs, tall and wiry. Wears a functional muted petrol-blue mechanic's riding jacket with burnt orange utility tabs and ribbed shoulders, dark brown mechanic's gloves, faded dark denim, armored steel-gray boots, a loose blue bandana tied around one wrist. Steady calm expression, hand relaxed as if mid conversation."
+    },
+    {
+      "path": "Characters_Standing/jack.png",
+      "key": "jack",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nRacing rival Jack, adult man early thirties, tall broad shouldered athlete, a swept blond crest with ash-blond side cut and a sharp indigo gaze. Original ivory white calf-length duelist coat over a navy mock-neck, controlled gold seams, ribbed violet elbow panels and grey tailored riding pants. Red muted rectangular belt clasp, clean grey riding boots, black gloves. Chin lifted, confident unsmiling stance, distinctive angular silhouette."
+    },
+    {
+      "path": "Characters_Standing/crow.png",
+      "key": "crow",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nA street racer and loyal teammate named Crow, adult man aged mid twenties, slightly shorter and broad forearms, warm tan face, hazel eyes, burnt orange hair swept into three broad loose points and one swept fringe rather than long spikes. Cropped dark ash riding jacket with a rust-orange padded hood, slate gray elbow sleeves and matte leather bracers, rugged olive cargo trousers and black orange-stitched motorcycle boots. Smirk and practical stance, one hand loose on hip belt, no printed marks."
+    },
+    {
+      "path": "Characters_Standing/mizoguchi.png",
+      "key": "mizoguchi",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nMizoguchi, dignified Japanese steward and former career endurance rider, 55, muscular middle-aged build, short neat salt-and-pepper brush cut, discreet moustache and strong brow, brown eyes. Olive-black utility riding suit under a fitted warm-gray French estate long jacket with muted sage and brass waist trim, black riding gloves and clean high boots. Straight posture, quiet determined expression, slightly cupped hands in a steward's attentive pose."
+    },
+    {
+      "path": "Characters_Standing/misty.png",
+      "key": "misty",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nMisty, poised adult woman in her early thirties, mid-long dark ebony hair with indigo falloff and slight side part, pale teal eyes, elegant straight posture, dark skin of warm rosy undertones. In an original asymmetrical dark purple and teal high-collar floor-length dueling gown coat over practical charcoal riding pants and heeled boots, small silver serpent-shaped clasp and dark green opaque gloves. Expression pained under composure, discreet jewelry, fully clothed."
+    },
+    {
+      "path": "Characters_Standing/rex.png",
+      "key": "rex",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nRex, mature strongly built adult man over fifty, neat long steel-grey hair pushed back and tied at the nape, dark grey eyes, imposing but composed face with subtle age lines. Formal navy long tunic and muted ivory high coat with gold-pale blue fine trim, graphite dress gloves and angular boots, left metallic prosthetic hand designed as understated slate steel with tiny cyan detail. Statesman presence, religious iconography absent, full silhouette."
+    },
+    {
+      "path": "Characters_Standing/zone.png",
+      "key": "zone",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nZ-ONE antagonist, original contemplative cybernetic elder in a compact upright articulated exosuit from shoulder to boots, small visible lined pale face framed by swept steel-white hair and deep dark eyes, sculpted navy steel panels and translucent cool cyan energy along spine, oxidized bronze joints, charcoal cloak split behind. Self-contained suit, frail human hand still visible with aged skin, lower plates narrow and ground-bearing, no vehicle or large halo. Regal, worn, restrained."
+    },
+    {
+      "path": "Characters_Standing/ghost_a.png",
+      "key": "ghost_a",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nA lone anonymous A-series pursuer known as Ghost, tall adult humanoid robot, originally designed heavy matte graphite racing armor with slightly streamlined angular shoulders, faceted fully enclosed black helmet and one slim horizontal blood-red luminous line, crisp metal neck collar and narrow red running lights, charcoal reinforced trousers and integrated technical boots. Straight alert pose, hands with articulated glove segments and no weapons, silhouette effortless to recognize."
     }
   ],
   "cutscenes": [
     {
       "path": "Cutscenes/ep01_backlash.png",
       "key": "ep01_backlash",
+      "scene": "beyond_destiny_ep_01_scene_04",
+      "firstLine": 252,
+      "lastLine": 275,
       "source": "ImageGen built-in",
       "resolution": [
         1672,
@@ -483,12 +769,119 @@
     {
       "path": "Cutscenes/ep02_bandage.png",
       "key": "ep02_bandage",
+      "scene": "beyond_destiny_ep_02_scene_03",
+      "firstLine": 136,
+      "lastLine": 153,
       "source": "ImageGen built-in",
       "resolution": [
         1672,
         941
       ],
-      "prompt": "A widescreen original Beyond Destiny narrative event CG, restrained commercial Korean anime illustration with realistic anatomy. Private dim retro-futuristic stadium waiting room, cool shaft of light from corridor, polished concrete and dark lockers in soft focus. A young adult woman with an asymmetric neck-length wine-red bob, wary rose-amber eyes and high charcoal collar oxblood long coat with silver leaf clasps carefully wraps an ivory cloth bandage around the palm of adult Korean man Yun seated beside her, lean adult with short tousled black side-parted hair and worn black coat with subtle aubergine lining. Focus on the artfully held hands and their quiet expressions, show both heads clearly and no visible gore, use believable fingers and cloth tension. Cool cyan edge light, one amber reflection, no words, no frame, no logos or copied commercial assets."
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed visual novel CG for Beyond Destiny. Premium hand-painted Korean animation with crisp restrained line work, believable adult anatomy, expressive faces, atmospheric visual depth. Make this an original narrative composition. No captions, readable text, UI, watermark, border, or logos. Use reference standing sprites only for character design, not for composition.\nDark private stadium waiting room, dim blue light and a warm reflection. Aki, adult woman age 21, asymmetric neck-length wine-red bob with narrow strand by jaw, rose-amber eyes. in her high-collar dark oxblood coat with silver leaf clasps is seated against the wall at right, winded and pale, visor set aside near the bench. Yun, adult Korean man age 24, lean athletic, short tousled black side-parted hair, charcoal gray eyes, worn long black raincoat with muted aubergine lining, charcoal gray shirt and healed thin pale barcode-like scar just below his left collarbone. kneels on one knee at left, patiently wrapping a white cloth bandage around Aki's open palm, which SHE holds out to HIM. Clear visual ownership of both of their hands. His sleeves lead to his two hands holding the cloth ends wrapped around her offered hand. Their faces visible and expressive, no graphic injury; focus on his care, her surprise, and unopened second roll beside them."
+    },
+    {
+      "path": "Cutscenes/ep13_fall.png",
+      "key": "ep13_fall",
+      "scene": "beyond_destiny_ep_13_scene_04",
+      "firstLine": 259,
+      "lastLine": 271,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed visual novel CG for Beyond Destiny. Premium hand-painted Korean animation with crisp restrained line work, believable adult anatomy, expressive faces, atmospheric visual depth. Make this an original narrative composition. No captions, readable text, UI, watermark, border, or logos. Use reference standing sprites only for character design, not for composition.\nDevastated highest floor of a shadowy glass research tower at night. Yun, adult Korean man age 24, lean athletic, short tousled black side-parted hair, charcoal gray eyes, worn long black raincoat with muted aubergine lining, charcoal gray shirt and healed thin pale barcode-like scar just below his left collarbone. stands at the rim of a shattered slab, holding an arm near his side, face emotionally hollow. In the midground below the ledge, Devine, adult male aged early forties, ash-copper hair swept straight back at temples with understated sideburns, amber eyes, precise predatory features, tailored warm-black ankle-length suit coat, collar seam embroidered small dark copper leaves and a dull gold signet ring. is losing his grip on the fractured steel rail as it bends loose, small against the concentric broken architecture and shadowy drops. Aki, adult woman age 21, asymmetric neck-length wine-red bob with narrow strand by jaw, rose-amber eyes. in unmasked oxblood coat visible a few steps behind in shock. Oblique elevated camera; red-purple smoke and cool scattered moonlight, focus on distance and disillusionment, no visible aftermath injuries."
+    },
+    {
+      "path": "Cutscenes/ep13_ashes.png",
+      "key": "ep13_ashes",
+      "scene": "beyond_destiny_ep_13_scene_06",
+      "firstLine": 331,
+      "lastLine": 346,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed visual novel CG for Beyond Destiny. Premium hand-painted Korean animation with crisp restrained line work, believable adult anatomy, expressive faces, atmospheric visual depth. Make this an original narrative composition. No captions, readable text, UI, watermark, border, or logos. Use reference standing sprites only for character design, not for composition.\nSpacious blue hour clearing outside the collapsed institute, thin dawn edge lighting in mist and soot like snow. Yun, adult Korean man age 24, lean athletic, short tousled black side-parted hair, charcoal gray eyes, worn long black raincoat with muted aubergine lining, charcoal gray shirt and healed thin pale barcode-like scar just below his left collarbone. and Aki, adult woman age 21, asymmetric neck-length wine-red bob with narrow strand by jaw, rose-amber eyes. in unmasked oxblood leaf-clasp coat kneel in a quiet comforting embrace in midground, Aki holding his worn coat with both hands and crying against his chest, his hand steady against her hair. A line of ruined architecture far in the distance. Strong emotional restraint and soft cold light with first warm dawn at horizon."
+    },
+    {
+      "path": "Cutscenes/ep17_violet_fire.png",
+      "key": "ep17_violet_fire",
+      "scene": "beyond_destiny_ep_17_scene_04",
+      "firstLine": 129,
+      "lastLine": 155,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed visual novel CG for Beyond Destiny. Premium hand-painted Korean animation with crisp restrained line work, believable adult anatomy, expressive faces, atmospheric visual depth. Make this an original narrative composition. No captions, readable text, UI, watermark, border, or logos. Use reference standing sprites only for character design, not for composition.\nA windswept overlook above Satellite Island, a very distant dim violet fire reflected in coastal mist. Aki, adult woman age 21, asymmetric neck-length wine-red bob with narrow strand by jaw, rose-amber eyes. wearing a modest soft slate trench jacket over an ivory knitted top and dark oxblood scarf cups Yun, adult Korean man age 24, lean athletic, short tousled black side-parted hair, charcoal gray eyes, worn long black raincoat with muted aubergine lining, charcoal gray shirt and healed thin pale barcode-like scar just below his left collarbone.'s face in both hands. An intimate two-shot framed through foreground railing, their faces near middle with all fingertips plausible, her expression tearful yet resolute, his quietly shocked. An abandoned paper cup sits to the side. Both fully dressed."
+    },
+    {
+      "path": "Cutscenes/ep23_scar.png",
+      "key": "ep23_scar",
+      "scene": "beyond_destiny_ep_23_scene_04",
+      "firstLine": 149,
+      "lastLine": 173,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed visual novel CG for Beyond Destiny. Premium hand-painted Korean animation with crisp restrained line work, believable adult anatomy, expressive faces, atmospheric visual depth. Make this an original narrative composition. No captions, readable text, UI, watermark, border, or logos. Use reference standing sprites only for character design, not for composition.\nQuiet romantic story moment, both adults fully clothed in layered road clothes. Aki, adult woman age 21, asymmetric neck-length wine-red bob with narrow strand by jaw, rose-amber eyes. in a wine-red and black motorcycle jacket with collar and gloves off, kneels beside Yun, adult Korean man age 24, lean athletic, short tousled black side-parted hair, charcoal gray eyes, worn long black raincoat with muted aubergine lining, charcoal gray shirt and healed thin pale barcode-like scar just below his left collarbone. seated on a bench under a warm streetlamp, dark closed trousers and black coat open only at neck. In a 3/4 over-the-shoulder view, she offers a tender brief kiss to the small healed pale scar by his collarbone, fingers gently holding his sleeve. Keep the gestures restrained and natural, faces and warm lamplight center the image, cyan-blue isolated nighttime circuit in the background, no sexualization, emphasis on comfort."
+    },
+    {
+      "path": "Cutscenes/ep24_ambush.png",
+      "key": "ep24_ambush",
+      "scene": "beyond_destiny_ep_24_scene_03",
+      "firstLine": 128,
+      "lastLine": 145,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed event CG for Beyond Destiny. Hand-painted commercial Korean animation with clean restrained linework, solid grounded shapes, believable complex expression and pose, layered depth, focused composition with room across bottom for subtitles. No lettering, watermark, UI, borders, or replication of any existing commercial anime or game image. Supplied sprites are only character design reference; compose a new scene.\nYun, a lean adult Korean man of 24, short tousled jet-black side-parted hair, charcoal eyes and worn black raincoat, muted aubergine lining, gray shirt, healed faint barcode-shaped scar near left collarbone. steps forward in protective stance in foreground on dark elevated circuit, shielding the fallen Aki, 21-year-old adult with an asymmetric neck-length wine-red bob and rose-amber eyes in black-oxblood riding gear beside the orange-glowing wreck of her motorcycle. Mid-distance gray futuristic attack bike and rider in polished dark steel full-face helmet with thin red horizontal eye lighting, thrown fragments suspended in the violet shockwave, rainy port skyline. Oblique composition, eye and body movement point from ghost at left toward Yun and Aki at right. No blood close-ups."
+    },
+    {
+      "path": "Cutscenes/ep31_mask.png",
+      "key": "ep31_mask",
+      "scene": "beyond_destiny_ep_31_scene_04",
+      "firstLine": 214,
+      "lastLine": 218,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed event CG for Beyond Destiny. Hand-painted commercial Korean animation with clean restrained linework, solid grounded shapes, believable complex expression and pose, layered depth, focused composition with room across bottom for subtitles. No lettering, watermark, UI, borders, or replication of any existing commercial anime or game image. Supplied sprites are only character design reference; compose a new scene.\nA high-speed night race on a straight coast highway. Aki, 21-year-old adult with an asymmetric neck-length wine-red bob and rose-amber eyes in a black/oxblood riding suit and open-faced helmet is seen on her original custom scarlet racing motorcycle, resolute, one look toward Yun, a lean adult Korean man of 24, short tousled jet-black side-parted hair, charcoal eyes and worn black raincoat, muted aubergine lining, gray shirt, healed faint barcode-shaped scar near left collarbone. on his matte black motorcycle. Scarlet petal-like light streams like wind across the lane and forms a distant original rose-shaped dragon aura with white flare in the far backdrop. A faint dark mask shape visibly shatters in the light as a purely metaphorical reflection in Yun's scratched windscreen; his actual human face remains visible and intact. Widescreen low moving camera, expressive reads without a text overlay, no additional riders."
+    },
+    {
+      "path": "Cutscenes/ep35_hand.png",
+      "key": "ep35_hand",
+      "scene": "beyond_destiny_ep_35_scene_04",
+      "firstLine": 172,
+      "lastLine": 215,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed event CG for Beyond Destiny. Hand-painted commercial Korean animation with clean restrained linework, solid grounded shapes, believable complex expression and pose, layered depth, focused composition with room across bottom for subtitles. No lettering, watermark, UI, borders, or replication of any existing commercial anime or game image. Supplied sprites are only character design reference; compose a new scene.\nLow oblique camera at the rim of an Ark Cradle collapsing steel platform above an empty black void. Aki, 21-year-old adult with an asymmetric neck-length wine-red bob and rose-amber eyes in a high-collared black and aubergine-and-oxblood armored riding jacket lies pressed to the platform edge, her right forearm extending to hold the wrist of Sherry, 24-year-old white French woman with sleek sun-gold shoulder-length hair with face-framing long layers, eyes a vivid icy blue, angular fine features, cool pale complexion, poised athletic build. Sherry hangs below the rim, wearing a weathered dark midnight-violet high-collared long coat with strips of ivory shoulder panel and dull gold hems. Their hands and unflinching eye contact center the frame. Only these two characters in the close-mid composition, uncluttered, clear anatomy, cold blue underlight with a small soft warm reflection on their cheeks. This is a rescue, no visible injuries."
+    },
+    {
+      "path": "Cutscenes/ep37_home.png",
+      "key": "ep37_home",
+      "scene": "beyond_destiny_ep_37_scene_05",
+      "firstLine": 176,
+      "lastLine": 187,
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original widescreen 16:9 full bleed event CG for Beyond Destiny. Hand-painted commercial Korean animation with clean restrained linework, solid grounded shapes, believable complex expression and pose, layered depth, focused composition with room across bottom for subtitles. No lettering, watermark, UI, borders, or replication of any existing commercial anime or game image. Supplied sprites are only character design reference; compose a new scene.\nLow warm sunset entering a modest Neo Domino apartment, amber reflection on glass balcony doors. Yun, a lean adult Korean man of 24, short tousled jet-black side-parted hair, charcoal eyes and worn black raincoat, muted aubergine lining, gray shirt, healed faint barcode-shaped scar near left collarbone. smiles softly in a simple dark grey collar shirt by the veranda, his raincoat hung on a hook at the back. Aki, 21-year-old adult with an asymmetric neck-length wine-red bob and rose-amber eyes with an oatmeal knit pullover and burgundy apron stirs stew with a wooden spoon. Sherry, 24-year-old white French woman with sleek sun-gold shoulder-length hair with face-framing long layers, eyes a vivid icy blue, angular fine features, cool pale complexion, poised athletic build. Sherry wears a tailored cream top and warm blue apron and tastes sauce with a small spoon, smiles toward the others. Only these three adults. Show the domestic scene with warm backlight, silhouette of the estuary outside, smiles and hands believable, not posed, quietly intimate."
     }
   ]
 }

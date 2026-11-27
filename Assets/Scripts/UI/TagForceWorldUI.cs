@@ -111,9 +111,12 @@ namespace YGOPortable.UI
 
         internal void Close()
         {
-            ClearRpgInterlude();
-            Root.SetActive(false);
-            ClearBody();
+            if (_screen != null)
+            {
+                ClearRpgInterlude();
+                Root.SetActive(false);
+                ClearBody();
+            }
             _images.Clear();
         }
 

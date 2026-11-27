@@ -237,10 +237,7 @@ def restore_source(episode):
     return "".join(chunks).encode("utf-8-sig" if episode["sourceBom"] else "utf-8")
 
 
-def bind_backgrounds(scenes, backgrounds, require_all):
-    manifest = json.loads(ASSET_MANIFEST.read_text(encoding="utf-8"))
-    if manifest.get("version") != 1:
-        raise ValueError("Unknown Beyond Destiny asset manifest")
+def bind_backgrounds(scenes, backgrounds, manifest, require_all):
     bindings = {}
     paths = set()
     for entry in manifest["maps"]:
@@ -265,6 +262,30 @@ def bind_backgrounds(scenes, backgrounds, require_all):
     return len(bindings)
 
 
+def bind_cutscenes(scenes, manifest):
+    by_scene = {scene["id"]: scene for scene in scenes}
+    keys = set()
+    for entry in manifest["cutscenes"]:
+        key, path = entry["key"], entry["path"]
+        if (not re.fullmatch(r"ep[0-9]{2}_[a-z_]+", key) or key in keys or
+                path != f"Cutscenes/{key}.png" or not (ASSET_ROOT / path).is_file()):
+            raise ValueError(f"Invalid, duplicate, or missing Beyond Destiny cutscene: {path}")
+        keys.add(key)
+        scene = by_scene.get(entry["scene"])
+        if scene is None:
+            raise ValueError(f"Cutscene {key} references an unknown scene: {entry['scene']}")
+        start, end = entry["firstLine"], entry["lastLine"]
+        visible = [cue for cue in scene["events"] if start <= cue["line"] <= end and
+                   cue["kind"] in {"dialogue", "thought", "narration", "system", "prose"}]
+        if not visible or visible[0]["line"] != start or visible[-1]["line"] != end:
+            raise ValueError(f"Cutscene {key} does not start and end on readable cues in {scene['id']}")
+        for cue in visible:
+            if "cutsceneKey" in cue:
+                raise ValueError(f"Cutscene {key} overlaps another CG at {scene['id']}:{cue['line']}")
+            cue["cutsceneKey"] = key
+    return len(keys)
+
+
 def build(source, *, require_all_maps=False):
     hashes = json.loads(SOURCE_HASHES.read_text(encoding="utf-8"))
     episode_files = [f"yugioh_5ds_ep{number}_script.txt" for number in range(1, EPISODE_COUNT + 1)]
@@ -287,10 +308,15 @@ def build(source, *, require_all_maps=False):
     for scene in scenes:
         if scene["backgroundKey"] not in catalog["backgrounds"]:
             raise ValueError(f"Undefined background for {scene['id']}")
-    mapped_count = bind_backgrounds(scenes, catalog["backgrounds"], require_all_maps)
+    manifest = json.loads(ASSET_MANIFEST.read_text(encoding="utf-8"))
+    if manifest.get("version") != 1:
+        raise ValueError("Unknown Beyond Destiny asset manifest")
+    mapped_count = bind_backgrounds(scenes, catalog["backgrounds"], manifest, require_all_maps)
+    cutscenes = bind_cutscenes(scenes, manifest)
     return {"schemaVersion": 1, "id": "beyond_destiny", "title": "5D's: Beyond Destiny",
             "linear": True, "sourceBibleSha256": hashes["5d_s_story_bible.md"],
-            "speakers": SPEAKERS, "cueCatalog": catalog, "mappedBackgrounds": mapped_count, "episodes": episodes}
+            "speakers": SPEAKERS, "cueCatalog": catalog, "mappedBackgrounds": mapped_count,
+            "mappedCutscenes": cutscenes, "episodes": episodes}
 
 
 def main():
@@ -313,6 +339,7 @@ def main():
         parser.exit(1, f"{error}\n")
     print(f"{EPISODE_COUNT} episodes, {SCENE_COUNT} scenes, {CHARACTER_COUNT:,} characters verified")
     print(f"{data['mappedBackgrounds']}/{len(data['cueCatalog']['backgrounds'])} background cues bound to artwork")
+    print(f"{data['mappedCutscenes']} event CGs bound to manuscript line ranges")
 
 
 if __name__ == "__main__":

@@ -43,9 +43,17 @@ namespace YGOPortable.Editor
             Require(cues["standing"].Any(cue => cue.cast?.Length > 1) &&
                 cues["music"].Any(cue => cue.clipKeys?.Contains("BGM_Dark_Alley_Loop") == true),
                 "The Unity loader did not deserialize cast or music cues.");
+            string assetFolder = Path.Combine(Application.streamingAssetsPath, "TagForce", BeyondDestinyCampaign.AssetFolder);
+            bool Exists(string path) => !string.IsNullOrEmpty(path) && File.Exists(Path.Combine(assetFolder, path));
             Require(scenes[0].backgroundPath == "Maps/spot_neodomino_rain_alley.png" &&
-                cues["background"].Any(cue => cue.assetPath == "Maps/spot_ark_cradle.png"),
-                "The campaign did not deserialize new environment artwork bindings.");
+                scenes.All(scene => Exists(scene.backgroundPath)) && cues["background"].Count() == 153 &&
+                cues["background"].All(cue => Exists(cue.assetPath)),
+                "A manuscript background could not be loaded from the campaign art folder.");
+            var cutscenes = scenes.SelectMany(scene => scene.events).Where(cue => cue.cutsceneKey != null).ToArray();
+            Require(cutscenes.All(cue => cue.IsReadable && Exists($"Cutscenes/{cue.cutsceneKey}.png")) &&
+                cutscenes.Select(cue => cue.cutsceneKey).Distinct().Count() == 10 &&
+                cutscenes.All(cue => cue.cutsceneKey != "ep02_bandage" || cue.line is >= 136 and <= 153),
+                "A CG is missing or appears before its manuscript beat.");
             var boss = encounters.Single(encounter => encounter.episodeId == "beyond_destiny_ep_31");
             Require(boss.Playable && boss.Riding && boss.resolution == "canonicalOpponentWin" &&
                 campaign.DeckById(boss.opponentDeckId).sigCard == 73580471 &&

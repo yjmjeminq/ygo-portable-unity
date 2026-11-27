@@ -17,6 +17,20 @@ namespace YGOPortable.Editor
     {
         private const string Active = "Ygo.BeyondDestiny.PlayCheck";
         private const string Profile = "Ygo.BeyondDestiny.PlayCheckProfile";
+        private static readonly (int Episode, string Key)[] StoryFrames =
+        {
+            (2, "ep02_bandage"),
+            (13, "ep13_fall"),
+            (13, "ep13_ashes"),
+            (17, "ep17_violet_fire"),
+            (23, "ep23_scar"),
+            (24, "ep24_ambush"),
+            (31, "ep31_mask"),
+            (35, "ep35_hand"),
+            (37, "ep37_home"),
+        };
+        private static BeyondDestinyCampaign _campaign;
+        private static int _storyFrame;
         private static double _deadline, _next;
         private static int _phase;
         private static bool _openingDialogueCaptured, _backlashCaptured;
@@ -39,6 +53,7 @@ namespace YGOPortable.Editor
             SessionState.SetString(Active + ".company", PlayerSettings.companyName);
             SessionState.SetBool(Active, true);
             SessionState.SetInt(Active + ".exit", 1);
+            SessionState.SetBool(Active + ".runtimeError", false);
             PlayerSettings.companyName = "YGO Portable QA";
             PlayerSettings.productName = profile;
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -54,16 +69,24 @@ namespace YGOPortable.Editor
             {
                 _deadline = EditorApplication.timeSinceStartup + 150;
                 _driver = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(), searchCombos: false);
+                Application.logMessageReceived += OnRuntimeLog;
                 EditorApplication.update += Step;
             }
             else if (change == PlayModeStateChange.EnteredEditMode)
             {
                 EditorApplication.update -= Step;
+                Application.logMessageReceived -= OnRuntimeLog;
                 PlayerSettings.productName = SessionState.GetString(Active + ".product", "");
                 PlayerSettings.companyName = SessionState.GetString(Active + ".company", "");
                 SessionState.SetBool(Active, false);
-                EditorApplication.Exit(SessionState.GetInt(Active + ".exit", 1));
+                EditorApplication.Exit(SessionState.GetBool(Active + ".runtimeError", false) ? 1 : SessionState.GetInt(Active + ".exit", 1));
             }
+        }
+
+        private static void OnRuntimeLog(string message, string stack, LogType type)
+        {
+            if (type is not (LogType.Exception or LogType.Error or LogType.Assert)) return;
+            SessionState.SetBool(Active + ".runtimeError", true);
         }
 
         private static void Step()
@@ -155,8 +178,18 @@ namespace YGOPortable.Editor
                         if (!_openingDialogueCaptured || !_backlashCaptured)
                             throw new InvalidOperationException("Opening story or Backlash artwork did not render.");
                         Debug.Log("[Beyond Destiny Play Mode] Picker, field, opening, native duel, Backlash and episode-two resume passed.");
-                        Finish(0);
+                        _campaign = BeyondDestinyCampaign.Load(Application.streamingAssetsPath);
+                        CaptureStoryFrame();
                     });
+                    return;
+                }
+
+                if (_phase == 6 && FindButton("캠페인 선택") != null)
+                {
+                    if (!BeyondDestinyProgress.Load(Application.persistentDataPath, _campaign).completed)
+                        throw new InvalidOperationException("The final episode did not persist completion.");
+                    Debug.Log("[Beyond Destiny Play Mode] Nine additional event CGs rendered, and the finale saved completion.");
+                    Finish(0);
                     return;
                 }
 
@@ -171,8 +204,7 @@ namespace YGOPortable.Editor
                     return;
                 }
                 if (!_backlashCaptured && scene.id == "beyond_destiny_ep_01_scene_04" &&
-                    UnityEngine.Object.FindObjectsByType<Image>(FindObjectsSortMode.None)
-                        .Any(image => image.sprite != null && image.sprite.name == "ep01_backlash"))
+                    FindCutscene("ep01_backlash") != null)
                 {
                     CaptureAfter("04-backlash", 1.30);
                     _backlashCaptured = true;
@@ -184,6 +216,36 @@ namespace YGOPortable.Editor
                 Finish(1);
             }
         }
+
+        private static void CaptureStoryFrame()
+        {
+            _phase = 6;
+            if (_storyFrame >= StoryFrames.Length) return;
+            var frame = StoryFrames[_storyFrame];
+            var episode = _campaign.Episodes[frame.Episode - 1];
+            int sceneIndex = Array.FindIndex(episode.scenes, scene => scene.events.Any(cue => cue.cutsceneKey == frame.Key));
+            if (sceneIndex < 0) throw new InvalidOperationException($"No manuscript anchor for {frame.Key}.");
+            int cueIndex = Array.FindIndex(episode.scenes[sceneIndex].events, cue => cue.cutsceneKey == frame.Key);
+            var progress = BeyondDestinyProgress.Load(Application.persistentDataPath, _campaign);
+            progress.episodeIndex = frame.Episode - 1;
+            progress.sceneIndex = sceneIndex;
+            progress.cueIndex = cueIndex;
+            progress.Save(Application.persistentDataPath, _campaign);
+            _app.ShowScreen(AppScreen.Campaigns);
+            Click("5D’s: Beyond Destiny");
+            CaptureAfter($"{_storyFrame + 7:00}-{frame.Key}", 1.3, () =>
+            {
+                var image = FindCutscene(frame.Key);
+                var overlay = image?.GetComponentInParent<CanvasGroup>();
+                if (overlay == null || overlay.alpha < .98f || FindAdvance() == null)
+                    throw new InvalidOperationException($"The event CG did not settle under the dialogue for {frame.Key}.");
+                ++_storyFrame;
+                CaptureStoryFrame();
+            });
+        }
+
+        private static Image FindCutscene(string key) => UnityEngine.Object.FindObjectsByType<Image>(FindObjectsSortMode.None)
+            .FirstOrDefault(image => image.name == "CG" && image.isActiveAndEnabled && image.sprite?.name == key);
 
         private static BeyondDestinyPlayback Playback() => Get<BeyondDestinyPlayback>(Get<BeyondDestinyUI>(_app, "_beyondDestiny"), "_playback");
 

@@ -117,7 +117,7 @@ namespace YGOPortable.Core
                         if (stageActor.Key != "hero") cast = Portrait(stageActor.Key, outfits.GetValueOrDefault(stageActor.Key));
                 }
                 pages.Add(new Page(checkpoint, cue, map, Portrait("hero", outfits.GetValueOrDefault("hero")),
-                    cast, CutsceneAt(scene.id), effect, audio.ToArray()));
+                    cast, cue.cutsceneKey, effect, audio.ToArray()));
                 checkpoint = index + 1;
                 audio.Clear();
                 effect = null;
@@ -209,21 +209,6 @@ namespace YGOPortable.Core
 
         private static string Portrait(string actor, string outfit) => string.IsNullOrWhiteSpace(actor) ? null :
             "Characters_Standing/" + actor + (string.IsNullOrEmpty(outfit) ? "" : "_" + outfit);
-
-        internal static string CutsceneAt(string scene) => scene switch
-        {
-            "beyond_destiny_ep_01_scene_04" => "ep01_backlash",
-            "beyond_destiny_ep_02_scene_03" => "ep02_bandage",
-            "beyond_destiny_ep_13_scene_04" => "ep13_fall",
-            "beyond_destiny_ep_13_scene_06" => "ep13_ashes",
-            "beyond_destiny_ep_17_scene_04" => "ep17_violet_fire",
-            "beyond_destiny_ep_23_scene_04" => "ep23_scar",
-            "beyond_destiny_ep_24_scene_03" => "ep24_ambush",
-            "beyond_destiny_ep_31_scene_04" => "ep31_mask",
-            "beyond_destiny_ep_35_scene_04" => "ep35_hand",
-            "beyond_destiny_ep_37_scene_05" => "ep37_home",
-            _ => null,
-        };
 
         private static string VisualEffect(string text) =>
             text.Contains("흔들") || text.Contains("진동") ? "shake" :

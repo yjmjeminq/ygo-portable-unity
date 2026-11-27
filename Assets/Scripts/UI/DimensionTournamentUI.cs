@@ -86,6 +86,7 @@ namespace YGOPortable.UI
             _simulation?.Dispose();
             _simulation = null;
             _aiResults.Clear();
+            if (Root == null) return;
             _deck.Hide();
             CloseDialogue();
             Root.SetActive(false);
