@@ -346,20 +346,16 @@ namespace YGOPortable.UI
             return canvas;
         }
 
-        internal void OpenRpgField() => OpenRpgField(StoryModeUI.RpgSeriesId);
-
-        internal void OpenGxRpgField() => OpenRpgField(StoryModeUI.GxRpgSeriesId);
-
-        private void OpenRpgField(string seriesId)
+        internal void OpenGxRpgField()
         {
-            if (!_tagForceWorld.PrepareRpgField(openIntro: true, seriesId: seriesId)) return;
+            if (!_tagForceWorld.PrepareRpgField(openIntro: true)) return;
             ShowScreen(AppScreen.TagForceWorld);
         }
 
         internal void OpenRpgFieldEpisode(int index)
         {
             if (_screen != AppScreen.TagForceWorld || !_tagForceWorld.CanStartRpgEpisode(index)) return;
-            _storyMode.UseRpgCampaign(true, fromField: true, seriesId: _tagForceWorld.RpgCampaignId);
+            _storyMode.UseRpgCampaign(true, fromField: true);
             ShowScreen(AppScreen.StoryMode);
             _storyMode.OpenFieldEpisode(index);
         }
@@ -393,7 +389,7 @@ namespace YGOPortable.UI
         internal void OpenRpgRecap(int episode, string cutscene = null)
         {
             if (_screen != AppScreen.TagForceWorld || episode < 0 || episode >= _tagForceWorld.RpgClears) return;
-            _storyMode.UseRpgCampaign(true, fromField: true, seriesId: _tagForceWorld.RpgCampaignId);
+            _storyMode.UseRpgCampaign(true, fromField: true);
             ShowScreen(AppScreen.StoryMode);
             _storyMode.OpenFieldRecap(episode, cutscene);
         }

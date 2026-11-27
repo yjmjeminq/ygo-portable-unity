@@ -129,17 +129,16 @@ namespace YGOPortable.UI
         internal static string NewlyUnlockedRegions(int before, int after) => string.Join(" · ",
             RpgRegions.Where(region => !region.IsOpen(before) && region.IsOpen(after)).Select(region => region.Name));
 
-        internal bool PrepareRpgField(bool openIntro = false, string seriesId = StoryModeUI.RpgSeriesId)
+        internal bool PrepareRpgField(bool openIntro = false)
         {
             ClearRpgInterlude();
-            if (!LoadWorldCampaign(seriesId)) return false;
+            if (!LoadWorldCampaign()) return false;
             _rpgField = true;
             _observedRpgClears = RpgClears;
-            _rpgIntroOnOpen = !IsGxCampaign && openIntro && _observedRpgClears == 0 && !CollectionProgress.RpgIntroSeen;
+            _rpgIntroOnOpen = false;
             _rpgLocation = Array.FindIndex(CampaignRegions, region => region.Id == PlayerPrefs.GetString(RpgRegionPreference));
             if (_rpgLocation < 0 || !CampaignRegions[_rpgLocation].IsOpen(_observedRpgClears))
                 _rpgLocation = CampaignRegionForEpisode(_observedRpgClears + 1);
-            if (_rpgIntroOnOpen) _rpgLocation = RpgGarage;
             _rpgAnnounceArrival = openIntro;
             _position = RpgFieldArrival(_rpgLocation);
             _resident = null;

@@ -12,7 +12,7 @@ namespace YGOPortable.UI
         private RpgRegion[] _campaignRegions = RpgRegions;
         private (int From, int Exit, int To, int Entry)[] _campaignRoutes;
         private readonly Dictionary<string, int> _campaignRegionIndex = new(StringComparer.Ordinal);
-        internal string RpgCampaignId { get; private set; } = StoryModeUI.RpgSeriesId;
+        internal string RpgCampaignId { get; private set; }
         internal bool IsGxCampaign => RpgCampaignId == StoryModeUI.GxRpgSeriesId;
         internal string RpgAssetFolder => IsGxCampaign ? "GX" : "5DS";
         private string RpgArt => "TagForce/" + RpgAssetFolder + "/";
@@ -63,9 +63,10 @@ namespace YGOPortable.UI
         private bool AutomaticRpgScenePending => _rpgField && _page == Page.Field &&
             CurrentRpgEpisode?.isCutsceneOnly == true;
 
-        private bool LoadWorldCampaign(string seriesId)
+        private bool LoadWorldCampaign()
         {
-            if (_rpgCampaign != null && RpgCampaignId == seriesId) return true;
+            const string seriesId = StoryModeUI.GxRpgSeriesId;
+            if (_rpgCampaign != null) return true;
             var script = StoryModeUI.LoadRpgScript(Application.streamingAssetsPath, seriesId);
             var decks = StoryModeUI.LoadRpgDecks(Application.streamingAssetsPath, seriesId);
             if (script == null || script.episodes.Any(episode => !episode.isCutsceneOnly &&
@@ -73,28 +74,22 @@ namespace YGOPortable.UI
                     !decks.ContainsKey(episode.forcedPlayerDeckId))))
                 return false;
 
-            bool gx = seriesId == StoryModeUI.GxRpgSeriesId;
             var configuration = TagForceData.LoadRpgConfiguration(Application.streamingAssetsPath, seriesId);
-            if (configuration == null || gx && script.episodes.Any(episode => configuration.Spot(episode.regionId) == null))
-                return false;
-            var regions = gx ? configuration.spots.Select((spot, index) =>
-                new RpgRegion(spot.spotId, spot.name, spot.unlockAfter, index, mapPath: spot.mapPath)).ToArray() : RpgRegions;
-            var floorData = (gx ? configuration.spots : configuration.fieldSpots)?.ToDictionary(spot => spot.spotId);
-            if (floorData == null || regions.Any(region => !floorData.TryGetValue(region.Id, out var spot) ||
-                spot.walkPolygon?.Length is not > 2)) return false;
+            if (configuration == null || script.episodes.Any(episode => configuration.Spot(episode.regionId) == null) ||
+                configuration.spots.Any(spot => spot.walkPolygon?.Length is not > 2)) return false;
+            var regions = configuration.spots.Select((spot, index) =>
+                new RpgRegion(spot.spotId, spot.name, spot.unlockAfter, index, mapPath: spot.mapPath)).ToArray();
 
             RpgCampaignId = seriesId;
             _rpgCampaign = script;
             _rpgWorldDecks = decks;
             _rpgConfiguration = configuration;
             _campaignRegionIndex.Clear();
-            _campaignRoutes = null;
             _campaignRegions = regions;
-            _rpgTerrainByRegion = regions.Select(region => new RpgFieldTerrain(floorData[region.Id])).ToArray();
+            _rpgTerrainByRegion = configuration.spots.Select(spot => new RpgFieldTerrain(spot)).ToArray();
             _rpgSceneTerrain.Clear();
             foreach (var scene in configuration.fieldScenes ?? Array.Empty<TagForceSpot>())
                 _rpgSceneTerrain.Add($"Maps/{scene.spotId}.png", new RpgFieldTerrain(scene));
-            if (!gx) return true;
             for (int index = 0; index < _campaignRegions.Length; ++index)
                 _campaignRegionIndex.Add(_campaignRegions[index].Id, index);
 

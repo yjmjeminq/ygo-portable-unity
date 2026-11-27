@@ -39,8 +39,8 @@ namespace YGOPortable.Editor
                 if (gxOnly)
                 {
                     VerifyGxScenarioEffects();
-                    VerifyRpgTerrainData(streaming, gxOnly: true);
-                    VerifyRpgField(starter, save, gxOnly: true);
+                    VerifyRpgTerrainData(streaming);
+                    VerifyRpgField(save);
                     Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
                     Debug.Log("[VERIFY GX] All GX checks passed. Native script errors=0.");
                 }
@@ -52,7 +52,6 @@ namespace YGOPortable.Editor
                     VerifyDmScenarioEffects();
                     VerifyGxScenarioEffects();
                     Verify5DsScenarioEffects();
-                    VerifyRpgCampaign(starter);
                     VerifyZexalScenarioEffects();
                     VerifyArcVScenarioEffects();
                     VerifyVrainsScenarioEffects();
@@ -61,7 +60,7 @@ namespace YGOPortable.Editor
                     VerifyDialogueChoices(starter);
                     VerifyOpeningAndSave(save);
                     VerifyRpgTerrainData(streaming);
-                    VerifyRpgField(starter, save);
+                    VerifyRpgField(save);
                     Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
                 }
                 exit = 0;
@@ -111,213 +110,6 @@ namespace YGOPortable.Editor
                 pausedField.SetValue(null, oldPaused);
                 UnityEngine.Object.DestroyImmediate(audio);
             }
-        }
-
-        private static void VerifyRpgCampaign(UserDeck playerDeck)
-        {
-            string streaming = Application.streamingAssetsPath;
-            var script = StoryModeUI.LoadRpgScript(streaming);
-            var decks = StoryModeUI.LoadRpgDecks(streaming);
-            Require(script?.episodes.Length == 50 && decks.Count == 50, "The entire RPG campaign did not load.");
-            var canvas = new GameObject("RPG campaign verification", typeof(Canvas));
-            var events = new GameObject("RPG input verification", typeof(EventSystem));
-            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
-            try
-            {
-                DeckRepository.SaveUserDeck(playerDeck);
-                var story = new StoryModeUI(canvas.AddComponent<GameAppController>(), canvas.transform);
-                story.UseRpgCampaign(true);
-                story.Open();
-                var root = story.Root.transform;
-                var rows = root.GetComponentsInChildren<ScrollRect>().Single().content;
-                Require(rows.childCount == 50 && rows.Find("Episode_50").gameObject.activeInHierarchy,
-                    "Episode 50 was missing from the RPG selection.");
-
-                var loaded = story.GetRpgScript(StoryModeUI.RpgSeriesId);
-                for (int i = 0; i < loaded.episodes.Length; i++)
-                {
-                    var episode = loaded.episodes[i];
-                    var match = story.GetOpponentMatch(episode).Deck;
-                    Require(match?.id == 59001 + i && match.charId == episode.charId,
-                        $"Wrong deck for RPG episode {i + 1}.");
-                    Require(match.main.Length == 40 && match.extra.Length <= 15 && match.side.Length <= 15,
-                        $"Invalid deck size in 5D's RPG deck {match.id}.");
-                    var cards = match.main.Concat(match.extra).Concat(match.side).ToArray();
-                    Require(cards.Contains(match.sigCard), $"The signature card is absent from 5D's RPG deck {match.id}.");
-                    foreach (uint code in cards)
-                    {
-                        var card = CardDatabase.Get(code);
-                        Require(card != null && YgoNativeBridge.YGO_HasCard(code) != 0 &&
-                            (card.type & (YgoConstants.TYPE_XYZ | YgoConstants.TYPE_PENDULUM |
-                            YgoConstants.TYPE_LINK | YgoConstants.TYPE_TOKEN)) == 0,
-                            $"Illegal or unavailable 5D's RPG card {code} in deck {match.id}.");
-                    }
-                    var main = match.main.Select(CardDatabase.Get).ToArray();
-                    var extra = match.extra.Select(CardDatabase.Get).ToArray();
-                    Require(main.All(card => !card.IsExtra) && extra.All(card => card.IsExtra),
-                        $"A card is in the wrong zone in 5D's RPG deck {match.id}.");
-                    if (extra.Any(card => card.IsSynchro))
-                    {
-                        Require(main.Any(card => card.IsMonster && (card.type & YgoConstants.TYPE_TUNER) != 0) &&
-                            main.Any(card => card.IsMonster && (card.type & YgoConstants.TYPE_TUNER) == 0),
-                            $"Missing Synchro materials in 5D's RPG deck {match.id}.");
-                    }
-                    var raid = story.GetRaid(episode);
-                    var opening = default(StoryBattlePlan).Apply(raid, match, episode.gimmick);
-                    using var duel = new DuelSession();
-                    Require(duel.StartNewDuel(playerDeck.main, playerDeck.extra, match.main, match.extra,
-                        seed: new ulong[] { 21, 906, 711, 399 }, storyGimmick: episode.gimmick,
-                        playerOpening: opening.Player, opponentOpening: opening.Opponent),
-                        $"RPG episode {i + 1} could not start.");
-                    if (i is 6 or 26)
-                    {
-                        var pilot = new TacticalAI { Difficulty = AIDifficulty.Easy };
-                        for (int step = 0; step < 30 && !InMain(duel, 1) && !duel.IsFinished && duel.RetryCount == 0; step++)
-                        {
-                            if (duel.ActivePrompt is { } prompt) duel.SubmitResponse(pilot.ComputeResponse(duel, prompt));
-                            else duel.StepUntilPrompt();
-                        }
-                        Require(InMain(duel, 1) && duel.RetryCount == 0,
-                            $"RPG episode {i + 1} did not resolve its startup prompts.");
-                    }
-                    var rival = duel.Players[1];
-                    if (StoryGimmickRuntime.IsRidingDuel(episode.gimmick))
-                        Require(story.RidingMachineFor(episode) == "스트라이크 팽" &&
-                            duel.Players.All(seat => seat.szone[5]?.code == StoryGimmickRuntime.SpeedWorld) &&
-                            duel.Players[0].hand.Count == 5 && rival.hand.Count == opening.Opponent.Hand,
-                            $"Riding duel {i + 1} had the wrong machine, field or hand.");
-                    if (i == 6)
-                        Require(duel.Players[0].mzone.Count(card => card?.code == StoryGimmickRuntime.HandcuffToken) == 2,
-                            "The prison episode did not begin with both handcuffs.");
-                    if (i == 26)
-                        Require(rival.mzone.Any(card => card?.code == 39823987) &&
-                            rival.grave.Any(card => card.code == 66818682), "The Godwin raid did not prepare Inti and Quilla.");
-                    if (raid.HasValue && episode.raidCard != 0)
-                        Require(rival.mzone.Concat(rival.szone).Any(card => card?.code == episode.raidCard),
-                            $"The RPG raid had no opening ace in episode {i + 1}.");
-                    foreach (var (code, _) in StoryGimmickRuntime.StartingCards(episode.gimmick))
-                        Require(rival.mzone.Concat(rival.szone).Any(card => card?.code == code),
-                            $"Missing starting card {code} for episode {i + 1}.");
-                }
-                var dialogue = new StoryModeUI.StoryDialogueView(canvas.transform);
-                var scene = canvas.transform.Find("StoryDialogue/Scene");
-                var cutscene = scene.Find("CutsceneOverlay").GetComponent<CanvasGroup>();
-                var portraits = scene.Find("Portraits").GetComponent<CanvasGroup>();
-                var badge = scene.Find("DialogueBox/SpeakerBadge").gameObject;
-                var cg = cutscene.transform.Find("CG").GetComponent<Image>();
-                var body = scene.Find("DialogueBox/Text/Label").GetComponent<Text>();
-                var caret = scene.Find("DialogueBox/AdvanceCaret/Label").GetComponent<Text>();
-                var next = scene.Find("DialogueBox/Next/Button").GetComponent<Button>();
-                var playerPortrait = portraits.transform.Find("Protagonist").GetComponent<Image>();
-                var speakerPortrait = portraits.transform.Find("Opponent").GetComponent<Image>();
-                var speakerReaction = speakerPortrait.transform.Find("Reaction/Label").GetComponent<Text>();
-                try
-                {
-                    var cgLines = loaded.episodes.SelectMany(episode =>
-                        episode.preDialogues.Concat(episode.postWinDialogues).Concat(episode.postLoseDialogues))
-                        .Where(line => !string.IsNullOrEmpty(line.cutscene)).ToArray();
-                    Require(cgLines.Length == 10 && cgLines.Select(line => line.cutscene).Distinct().Count() == 7,
-                        "The authored RPG cutscenes were missing.");
-                    foreach (var line in cgLines)
-                    {
-                        dialogue.Open("컷씬 확인", "카이", DeckRepository.GetCharacter(1),
-                            new[]
-                            {
-                                new StoryDialogueLine { speaker = line.speaker, text = new string('가', 40), cutscene = line.cutscene },
-                                new StoryDialogueLine { speaker = "이자요이 아키", text = "<b>고마워.</b>", emotion = "blush" },
-                                new StoryDialogueLine { speaker = "카이", text = "그래." },
-                                new StoryDialogueLine { speaker = "설명", text = "바람이 스쳤다." },
-                            }, () => { }, rpg: true);
-                        var restingPortrait = speakerPortrait.sprite;
-                        Require(!badge.activeSelf && playerPortrait.enabled && speakerPortrait.enabled &&
-                            scene.Find("ProtagonistSD") == null && scene.Find("OpponentSD") == null,
-                            "Narration lost the two stage portraits or displayed an SD character inside the panel.");
-                        Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.28f) &&
-                            body.font == Resources.Load<Font>("StoryFonts/GowunDodum-Regular") &&
-                            scene.Find("DialogueBox").GetComponent<Image>() is { type: Image.Type.Sliced } panel &&
-                            panel.sprite.name == "RPG dialogue glass" &&
-                            scene.Find("DialogueTools").GetComponentsInChildren<Button>().Length == 5 &&
-                            scene.Find("DialogueTools/Hide/Button").GetComponentInChildren<Text>().text == "창 숨김" &&
-                            ((Image)next.targetGraphic).color.a == 0f &&
-                            string.IsNullOrEmpty(next.GetComponentInChildren<Text>().text) &&
-                            badge.GetComponentInChildren<Text>(true).font == Resources.Load<Font>("StoryFonts/Paperlogy-7Bold") &&
-                            body.GetComponent<Shadow>().effectDistance == new Vector2(1.5f, -1.5f) &&
-                            body.color == new Color(.92f, .93f, .96f) && !caret.enabled &&
-                            cg.GetComponent<AspectRatioFitter>().aspectMode == AspectRatioFitter.AspectMode.FitInParent,
-                            "RPG dialogue typography or the cutscene fit did not match the visual novel layout.");
-                        dialogue.Update(.2f);
-                        Require(Mathf.Approximately(cutscene.alpha, .5f) && Mathf.Approximately(portraits.alpha, .5f),
-                            "The midpoint of the CG fade was incorrect.");
-                        dialogue.Update(.2f);
-                        Require(cutscene.alpha == 1f && portraits.alpha == 0f && cg.sprite != null,
-                            "The CG did not cover the scene.");
-                        next.onClick.Invoke();
-                        next.onClick.Invoke();
-                        dialogue.Update(.05f);
-                        Require(body.text == "<b>고</b>" && !caret.enabled,
-                            "Typing leaked rich-text markup or showed the advance caret too soon.");
-                        dialogue.Update(.35f);
-                        Require(cutscene.alpha == 0f && portraits.alpha == 1f && badge.activeSelf &&
-                            playerPortrait.enabled && speakerPortrait.enabled &&
-                            caret.enabled && body.text == "<b>고마워.</b>" &&
-                            badge.GetComponentInChildren<Text>().color == (Color)new Color32(0xFF, 0x40, 0x81, 255) &&
-                            speakerPortrait.sprite != restingPortrait && !speakerReaction.enabled &&
-                            speakerPortrait.color.g > .98f && speakerPortrait.color.b > .98f,
-                            "The authored blush did not return cleanly after fading out the CG.");
-                        var listeningPortrait = speakerPortrait.sprite;
-                        next.onClick.Invoke();
-                        dialogue.Update(.4f);
-                        Require(playerPortrait.enabled && speakerPortrait.enabled &&
-                            speakerPortrait.sprite == listeningPortrait &&
-                            playerPortrait.sprite.rect.size == new Vector2(448f, 576f),
-                            "Switching speakers did not keep the listener and Kai's aligned neutral frame.");
-                        next.onClick.Invoke();
-                        dialogue.Update(.4f);
-                        Require(!badge.activeSelf && playerPortrait.enabled && speakerPortrait.enabled &&
-                            playerPortrait.rectTransform.localScale.x < 1f && speakerPortrait.rectTransform.localScale.x < 1f,
-                            "A narration line did not dim the two portraits.");
-                    }
-                    var fx = scene.GetComponent<StoryDialogueFx>();
-                    var dialogueBox = (RectTransform)scene.Find("DialogueBox");
-                    var flash = scene.Find("DialogueFlash").GetComponent<Image>();
-                    var rest = dialogueBox.anchoredPosition;
-                    fx.DrawFrame("shake", .125f);
-                    Require(dialogueBox.anchoredPosition != rest, "Shake did not move the text box.");
-                    fx.ResetEffect();
-                    fx.DrawFrame("flash", .25f);
-                    Require(flash.color.a > 0f && flash.color.r == flash.color.g, "Flash did not fill the scene in white.");
-                    fx.DrawFrame("heartbeat", .125f);
-                    float firstPulse = flash.color.a;
-                    fx.DrawFrame("heartbeat", .375f);
-                    Require(firstPulse > 0f && flash.color.a == 0f, "Heartbeat did not pulse.");
-                    fx.DrawFrame("heartbeat", .625f);
-                    Require(flash.color.a > 0f && flash.color.r > flash.color.g, "The second pink heartbeat pulse was missing.");
-                    fx.ResetEffect();
-                }
-                finally { dialogue.Close(); }
-                root.Find("StoryBrowser/EpisodeDetails/StartEpisode/Button").GetComponent<Button>().onClick.Invoke();
-                var preparation = root.Find("StoryDialogue");
-                var preparationScene = preparation.Find("Scene");
-                var skip = preparationScene.Find("DialogueTools/Skip/Button").GetComponent<Button>();
-                skip.onClick.Invoke();
-                preparationScene.Find("Choices/Choice_0/Button").GetComponent<Button>().onClick.Invoke();
-                skip.onClick.Invoke();
-                var picker = preparation.Find("DeckSelection");
-                Require(picker.gameObject.activeSelf &&
-                    picker.GetComponentInChildren<Dropdown>().options.Any(option => option.text == playerDeck.name),
-                    "The RPG preparation did not offer the player's saved deck.");
-                picker.Find("Window/Apply/Button").GetComponent<Button>().onClick.Invoke();
-                story.UseRpgCampaign(false);
-                story.Open();
-                Require(!rows.Find("Episode_50").gameObject.activeSelf,
-                    "Returning to the original campaign left the RPG episodes on screen.");
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(canvas);
-                UnityEngine.Object.DestroyImmediate(events);
-            }
-            Debug.Log("[VERIFY 5DS RPG] Fifty episodes, dedicated decks, riding openings, portrait transitions and all seven CG assets passed.");
         }
 
         private static void VerifyDialogueChoices(UserDeck starter)

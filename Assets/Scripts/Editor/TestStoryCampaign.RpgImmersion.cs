@@ -9,15 +9,13 @@ namespace YGOPortable.Editor
 {
     internal static partial class TestStoryCampaign
     {
-        private static void VerifyRpgTerrainData(string streaming, bool gxOnly = false)
+        private static void VerifyRpgTerrainData(string streaming)
         {
             var gx = TagForceData.LoadRpgConfiguration(streaming, StoryModeUI.GxRpgSeriesId);
-            var fiveDs = gxOnly ? Array.Empty<TagForceSpot>() :
-                TagForceData.LoadRpgConfiguration(streaming, StoryModeUI.RpgSeriesId).fieldSpots;
-            Require(gx.spots.Length == 12 && (gxOnly || fiveDs.Length == 11) &&
-                gx.fieldScenes.Length == 2, "A campaign or prologue background omitted its terrain data.");
+            Require(gx.spots.Length == 12 && gx.fieldScenes.Length == 2,
+                "A GX campaign or prologue background omitted its terrain data.");
             var path = new List<Vector2>(24);
-            foreach (var spot in gx.spots.Concat(fiveDs).Concat(gx.fieldScenes))
+            foreach (var spot in gx.spots.Concat(gx.fieldScenes))
             {
                 var terrain = new RpgFieldTerrain(spot);
                 Require(spot.walkPolygon.All(terrain.Contains) &&
@@ -79,7 +77,7 @@ namespace YGOPortable.Editor
             Require(footsteps.Select(surface => DuelAudio.GetRpgFootstep(surface, -1)).Distinct().Count() == 6 &&
                 footsteps.All(surface => DuelAudio.GetRpgFootstep(surface, -1) != DuelAudio.GetRpgFootstep(surface, 1)),
                 "Floor materials or alternating feet shared the same footstep sound.");
-            Debug.Log($"[{(gxOnly ? "VERIFY GX TERRAIN" : "VERIFY 2.5D TERRAIN")}] {12 + fiveDs.Length} fields and 2 prologue stages, perspective, obstacle routes, wall slide, allocation-free geometry and six step materials passed.");
+            Debug.Log("[VERIFY GX TERRAIN] 12 fields and 2 prologue stages, perspective, obstacle routes, wall slide, allocation-free geometry and six step materials passed.");
         }
     }
 }

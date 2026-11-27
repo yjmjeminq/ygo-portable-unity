@@ -40,9 +40,15 @@ namespace YGOPortable.Editor
                 var bgm = canvas.GetComponents<AudioSource>()[1];
                 var menu = new TitleAndMenuUI(app, canvas.transform);
                 var entries = menu.MenuRoot.GetComponentsInChildren<Button>(true);
-                Require(entries.Any(button => button.transform.parent.name == "RpgWorld") &&
-                    entries.All(button => button.transform.parent.name != "TagForceWorld"),
-                    "The main menu did not offer RPG World in place of the old Tag Force entry.");
+                Require(entries.Any(button => button.transform.parent.name == "GxRpgWorld") &&
+                    entries.All(button => button.transform.parent.name is not ("RpgWorld" or "TagForceWorld")),
+                    "The main menu campaign should be the GX RPG.");
+                var fiveDs = TagForceData.Series.Single(series => series.Id == "5ds");
+                var sharedScenario = TagForceData.Load(streaming, fiveDs);
+                Require(TagForceData.LoadRpgConfiguration(streaming, fiveDs.Id) == null &&
+                    sharedScenario?.Spot("spot_daedalus_bridge") is { } bridge &&
+                    File.Exists(Path.Combine(streaming, bridge.mapPath)),
+                    "Removing the 5D's RPG should keep the shared Tag Force scenario and bridge asset.");
                 world = new TagForceWorldUI(app, canvas.transform);
                 var panel = world.Root.transform.Find("World");
 
@@ -315,22 +321,22 @@ namespace YGOPortable.Editor
             float quarterStep = 1f / (4f * 8f);
             float peak = quarterStep;
             Call(world, "MoveTo", new Vector2(.1f, .16f), null, null);
-            Call(world, "AdvanceWalk", .5f, peak);
+            Call(world, "AdvanceWalk", .5f, peak, false);
             Require(playerSprite.localScale.x == -1 && partnerSprite.localScale.x == -1 &&
                 Mathf.Abs(player.anchoredPosition.y - 6f) < .01f && partner.anchoredPosition.y != 0,
                 "Leftward movement did not face left and bob.");
-            Call(world, "AdvanceWalk", .1f, quarterStep * 3f);
+            Call(world, "AdvanceWalk", .1f, quarterStep * 3f, false);
             Require(Mathf.Abs(player.anchoredPosition.y + 6f) < .01f, "Walking bob half-cycle did not match 8 Hz.");
-            Call(world, "AdvanceWalk", .1f, quarterStep * 5f);
+            Call(world, "AdvanceWalk", .1f, quarterStep * 5f, false);
             Require(Mathf.Abs(player.anchoredPosition.y - 6f) < .01f, "Walking bob full cycle did not match 8 Hz.");
-            Call(world, "AdvanceWalk", 2f, peak);
+            Call(world, "AdvanceWalk", 2f, peak, false);
             Require(player.anchoredPosition == Vector2.zero && partner.anchoredPosition == Vector2.zero,
                 "Idle actors retained a bob offset.");
             Call(world, "MoveTo", new Vector2(.1f, .5f), null, null);
-            Call(world, "AdvanceWalk", .5f, peak);
+            Call(world, "AdvanceWalk", .5f, peak, false);
             Require(playerSprite.localScale.x == -1, "Vertical movement reset the last direction.");
             Call(world, "MoveTo", new Vector2(.9f, .5f), null, null);
-            Call(world, "AdvanceWalk", .5f, peak);
+            Call(world, "AdvanceWalk", .5f, peak, false);
             Require(playerSprite.localScale.x == 1 && partnerSprite.localScale.x == 1, "Moving right did not flip both sprites.");
             float x = player.anchorMin.x;
             world.Update(.1f, Vector2.right);
@@ -353,7 +359,7 @@ namespace YGOPortable.Editor
             var click = new PointerEventData(null) { button = PointerEventData.InputButton.Left };
             Require(ExecuteEvents.Execute(sdSprite.gameObject, click, ExecuteEvents.pointerClickHandler),
                 "No pointer-click handler was attached to the SD portrait.");
-            Call(world, "AdvanceWalk", 4f, peak);
+            Call(world, "AdvanceWalk", 4f, peak, false);
             var left = (RectTransform)panel.Find("Conversation/Protagonist");
             var right = (RectTransform)panel.Find("Conversation/Guest");
             var portrait = left.GetComponent<Image>().sprite;
@@ -400,7 +406,7 @@ namespace YGOPortable.Editor
             {
                 DuelAudio.SfxVolume = .2f;
                 Press(panel, "Pickup1");
-                Call(world, "AdvanceWalk", 4f, 0f);
+                Call(world, "AdvanceWalk", 4f, 0f, false);
                 var reward = (AudioClip)typeof(DuelAudio).GetField("_clipWorldReward",
                     BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
                 Require(reward != null && reward.length > .3f, "A reward did not select the dedicated fanfare.");
