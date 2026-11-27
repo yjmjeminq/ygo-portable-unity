@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "style": "Original commercial Korean animation environments, layered 2.5D depth, realistic wet industrial materials and restrained cyan lighting",
+  "maps": [
+    {
+      "path": "Maps/spot_neodomino_rain_alley.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_01_scene_01_bg_1",
+        "beyond_destiny_ep_01_scene_02_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "An abandoned industrial back alley outside a dense futuristic Japanese coastal city in torrential rain. Elevated three-quarter game camera, open traversable asphalt with long puddles, weathered factory walls, distant cyan and magenta skyline, warm amber industrial lamp."
+    },
+    {
+      "path": "Maps/spot_kaiba_dome_plaza.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_02_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Original futuristic domed dueling stadium on the Japanese coast under overcast daylight. Elevated three-quarter game camera, wide slate pedestrian concourse and teal-lit transit doors, industrial architecture rising behind the unobstructed walking area."
+    },
+    {
+      "path": "Maps/spot_factory_duel_hall.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_01_scene_03_bg_1",
+        "beyond_destiny_ep_01_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny campaign production map, widescreen full-bleed 16:9, commercial Korean animation hand-painted environment, crisp dark linework and layered realistic geometry, steel blue and restrained cyan accents, elevated three-quarter gameplay camera, broad continuous walkable surface across lower half, pensively dramatic. No people, character silhouettes, UI, text, game logos, watermark, frame, letters, existing game level recreation. Night interior of an abandoned old steel mill in a rainy coastal city. Enormous dark rafters, bar windows showing rain, broken pieces of old assembly line well back along walls. A shallow foreground concrete hall and broad middle aisle remain unobstructed clear floor for the two duelists. Thin crimson holographic bramble projections drift at the perimeter and rise by distant pillars like an electric dueling field, while the walkable center remains dark blue concrete with a faint wet sheen. Faded amber practical light by the farther open steel loading door. Readable cinematic silhouettes."
+    },
+    {
+      "path": "Maps/spot_kaiba_dome_corridor.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_02_scene_01_bg_2",
+        "beyond_destiny_ep_02_scene_02_bg_1",
+        "beyond_destiny_ep_04_scene_02_bg_1",
+        "beyond_destiny_ep_04_scene_04_bg_1",
+        "beyond_destiny_ep_05_scene_02_bg_1",
+        "beyond_destiny_ep_09_scene_01_bg_1",
+        "beyond_destiny_ep_09_scene_02_bg_1",
+        "beyond_destiny_ep_09_scene_03_bg_1",
+        "beyond_destiny_ep_09_scene_04_bg_1",
+        "beyond_destiny_ep_09_scene_05_bg_1",
+        "beyond_destiny_ep_10_scene_01_bg_1",
+        "beyond_destiny_ep_10_scene_02_bg_1",
+        "beyond_destiny_ep_10_scene_03_bg_1",
+        "beyond_destiny_ep_10_scene_05_bg_1",
+        "beyond_destiny_ep_32_scene_03_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny campaign production map, widescreen full-bleed 16:9, commercial Korean animation hand-painted environment, crisp dark linework and layered realistic geometry, steel blue and restrained cyan accents, elevated three-quarter gameplay camera, broad continuous walkable surface across lower half, pensively dramatic. No people, character silhouettes, UI, text, game logos, watermark, frame, letters, existing game level recreation. A quiet subterranean competitors' corridor in the futuristic oval arena dome. Restrained modern engineering and cold desaturated light. In the lower half a broad open concrete pedestrian aisle and cool strip-lit floor converge gently toward a closed access door, walls include pale blue acoustic panels and low bolted bench on one side; an unlettered wall monitor shows hazy light from arena broadcast without any figure or typography. Shadowed side passage and an inset wooden bench set back for a private conversation, no props in the center."
+    },
+    {
+      "path": "Maps/spot_kaiba_dome_arena.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_05_scene_01_bg_1",
+        "beyond_destiny_ep_08_scene_01_bg_1",
+        "beyond_destiny_ep_08_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny campaign production map, widescreen full-bleed 16:9, commercial Korean animation hand-painted environment, crisp dark linework and layered realistic geometry, steel blue and restrained cyan accents, elevated three-quarter gameplay camera, broad continuous walkable surface across lower half, pensively dramatic. No people, character silhouettes, UI, text, game logos, watermark, frame, letters, existing game level recreation. Interior view inside a vast futuristic domed dueling arena at noon, stadium audience terraces suggested with muted color bands only and no individual people. Looking across a broad clean open polished dark blue-gray competition floor, original low geometric circles and seams set in its texture without any logo or text, vertical stadium lamps tucked high against curved support ribs, glass roof daylight reflected in sweeping arcs on the concrete. No magical monsters. Raised foreground viewpoint with huge spatial depth; walkable center stage spans the lower half."
+    },
+    {
+      "path": "Maps/spot_arcadia_atrium.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_12_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny production field map. Full-bleed 16:9 anime game environment painting, Korean commercial animation with clean thin restrained line work and grounded architecture, layered three-quarter gameplay camera, broad unblocked walking floor across bottom half, detailed original materials and believable consistent location geometry. No people, no existing commercial game level, no text, no logo, no frame, no watermark. An imposing intact experimental high-rise facility atrium laboratory in a cold futuristic coastal metropolis at night. Dark professional glass, floors of blue black basalt, crimson warning lights subdued, skylight and tall steel columns in behind, a distant suspended medical laboratory corridor with opaque cubicles not visible inside. Open clean foreground circulation floor (lower half), approachable door in center, visually ornate but uncluttered. Original sci-fi institutional design."
+    },
+    {
+      "path": "Maps/spot_arcadia_collapse.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_11_scene_03_bg_1",
+        "beyond_destiny_ep_11_scene_05_bg_1",
+        "beyond_destiny_ep_12_scene_05_bg_1",
+        "beyond_destiny_ep_13_scene_01_bg_1",
+        "beyond_destiny_ep_13_scene_04_bg_1",
+        "beyond_destiny_ep_13_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny production field map. Full-bleed 16:9 anime game environment painting, Korean commercial animation with clean thin restrained line work and grounded architecture, layered three-quarter gameplay camera, broad unblocked walking floor across bottom half, detailed original materials and believable consistent location geometry. No people, no existing commercial game level, no text, no logo, no frame, no watermark. A crumbling experimental high-rise facility atrium laboratory after an explosion, with the same steel columns, blue-black basalt floor, skylight and suspended glass corridor of a cold authoritarian research facility. Night skyline behind broken windows, angled collapsed beams and dusty medical monitors away from the foreground. Low crimson backup lights, a few orange sparks carried in dense blue-gray smoke. Wide clear diagonal walking path through lower half. No bodies or graphic detail."
+    },
+    {
+      "path": "Maps/spot_team5ds_garage.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_06_scene_01_bg_1",
+        "beyond_destiny_ep_06_scene_03_bg_1",
+        "beyond_destiny_ep_16_scene_01_bg_1",
+        "beyond_destiny_ep_21_scene_02_bg_1",
+        "beyond_destiny_ep_21_scene_03_bg_1",
+        "beyond_destiny_ep_21_scene_04_bg_1",
+        "beyond_destiny_ep_25_scene_04_bg_1",
+        "beyond_destiny_ep_26_scene_04_bg_1",
+        "beyond_destiny_ep_27_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny production field map. Full-bleed 16:9 anime game environment painting, Korean commercial animation with clean thin restrained line work and grounded architecture, layered three-quarter gameplay camera, broad unblocked walking floor across bottom half, detailed original materials and believable consistent location geometry. No people, no existing commercial game level, no text, no logo, no frame, no watermark. Original mechanical racing team repair garage at dockside in a futuristic coastal city. Team workshop with matte metal rolling doors, tool shelves and partially disassembled custom motorbikes parked against edges, an orderly luminous workbench and broad clear blue-gray polished concrete floor across the foreground. Cool fluorescent sidelight and warm amber lamp on desk, steel-gray palette, dawn cyan light in rain-wet doors. No text or logos."
+    },
+    {
+      "path": "Maps/spot_night_circuit.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_22_scene_01_bg_1",
+        "beyond_destiny_ep_22_scene_02_bg_1",
+        "beyond_destiny_ep_22_scene_04_bg_1",
+        "beyond_destiny_ep_23_scene_01_bg_1",
+        "beyond_destiny_ep_24_scene_01_bg_1",
+        "beyond_destiny_ep_24_scene_02_bg_1",
+        "beyond_destiny_ep_24_scene_03_bg_1",
+        "beyond_destiny_ep_24_scene_04_bg_1",
+        "beyond_destiny_ep_24_scene_05_bg_1",
+        "beyond_destiny_ep_32_scene_02_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny production field map. Full-bleed 16:9 anime game environment painting, Korean commercial animation with clean thin restrained line work and grounded architecture, layered three-quarter gameplay camera, broad unblocked walking floor across bottom half, detailed original materials and believable consistent location geometry. No people, no existing commercial game level, no text, no logo, no frame, no watermark. Abandoned original motor racing ring road at late blue night on city outskirts, clean broad chassis-height asphalt roadway curves into a series of barriers and rises over distant foggy violet coastal city. View proportion still raised for game camera, clear lower two lanes across frame for travel, blue-black road and occasional lane markings only, scattered teal fixtures at edges, geometric metallic service gantries, wet surfaces, low fuel haze and a long horizon. No cars or figures."
+    },
+    {
+      "path": "Maps/spot_wrgp_stadium.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_29_scene_01_bg_1",
+        "beyond_destiny_ep_29_scene_02_bg_1",
+        "beyond_destiny_ep_29_scene_03_bg_1",
+        "beyond_destiny_ep_29_scene_04_bg_1",
+        "beyond_destiny_ep_29_scene_05_bg_1",
+        "beyond_destiny_ep_30_scene_01_bg_1",
+        "beyond_destiny_ep_30_scene_02_bg_1",
+        "beyond_destiny_ep_30_scene_03_bg_1",
+        "beyond_destiny_ep_30_scene_04_bg_1",
+        "beyond_destiny_ep_30_scene_05_bg_1",
+        "beyond_destiny_ep_31_scene_01_bg_1",
+        "beyond_destiny_ep_31_scene_02_bg_1",
+        "beyond_destiny_ep_31_scene_03_bg_1",
+        "beyond_destiny_ep_31_scene_04_bg_1",
+        "beyond_destiny_ep_31_scene_05_bg_1",
+        "beyond_destiny_ep_32_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny production field map. Full-bleed 16:9 anime game environment painting, Korean commercial animation with clean thin restrained line work and grounded architecture, layered three-quarter gameplay camera, broad unblocked walking floor across bottom half, detailed original materials and believable consistent location geometry. No people, no existing commercial game level, no text, no logo, no frame, no watermark. A futuristic original high-speed motor circuit inside a giant glass racing amphitheater at dusk, large curving track hugging dark stadium terraced seating and rings of warm-white lamps around the far edge. Lower half broad concrete and clearly defined track surface unobstructed for virtual walking and riding, mint-teal accents on distant pit building and muted orange in horizon, atmosphere of a decisive final. No bikes, no lettering."
+    },
+    {
+      "path": "Maps/spot_ark_cradle.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_33_scene_05_bg_1",
+        "beyond_destiny_ep_34_scene_01_bg_1",
+        "beyond_destiny_ep_34_scene_03_bg_1",
+        "beyond_destiny_ep_34_scene_04_bg_1",
+        "beyond_destiny_ep_34_scene_05_bg_1",
+        "beyond_destiny_ep_35_scene_01_bg_1",
+        "beyond_destiny_ep_35_scene_03_bg_1",
+        "beyond_destiny_ep_35_scene_04_bg_1",
+        "beyond_destiny_ep_35_scene_05_bg_1",
+        "beyond_destiny_ep_36_scene_01_bg_1",
+        "beyond_destiny_ep_36_scene_02_bg_1",
+        "beyond_destiny_ep_36_scene_03_bg_1",
+        "beyond_destiny_ep_36_scene_04_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Use case: illustration-story. Original Beyond Destiny production field map. Full-bleed 16:9 anime game environment painting, Korean commercial animation with clean thin restrained line work and grounded architecture, layered three-quarter gameplay camera, broad unblocked walking floor across bottom half, detailed original materials and believable consistent location geometry. No people, no existing commercial game level, no text, no logo, no frame, no watermark. Inside an impossible original suspended sky citadel, a vast broken corridor of white graphite alloy and black obsidian. Filigree ribs and oxidized machinery behind hang in dark blue void; dim violet light of a cold core at far center, drifting dust against sparse windows with city far beneath. Underfoot a surviving broad horizontal path occupies the lower half, physically walkable, edges and cavities beyond clear. Commercial anime environment painting with no figures."
+    },
+    {
+      "path": "Maps/spot_arcadia_private_room.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_03_scene_01_bg_1",
+        "beyond_destiny_ep_03_scene_02_bg_1",
+        "beyond_destiny_ep_03_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. Sterile private suite in a futuristic high-rise institution at deep blue night. A neatly covered single bed and clinical side table offset to the left, an open central passage, windows stretching along the rear with coastal city skyline, cold blue pools of fluorescent light and a narrow partly open doorway. Quiet and controlled, contemporary rather than luxurious, lots of empty wood-and-stone floor for staging."
+    },
+    {
+      "path": "Maps/spot_leblanc_estate.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_03_scene_03_bg_1",
+        "beyond_destiny_ep_26_scene_05_bg_1",
+        "beyond_destiny_ep_27_scene_04_bg_1",
+        "beyond_destiny_ep_27_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. A grand Neo Domino coastal city hillside estate under cold fog and approaching dawn. Art nouveau gray-stone mansion façade with broad steps, carefully clipped shrubs, black iron gates, wide lower entrance courtyard and a separate upper terrace with distant city below. Elegant dark slate, rim of amber windows, moody blue early twilight. No people and no text."
+    },
+    {
+      "path": "Maps/spot_hero_hideout.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_03_scene_04_bg_1",
+        "beyond_destiny_ep_14_scene_04_bg_1",
+        "beyond_destiny_ep_21_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. A rough solitary hideout inside an abandoned shipping warehouse on the outskirts, thought-out yet sparse. Mattress and rumpled blanket off to one side, rust-streaked desk with a few files and analog light on the other, old dark concrete, tall broken windows with gauzy cool street light backed by rust-colored evening. Wide clear space in foreground. Simple street-level resilience."
+    },
+    {
+      "path": "Maps/spot_kaiba_dome_control.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_04_scene_01_bg_1",
+        "beyond_destiny_ep_04_scene_03_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. Infrastructure control chamber under a future domed arena; dense red-green unmarked status lamps, enormous coolant pipes, thick tidy power cabling on walls and high overhead, tank banks and locked control stations at back only. Low red emergency illumination works against cold cyan accents. Clean broad floor lower half, no rails or hazards in its contiguous walking area."
+    },
+    {
+      "path": "Maps/spot_kaiba_dome_waiting_room.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_02_scene_03_bg_1",
+        "beyond_destiny_ep_05_scene_03_bg_1",
+        "beyond_destiny_ep_05_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. A quiet dimly lit private locker room for a highly ranked competitor under the domed arena. A curved mirror with hairline cracks at left, low bench along a wall, simple equipment lockers closed, cool bluish light entering from a tall partly open doorway and clean deep shadows, smooth unobstructed concrete floor for a tense private encounter. No clothing humans visible."
+    },
+    {
+      "path": "Maps/spot_leblanc_interior.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_07_scene_01_bg_1",
+        "beyond_destiny_ep_27_scene_02_bg_1",
+        "beyond_destiny_ep_28_scene_01_bg_1",
+        "beyond_destiny_ep_28_scene_02_bg_1",
+        "beyond_destiny_ep_28_scene_03_bg_1",
+        "beyond_destiny_ep_28_scene_04_bg_1",
+        "beyond_destiny_ep_28_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. A sophisticated shadowed wing of a wealthy hillside estate with tall French windows overlooking cold coastal night. Muted wine lacquer, long dark mahogany architectural panels and velvet runners beside broad polished floor, elegant old-fashioned walnut furniture well to edges, through an open arch distant marble stairs and chandelier. A private study with a bookcase beyond. No readable writing."
+    },
+    {
+      "path": "Maps/spot_city_hospital_corridor.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_14_scene_01_bg_1",
+        "beyond_destiny_ep_14_scene_02_bg_1",
+        "beyond_destiny_ep_25_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. Pristine single-patient hospital corridor, late dawn in a modern Japanese city. Chalk-white panels softened with warm daylight, orderly glass doors, wave of shadow and amber natural light on pale warm limestone paving. A soft few indirect teal lights link it to futuristic infrastructure. Wide hallway floor available for game staging, no medical staff or visible signage."
+    },
+    {
+      "path": "Maps/spot_city_hospital_room.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_25_scene_02_bg_1",
+        "beyond_destiny_ep_25_scene_03_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. Quiet private hospital room across the same hospital corridor. Pale clean wood, large windows with yellow early sunlight through horizontal blinds, simple unoccupied medical bed positioned back-right, rail and monitor tucked in place, open central floor reflecting the daylight. Contemplative and restrained. No body or injury depiction."
+    }
+  ]
+}

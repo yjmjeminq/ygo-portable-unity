@@ -1,0 +1,23 @@
+[
+  {"episode": 1, "scene": 3, "line": 158, "player": "hero", "opponent": "aki", "mode": "standard", "resolution": "interrupted"},
+  {"episode": 4, "scene": 2, "line": 55, "player": "hero", "opponent": "arcadia_agent", "mode": "standard", "resolution": "win"},
+  {"episode": 8, "scene": 1, "line": 21, "player": "yusei", "opponent": "aki", "mode": "cinematic", "resolution": "win"},
+  {"episode": 10, "scene": 2, "line": 45, "player": "hero", "opponent": "arcadia_captain", "mode": "standard", "resolution": "win"},
+  {"episode": 11, "scene": 3, "line": 124, "player": "hero", "opponent": "arcadia_officer", "mode": "standard", "resolution": "win"},
+  {"episode": 13, "scene": 1, "line": 15, "player": "hero", "opponent": "devine", "mode": "standard", "resolution": "win"},
+  {"episode": 18, "scene": 3, "line": 72, "player": "hero", "opponent": "netherworld_commander", "mode": "standard", "resolution": "win"},
+  {"episode": 19, "scene": 1, "line": 19, "player": "aki", "opponent": "misty", "mode": "standard", "resolution": "win"},
+  {"episode": 20, "scene": 1, "player": "yusei", "opponent": "rex", "mode": "cinematic", "resolution": "win"},
+  {"episode": 22, "scene": 4, "line": 167, "player": "hero", "opponent": "aki", "mode": "riding", "resolution": "sparring"},
+  {"episode": 24, "scene": 2, "player": "aki", "opponent": "ghost", "mode": "cinematicRiding", "resolution": "opponentWin"},
+  {"episode": 24, "scene": 4, "line": 156, "player": "hero_anti_synchro", "opponent": "ghost", "mode": "riding", "resolution": "win"},
+  {"episode": 29, "scene": 2, "line": 60, "player": "hero_anti_synchro", "opponent": "vargas", "mode": "riding", "resolution": "win"},
+  {"episode": 29, "scene": 4, "line": 165, "player": "sherry", "opponent": "wrpg_anchor", "mode": "riding", "resolution": "win"},
+  {"episode": 30, "scene": 1, "line": 22, "player": "hero", "opponent": "jack", "mode": "riding", "resolution": "win"},
+  {"episode": 30, "scene": 4, "line": 127, "player": "hero", "opponent": "aki", "mode": "cinematicRiding", "resolution": "continues"},
+  {"episode": 31, "scene": 1, "line": 22, "player": "hero", "opponent": "aki", "mode": "riding", "resolution": "canonicalOpponentWin"},
+  {"episode": 32, "scene": 2, "line": 57, "player": "sherry", "opponent": "yusei", "mode": "cinematicRiding", "resolution": "opponentWin"},
+  {"episode": 34, "scene": 1, "line": 16, "player": "rescue", "opponent": "sherry", "mode": "standard", "resolution": "continues"},
+  {"episode": 35, "scene": 1, "line": 16, "player": "rescue", "opponent": "sherry", "mode": "standard", "resolution": "win"},
+  {"episode": 36, "scene": 5, "player": "yusei", "opponent": "zone", "mode": "cinematic", "resolution": "win"}
+]

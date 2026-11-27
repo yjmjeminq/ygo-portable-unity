@@ -1,0 +1,3 @@
+# Keep the approved manuscript byte-for-byte across Git clients.
+/Docs/Story5Ds/5d_s_story_bible.md -text
+/Docs/Story5Ds/yugioh_5ds_ep*_script.txt -text
