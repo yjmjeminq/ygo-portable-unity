@@ -16,7 +16,9 @@ namespace YGOPortable.Core
         public delegate void NativeLogDelegate(int logType, [MarshalAs(UnmanagedType.LPUTF8Str)] string message);
 
         private static readonly NativeLogDelegate PinnedLogCallback = DispatchNativeLog;
+        private static readonly object EngineLifetime = new();
         private static Action<int, string> _onLog;
+        [ThreadStatic] private static Action<int, string> _planningLog;
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         private static extern int YGO_Init(
@@ -24,7 +26,7 @@ namespace YGOPortable.Core
             [MarshalAs(UnmanagedType.LPUTF8Str)] string scriptPackPath);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void YGO_Shutdown();
+        private static extern void YGO_Shutdown();
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern int YGO_GetCardCount();
@@ -111,27 +113,45 @@ namespace YGOPortable.Core
 
         public static int Initialize(string streamingAssetsPath, Action<int, string> onLog = null)
         {
-            if (IsInitialized) return 0;
-            _onLog = onLog;
-            YGO_SetLogCallback(onLog == null ? null : PinnedLogCallback);
-            string propPath = Path.Combine(streamingAssetsPath, "cards_prop.bin");
-            string scriptPath = Path.Combine(streamingAssetsPath, "cardscripts.pack");
-            int rc = YGO_Init(propPath, scriptPath);
-            if (rc == 0) IsInitialized = true;
-            return rc;
+            lock (EngineLifetime)
+            {
+                if (IsInitialized) return 0;
+                _onLog = onLog;
+                YGO_SetLogCallback(PinnedLogCallback);
+                string propPath = Path.Combine(streamingAssetsPath, "cards_prop.bin");
+                string scriptPath = Path.Combine(streamingAssetsPath, "cardscripts.pack");
+                int rc = YGO_Init(propPath, scriptPath);
+                if (rc == 0) IsInitialized = true;
+                return rc;
+            }
         }
 
         public static void Shutdown()
         {
-            IsInitialized = false;
-            YGO_Shutdown();
-            _onLog = null;
+            lock (EngineLifetime)
+            {
+                IsInitialized = false;
+                YGO_Shutdown();
+                _onLog = null;
+            }
+        }
+
+        internal static T RunIsolatedPlanning<T>(Func<T> work, Action<int, string> onLog) where T : class
+        {
+            // Planning owns a separate native duel. Keep the global read-only script and card data alive until it ends.
+            lock (EngineLifetime)
+            {
+                if (!IsInitialized) return null;
+                _planningLog = onLog;
+                try { return work(); }
+                finally { _planningLog = null; }
+            }
         }
 
 #if UNITY_IOS && !UNITY_EDITOR
         [AOT.MonoPInvokeCallback(typeof(NativeLogDelegate))]
 #endif
-        private static void DispatchNativeLog(int logType, string message) => _onLog?.Invoke(logType, message);
+        private static void DispatchNativeLog(int logType, string message) => (_planningLog ?? _onLog)?.Invoke(logType, message);
 
         public static IntPtr CreateDuel(ulong[] seed, ulong flags = YgoConstants.DUEL_MODE_MR5,
             int lp1 = 8000, int draw1 = 5, int drawPerTurn1 = 1,

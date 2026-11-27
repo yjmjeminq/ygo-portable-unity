@@ -225,7 +225,7 @@ namespace YGOPortable.UI
         private void RefreshAiDifficulty()
         {
             _aiDifficultyLabel.text = _app.AiDifficulty == AIDifficulty.Master
-                ? "AI 난이도: 마스터 (0.6초 수읽기)" : "AI 난이도: 보통";
+                ? "AI 난이도: 마스터 (최대 1초 수읽기)" : "AI 난이도: 보통";
         }
 
         private void BuildSettingsOverlay(Transform parent)

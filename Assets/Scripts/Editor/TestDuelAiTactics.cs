@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using YGOPortable.AI;
@@ -47,6 +49,16 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
+            VerifyTemporaryBattleTricks();
+            VerifyReadyBoardValue();
+            VerifyUnconfirmedLethalScore();
+            VerifyNativeFieldDrawPlanning();
+            VerifyNativeBattlePlanningSlices();
+            VerifyLethalOnFinalPlanningResponse();
+            VerifyMasterInterruptionTiming();
+            VerifyPublicPlanningNegation();
+            VerifyDetachedPlanningReplay();
+            VerifyCostedBreakerPriority();
             VerifyNegationTargets();
             VerifyNativeFieldNegation(Imperm);
             VerifyNativeFieldNegation(DuelTactics.EffectVeiler);
@@ -61,8 +73,10 @@ namespace YGOPortable.Editor
             VerifyNativeBentenSearch();
             VerifyNativeRitualAcePreservation();
             VerifyNativeRitualWithSpareMaterials();
+            VerifyNativeExtraDeckAceTrades();
             VerifyAdditionalRitualAces();
             VerifyGxSelfDamageAndDestruction();
+            VerifySearchedReplacementProof();
             VerifyVolcanicEmperorSiege();
             VerifyDddContractRescueSearch();
             VerifyFieldAceEffects();
@@ -70,6 +84,529 @@ namespace YGOPortable.Editor
             VerifyAccesscodeCosts();
             VerifyGxBattlePriority();
             Debug.Log("[VERIFY AI TACTICS] Ash conservation, Baronne bait, summon budget, revealed sweeper and chain ordering passed. Retry=0");
+        }
+
+        private static void VerifyTemporaryBattleTricks()
+        {
+            const uint neos = 14124483, limiter = 23171610, rush = 70046172, score = 41767843;
+            const uint honest = 37742478, chalice = 25789292, forbiddenLance = 27243130, exodia = 83257450;
+            using var duel = new DuelSession();
+            var prompt = new DuelPrompt { playerId = 0, messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+            var master = new TacticalAI(null) { Difficulty = AIDifficulty.Master };
+            SetState(1, YgoConstants.PHASE_MAIN1);
+            duel.Players[0].mzone[0] = new LiveCardState { code = Stratos, controller = 0, attack = 1800,
+                position = YgoConstants.POS_FACEUP_ATTACK };
+            foreach (uint code in new[] { neos, limiter, rush, score })
+            {
+                var card = Effect(code);
+                Require(DuelTactics.TryGetTemporaryBattleTrick(code, card.description, out _) &&
+                    !DuelTactics.CanSpendBattleTrick(duel, prompt, card), $"Temporary combat effect {code} escaped the first-turn gate.");
+            }
+            prompt.activatable.Add(Effect(rush));
+            Require(AiBattleProbe.TryFindDecisionBlunder(duel, prompt, BitConverter.GetBytes(5), out string kind, out uint flagged) &&
+                kind == "temporary_combat_waste" && flagged == rush,
+                "The benchmark did not identify a known wasted boost with its card code.");
+            Require(BitConverter.ToInt32(master.ComputeResponse(duel, prompt), 0) == 7,
+                "Master spent a combat-only card on its opening Main Phase.");
+            Require(!DuelTactics.TryGetTemporaryBattleTrick(honest, (ulong)honest << 20, out _) &&
+                DuelTactics.TryGetTemporaryBattleTrick(honest, ((ulong)honest << 20) | 1, out _) &&
+                !DuelTactics.TryGetTemporaryBattleTrick(chalice, (ulong)chalice << 20, out _) &&
+                !DuelTactics.TryGetTemporaryBattleTrick(forbiddenLance, (ulong)forbiddenLance << 20, out _) &&
+                !DuelTactics.TryGetTemporaryBattleTrick(exodia, (ulong)exodia << 20, out _),
+                "Mixed effects or Exodia's lasting attack gain were classified as temporary boosts.");
+            SetState(2, YgoConstants.PHASE_MAIN2);
+            Require(!DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(rush)),
+                "A temporary battle boost remained available after combat.");
+
+            prompt.messageType = YgoConstants.MSG_SELECT_CHAIN;
+            SetState(2, YgoConstants.PHASE_DAMAGE);
+            typeof(DuelSession).GetProperty(nameof(DuelSession.HasActiveAttack)).SetValue(duel, true);
+            duel.AttackerLoc = duel.TargetLoc = YgoConstants.LOCATION_MZONE;
+            duel.TargetCon = 1;
+            var target = new LiveCardState { code = GeminiElf, controller = 1, attack = 2200, position = YgoConstants.POS_FACEUP_ATTACK };
+            duel.Players[1].mzone[0] = target;
+            Require(DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(rush)), "A +700 trick was held while it could win combat.");
+            var choose = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, min = 1, max = 1,
+                SelectionHint = DuelTactics.ApplyTo };
+            duel.CurrentChain.Add(new ChainLinkInfo { code = rush, description = (ulong)rush << 20 });
+            duel.Players[0].mzone[1] = FieldMonster(Baronne, 1);
+            choose.candidates.Add(new SelectableCardItem { code = Baronne, location = YgoConstants.LOCATION_MZONE, sequence = 1 });
+            choose.candidates.Add(new SelectableCardItem { code = Stratos, location = YgoConstants.LOCATION_MZONE });
+            Require(master.ComputeResponse(duel, choose).SequenceEqual(DuelSession.PackCardSelection(1)),
+                "Master applied a temporary boost to an uninvolved higher-ATK monster.");
+            duel.CurrentChain.Clear();
+            Require(!DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(limiter)), "Limiter was valued on a Warrior.");
+            duel.Players[0].mzone[0].race = YgoConstants.RACE_MACHINE;
+            Require(!DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(limiter)),
+                "Master traded its machine for a nonlethal boost with End Phase destruction.");
+            duel.Players[1].lp = 1200;
+            Require(DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(limiter)),
+                "Master declined a lethal machine boost with no End Phase to pay.");
+            target.attack = 1500;
+            Require(!DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(rush)), "A resolved win spent a redundant combat boost.");
+            target.code = 78371393;
+            Require(!DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(neos)), "A burn reflector caused a friendly attack boost.");
+            duel.TargetLoc = 0;
+            duel.Players[1].lp = 4200;
+            Require(DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(neos)), "The boost missed a 4300-point direct lethal.");
+            duel.Players[1].lp = 1500;
+            Require(!DuelTactics.CanSpendBattleTrick(duel, prompt, Effect(neos)), "The boost was wasted on existing direct lethal.");
+
+            Debug.Log("[VERIFY MASTER COMBAT TRICKS] Opening, Main 2, effect distinction, combat swing, reflection and direct lethal passed.");
+
+            static SelectableCardItem Effect(uint code) => new() { code = code, controller = 0,
+                location = YgoConstants.LOCATION_HAND, description = (ulong)code << 20 };
+            void SetState(int turn, int phase)
+            {
+                typeof(DuelSession).GetProperty(nameof(DuelSession.TurnNumber)).SetValue(duel, turn);
+                typeof(DuelSession).GetProperty(nameof(DuelSession.CurrentPhase)).SetValue(duel, phase);
+            }
+        }
+
+        private static void VerifyReadyBoardValue()
+        {
+            const uint dpe = 60461804, herald = 48546368, fairy = 39618799;
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            const uint conflict = 7403341, transcode = 46947713, firewall = 5043010;
+            var trap = CardDatabase.Get(conflict);
+            own.szone[0] = new LiveCardState { code = conflict, position = YgoConstants.POS_FACEDOWN_DEFENSE };
+            own.mzone[0] = FieldMonster(firewall);
+            Require(DuelAiPolicy.BackrowFieldCondition(own, trap) == false,
+                "A Firewall Dragon alone must not make Cynet Conflict usable.");
+            own.mzone[0] = FieldMonster(transcode);
+            Require(DuelAiPolicy.BackrowFieldCondition(own, trap) == true &&
+                DuelAiPolicy.ReadyInteractionCount(duel, 0, inspectPrivateCards: true) == 1,
+                "A face-up Code Talker must make the set Counter Trap usable.");
+            own.szone[0] = null;
+            own.mzone[0] = new LiveCardState { code = dpe, controller = 0, attack = 2500, baseAttack = 2500,
+                position = YgoConstants.POS_FACEUP_ATTACK };
+            own.mzone[1] = new LiveCardState { code = herald, controller = 0, attack = 2000, baseAttack = 2000,
+                position = YgoConstants.POS_FACEUP_DEFENSE };
+            Require(DuelAiPolicy.ReadyInteractionCount(duel, 0, inspectPrivateCards: true) == 1,
+                "Endboard values did not distinguish available removal from a negate with no payment.");
+            own.hand.Add(new LiveCardState { code = fairy, race = YgoConstants.RACE_FAIRY });
+            Require(DuelAiPolicy.ReadyInteractionCount(duel, 0, inspectPrivateCards: true) == 2,
+                "An affordable Fairy negate did not count on its endboard.");
+            own.mzone[0].effectsDisabled = true;
+            Require(DuelAiPolicy.ReadyInteractionCount(duel, 0, inspectPrivateCards: true) == 1,
+                "A disabled effect was counted as live interaction.");
+            own.mzone[0].attack = 5000;
+            Require(DuelAiPolicy.StableAttack(own.mzone[0], CardDatabase.Get(dpe), canBattle: false) == 2500,
+                "The endboard kept an attack increase that is irrelevant after combat.");
+            Require(ComboSearch.BoardValue(duel, 0, canBattle: false, master: true, turnEndVerified: true) >
+                ComboSearch.BoardValue(duel, 0, canBattle: false, master: true),
+                "An increase that survived the confirmed turn transition was discarded.");
+            var lower = new SelectableCardItem { code = 12014404, location = YgoConstants.LOCATION_EXTRA };
+            Require(DuelAiPolicy.NeedsAceMaterialProjection(own, lower), "Master risks both established aces on an unproven Xyz.");
+            own.mzone[2] = FieldMonster(Stratos);
+            Require(DuelAiPolicy.NeedsAceMaterialProjection(own, lower), "An unrelated disposable body must not bypass the native material check.");
+            Require(ComboSearch.IsPaidAceUpgrade(4, 4.02, true, false) &&
+                ComboSearch.IsPaidAceUpgrade(4, 2, true, true) &&
+                !ComboSearch.IsPaidAceUpgrade(4, 2, true, false) &&
+                !ComboSearch.IsPaidAceUpgrade(4, 5, false, false),
+                "Projected ace trades did not distinguish verified upgrades and lethal from a downgrade.");
+
+            own.hand.Clear();
+            own.deckCount = 30;
+            own.hand.Add(new LiveCardState { code = Ash });
+            own.hand.Add(new LiveCardState { code = Ash });
+            double duplicate = ComboSearch.BoardValue(duel, 0, canBattle: false, master: true);
+            own.hand[1].code = DuelTactics.MaxxC;
+            double distinct = ComboSearch.BoardValue(duel, 0, canBattle: false, master: true);
+            Require(DuelAiPolicy.ReadyHandInterruptions(own) == 2 && distinct > duplicate,
+                "Master valued two copies of the same once-per-turn handtrap as two distinct interruptions.");
+            own.deckCount = 2;
+            own.hand.Add(new LiveCardState { code = DuelTactics.CalledBy });
+            own.hand.Add(new LiveCardState { code = DuelTactics.InfiniteImpermanence });
+            Require(DuelAiPolicy.ReadyHandInterruptions(own) == 1,
+                "Master valued an unsafe draw handtrap or interruption that still needed to be Set.");
+        }
+
+        private static void VerifyUnconfirmedLethalScore()
+        {
+            using var duel = new DuelSession();
+            typeof(DuelSession).GetProperty(nameof(DuelSession.TurnNumber)).SetValue(duel, 2);
+            duel.Players[0].mzone[0] = FieldMonster(Stratos);
+            duel.Players[1].lp = 1801;
+            double aboveAttack = ComboSearch.BoardValue(duel, 0, canBattle: true, master: true);
+            duel.Players[1].lp = 1800;
+            double atAttack = ComboSearch.BoardValue(duel, 0, canBattle: true, master: true);
+            Require(atAttack > aboveAttack && atAttack - aboveAttack < .1,
+                "An unverified attack total jumped ahead of other lines before the native battle simulation.");
+        }
+
+        private static void VerifyNativeFieldDrawPlanning()
+        {
+            const uint fallenParadise = 13301895, hamon = 32491822;
+            using var duel = new DuelSession(recordPlanningReplay: true);
+            var main = Deck(GeminiElf);
+            Require(duel.StartNewDuel(main, Empty, main.Append(hamon).ToArray(), Empty,
+                p0GoesFirst: false, seed: new[] { 37UL, 29UL, 71UL, 97UL },
+                opponentOpening: new DuelOpening(8000, 0, fallenParadise, destinyUses: 0, deckMonster: hamon)),
+                "Could not start the native field draw fixture.");
+            var prompt = Drive(duel, IsIdle);
+            var own = duel.Players[prompt.playerId];
+            int drawIndex = prompt.activatable.FindIndex(card => card.code == fallenParadise);
+            Require(drawIndex >= 0 && ComboSearch.IsPublicFieldDraw(own, prompt.activatable[drawIndex]),
+                "Fallen Paradise did not offer its draw with Hamon already on the field.");
+            var master = new TacticalAI(null, searchCombos: true) { Difficulty = AIDifficulty.Master };
+            Require(new ComboSearch().Choose(duel, prompt, master) == ((drawIndex << 16) | 5),
+                "Master discarded the proven draw when the newly drawn cards became unknown.");
+            int previous = own.hand.Count;
+            DuelSession reopened = null;
+            int replayPauses = 0;
+            foreach (var state in duel.ReplayForPlanning(() => false, () => true))
+            {
+                if (state != null) reopened = state;
+                else replayPauses++;
+            }
+            using (var sliced = reopened)
+            {
+                Require(replayPauses >= main.Length * 2 && sliced?.ActivePrompt?.messageType == prompt.messageType,
+                    "The replay did not yield while loading both decks and restore the same native prompt.");
+                int resolutionPauses = 0;
+                foreach (bool paused in sliced.SubmitPlanningResponse(BitConverter.GetBytes((drawIndex << 16) | 5),
+                    () => true, preserveDeckSelection: false))
+                    if (paused) resolutionPauses++;
+                Drive(sliced, IsIdle);
+                Require(resolutionPauses > 0 && sliced.Players[prompt.playerId].hand.Count == previous + 2 &&
+                    own.hand.Count == previous && sliced.RetryCount == 0,
+                    "Resuming a paused native draw changed the response or the live session.");
+            }
+            duel.SubmitResponseInt((drawIndex << 16) | 5);
+            Drive(duel, IsIdle);
+            Require(own.hand.Count == previous + 2 && own.mzone.Any(card => card?.code == hamon) && duel.RetryCount == 0,
+                "The native draw did not preserve Hamon or gain both cards.");
+            Require(!ComboSearch.HasSafeDrawGain(2, 0, 10, 8000, 8000) &&
+                !ComboSearch.HasSafeDrawGain(2, 2, 0, 8000, 8000) &&
+                !ComboSearch.HasSafeDrawGain(2, 2, 10, 1000, 500),
+                "A draw with no net gain, an empty deck, or a life loss received the safe draw benefit.");
+            Debug.Log("[VERIFY MASTER FIELD DRAW] Native Fallen Paradise draw, no field loss, no hidden card selection.");
+        }
+
+        private static void VerifyNativeBattlePlanningSlices()
+        {
+            using var duel = new DuelSession(recordPlanningReplay: true);
+            Require(duel.StartNewDuel(Deck(GeminiElf), Empty, Deck(GeminiElf), Empty,
+                seed: new[] { 11UL, 29UL, 71UL, 97UL },
+                playerOpening: new DuelOpening(3000, 5, 0, destinyUses: 0),
+                opponentOpening: new DuelOpening(8000, 5, GeminiElf, destinyUses: 0)),
+                "Could not start the native battle fixture.");
+            Drive(duel, IsIdle);
+            duel.SubmitResponseInt(7);
+            Drive(duel, IsIdle);
+            SubmitIdle(duel, 0, GeminiElf);
+            Drive(duel, IsIdle);
+            duel.SubmitResponseInt(6);
+            var battle = Drive(duel, prompt => prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
+            var master = new TacticalAI(null, searchCombos: true) { Difficulty = AIDifficulty.Master };
+            var lethal = DuelCombat.FindLethal(duel, battle);
+            Require(battle.attackable.Count == 2 && lethal.HasValue && lethal.Value.Target == null,
+                "Expected two direct attacks to be necessary for lethal.");
+            var slices = DuelCombat.VerifyDirectAttackOrderInSlices(duel, battle, lethal.Value.Attacker, master, () => true).ToArray();
+            Require(slices.Any(slice => !slice.HasValue) && slices.LastOrDefault() is int candidate &&
+                battle.attackable[candidate].directAttackable && ReferenceEquals(duel.ActivePrompt, battle) && duel.Players[0].lp == 3000,
+                "Sliced battle proof did not return a legal decision or modified the live duel.");
+            for (int frame = 0; !master.AdvanceComboPlanning(duel, battle); frame++)
+                Require(frame < 256, "Battle decision did not complete.");
+            int selected = Read(master.ComputeResponse(duel, battle));
+            Require((selected & 0xffff) == 1 && battle.attackable[selected >> 16].directAttackable && duel.RetryCount == 0,
+                "The prepared battle decision did not choose a legal direct attack.");
+            var detachedMaster = new TacticalAI(null, searchCombos: true) { Difficulty = AIDifficulty.Master };
+            var pending = new DetachedAiPlanning(detachedMaster, duel, battle);
+            TacticalAI detached;
+            string error;
+            while (!pending.TryTake(battle, out detached, out error)) System.Threading.Thread.Sleep(1);
+            Require(detached != null && error == null && Read(detached.ComputeWithoutSpeculation(duel, battle)) == selected &&
+                ReferenceEquals(duel.ActivePrompt, battle), "The detached Master chose a different attack or touched the live prompt.");
+            var abandoned = new DetachedAiPlanning(detachedMaster, duel, battle);
+            Require(abandoned.TryTake(new DuelPrompt(), out var stale, out _) && stale == null,
+                "A detached decision was applied to a different prompt.");
+            Debug.Log("[VERIFY MASTER BATTLE PLANNING] Native battle proof can yield and preserve the live duel.");
+        }
+
+        private static void VerifyLethalOnFinalPlanningResponse()
+        {
+            const uint damageSpell = 19523799;
+            using var duel = new DuelSession(recordPlanningReplay: true);
+            Require(duel.StartNewDuel(Deck(damageSpell), Empty, Deck(GeminiElf), Empty,
+                seed: new[] { 17UL, 31UL, 41UL, 59UL },
+                opponentOpening: new DuelOpening(800, 0, 0, destinyUses: 0)),
+                "Could not start the native lethal fixture.");
+            var prompt = Drive(duel, IsIdle);
+            var master = new TacticalAI(null, searchCombos: true) { Difficulty = AIDifficulty.Master };
+            int spell = prompt.activatable.FindIndex(card => card.code == damageSpell);
+            Require(spell >= 0, "Expected an immediately available damage spell.");
+            using var trial = duel.ReplayForPlanning(() => false);
+            Require(trial != null, "The native lethal fixture did not replay.");
+            int stepsToWin = ResolveBurn(trial, (spell << 16) | 5);
+            int? decision = new ComboSearch(responseLimit: stepsToWin).Choose(duel, prompt, master);
+            Require(decision.HasValue && (decision.Value & 0xffff) == 5 &&
+                prompt.activatable[decision.Value >> 16].code == damageSpell && !duel.IsFinished,
+                "The final native planning response did not retain its confirmed lethal.");
+            Require(ResolveBurn(duel, decision.Value) == stepsToWin, "The live win differed from the projected response count.");
+            Debug.Log("[VERIFY MASTER FINAL RESPONSE] A win on the last search response is retained.");
+
+            int ResolveBurn(DuelSession session, int activation)
+            {
+                var pilot = master.ForkForComboSearch();
+                session.SubmitResponseInt(activation);
+                int steps = 1;
+                for (; !session.IsFinished && steps < 8; steps++)
+                {
+                    var next = session.ActivePrompt;
+                    Require(next != null && !IsIdle(next), "The damage spell did not resolve in a single main action.");
+                    session.SubmitResponse(pilot.ComputeResponse(session, next));
+                }
+                Require(session.IsFinished && session.Winner == prompt.playerId && session.RetryCount == 0,
+                    "The chosen damage spell did not end the native duel.");
+                return steps;
+            }
+        }
+
+        private static void VerifyMasterInterruptionTiming()
+        {
+            const uint duster = 18144506, dpe = 60461804, mirrorjade = DuelAiPolicy.Mirrorjade, mask = 21143940,
+                favorite = 75047173, targetedRemoval = 79759861;
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            var rival = duel.Players[1];
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, playerId = 0, canBp = true };
+            Set(nameof(DuelSession.TurnNumber), 2);
+            Set(nameof(DuelSession.TurnPlayer), (byte)0);
+            Set(nameof(DuelSession.CurrentPhase), YgoConstants.PHASE_MAIN1);
+            rival.szone[0] = new LiveCardState { controller = 1, sequence = 0, position = YgoConstants.POS_FACEDOWN_DEFENSE };
+            rival.szone[1] = new LiveCardState { controller = 1, sequence = 1, position = YgoConstants.POS_FACEDOWN_DEFENSE };
+            prompt.activatable.Add(new SelectableCardItem { code = Upstart, location = YgoConstants.LOCATION_HAND });
+            prompt.activatable.Add(new SelectableCardItem { code = duster, location = YgoConstants.LOCATION_HAND });
+            Require(DuelTactics.ChooseBoardBreaker(duel, prompt, (_, _) => true) == ((1 << 16) | 5),
+                "Master did not clear two opposing back-row cards before developing.");
+            Require(DuelTactics.ChooseBoardBreaker(duel, prompt, (_, effect) => effect.code != duster) == null,
+                "Master put an unavailable breaker before development.");
+            prompt.summonable.Add(new SelectableCardItem { code = Ash, location = YgoConstants.LOCATION_HAND });
+            prompt.summonable.Add(new SelectableCardItem { code = Stratos, location = YgoConstants.LOCATION_HAND });
+            Require(DuelTactics.ChooseRecoverySummon(duel, prompt, (_, _) => true) == (1 << 16),
+                "Master used a handtrap for recovery instead of an independent starter.");
+            rival.mzone[0] = new LiveCardState { code = Baronne, controller = 1, sequence = 0,
+                position = YgoConstants.POS_FACEUP_ATTACK, attack = 3000 };
+            Require(DuelTactics.ChooseRecoverySummon(duel, prompt, (_, _) => true) == null,
+                "Master exposed a recovery starter to an already established attacker.");
+
+            Set(nameof(DuelSession.TurnPlayer), (byte)1);
+            own.mzone[0] = FieldMonster(Stratos);
+            rival.szone[0] = rival.szone[1] = null;
+            rival.mzone[0] = new LiveCardState { code = GeminiElf, controller = 1, sequence = 0,
+                position = YgoConstants.POS_FACEUP_ATTACK, attack = 1900 };
+            prompt.messageType = YgoConstants.MSG_SELECT_CHAIN;
+            foreach (uint code in new[] { dpe, mirrorjade, mask, favorite })
+                Require(!DuelTactics.CanSpendMasterInterruption(duel, prompt, FastEffect(code)),
+                    $"Master spent {code} in an empty response window.");
+
+            duel.CurrentChain.Add(new ChainLinkInfo { code = BrandedFusion, triggerPlayer = 1 });
+            foreach (uint code in new[] { dpe, mirrorjade, favorite })
+                Require(DuelTactics.CanSpendMasterInterruption(duel, prompt, FastEffect(code)),
+                    $"Master kept {code} during an opposing development effect.");
+            duel.CurrentChain.Clear();
+            rival.mzone[0].attack = 2000;
+            foreach (uint code in new[] { dpe, mirrorjade, favorite })
+                Require(DuelTactics.CanSpendMasterInterruption(duel, prompt, FastEffect(code)),
+                    $"Master waited to use {code} against an exposed threat.");
+            rival.mzone[0].attack = 1900;
+            prompt.hintTimingOther = YgoConstants.TIMING_SPSUMMON;
+            foreach (uint code in new[] { dpe, mirrorjade, favorite })
+                Require(DuelTactics.CanSpendMasterInterruption(duel, prompt, FastEffect(code)),
+                    $"Master did not consider {code} in response to a special summon.");
+            duel.CurrentChain.Add(new ChainLinkInfo { code = mirrorjade, triggerPlayer = 0,
+                PublicTargets = new[] { ((byte)1, YgoConstants.LOCATION_MZONE, 0u) } });
+            Require(!DuelTactics.CanSpendMasterInterruption(duel, prompt, FastEffect(dpe)),
+                "Master used another removal when its chain already addressed the same monster.");
+
+            duel.CurrentChain[0] = new ChainLinkInfo { code = targetedRemoval, triggerPlayer = 1,
+                PublicTargets = new[] { ((byte)0, YgoConstants.LOCATION_MZONE, 0u) } };
+            prompt.hintTimingOther = 0;
+            Require(DuelTactics.CanSpendMasterInterruption(duel, prompt, FastEffect(mask)),
+                "Master did not consider saving a targeted HERO with Mask Change.");
+
+            prompt.playerId = 1;
+            duel.CurrentChain[0] = new ChainLinkInfo { code = BrandedFusion, triggerPlayer = 0 };
+            rival.mzone[0].code = Baronne;
+            prompt.candidates.Add(new SelectableCardItem { code = Ash, controller = 1, location = YgoConstants.LOCATION_HAND });
+            prompt.candidates.Add(new SelectableCardItem { code = Baronne, controller = 1,
+                location = YgoConstants.LOCATION_MZONE, description = ((ulong)Baronne << 20) | 1 });
+            Require(DuelTactics.FindPublicPlanningNegate(duel, prompt, 0) == 1,
+                "Master did not model the visible Baronne before the first development line.");
+            rival.mzone[0].position = YgoConstants.POS_FACEDOWN_DEFENSE;
+            Require(DuelTactics.FindPublicPlanningNegate(duel, prompt, 0) == -1,
+                "Master projected a reaction from the rival's hidden cards.");
+            Debug.Log("[VERIFY MASTER INTERRUPTION] Board breakers, empty-window conservation, summon interruption and targeted rescue passed.");
+
+            void Set(string name, object value) => typeof(DuelSession).GetProperty(name).SetValue(duel, value);
+            SelectableCardItem FastEffect(uint code) => new() { code = code, description = (ulong)code << 20,
+                location = YgoConstants.LOCATION_MZONE };
+        }
+
+        private static void VerifyPublicPlanningNegation()
+        {
+            const uint savage = 27548199, quasar = 35952884, dragoon = 37818794;
+            using var duel = new DuelSession();
+            duel.CurrentChain.Add(new ChainLinkInfo { code = BrandedFusion, triggerPlayer = 0 });
+            var prompt = new DuelPrompt { playerId = 1, messageType = YgoConstants.MSG_SELECT_CHAIN };
+            var opponent = duel.Players[1];
+            foreach (var (code, index) in new (uint, uint)[] { (dragoon, 1), (savage, 1), (quasar, 0) })
+            {
+                uint sequence = (uint)prompt.candidates.Count;
+                opponent.mzone[sequence] = FieldMonster(code, sequence);
+                var option = Effect(code, index, YgoConstants.LOCATION_MZONE);
+                option.sequence = sequence;
+                option.controller = 1;
+                prompt.candidates.Add(option);
+            }
+            Require(DuelTactics.FindPublicPlanningNegate(duel, prompt, 0) == 1,
+                "Public planning overlooked Savage's native negate or assumed the contents of Dragoon's hand.");
+            var used = new HashSet<(uint, uint, ulong)> { (savage, 1, ((ulong)savage << 20) | 1) };
+            Require(DuelTactics.FindPublicPlanningNegate(duel, prompt, 0, used) == 2,
+                "Public planning did not distinguish an already simulated negate from the next public threat.");
+            opponent.mzone[2].position = YgoConstants.POS_FACEDOWN_DEFENSE;
+            Require(DuelTactics.FindPublicPlanningNegate(duel, prompt, 0, used) == -1,
+                "Public planning used a hidden monster or a private discard.");
+
+            using var native = new DuelSession(recordPlanningReplay: true);
+            Require(native.StartNewDuel(Deck(Upstart), Empty, Deck(GeminiElf).Append(quasar).ToArray(), Empty,
+                seed: new[] { 211UL, 41UL, 29UL, 7UL }, opponentOpening: new DuelOpening(8000, 5, Baronne, deckMonster: quasar)),
+                "Could not start the native public negation fixture.");
+            var idle = Drive(native, IsIdle);
+            using var trial = native.ReplayForPlanning(() => false);
+            Require(trial != null, "Could not restore the two live negates in the planning copy.");
+            trial.BeginSpeculation(0, stopAfterTurn: true);
+            used.Clear();
+            for (int i = 0; i < 2; i++)
+            {
+                SubmitIdle(trial, 5, Upstart);
+                var reply = Drive(trial, choice => choice.messageType == YgoConstants.MSG_SELECT_CHAIN && choice.playerId == 1);
+                int selected = DuelTactics.FindPublicPlanningNegate(trial, reply, 0, used);
+                Require(selected >= 0, "A public native negate was available for the second development check.");
+                var answer = reply.candidates[selected];
+                Require(used.Add((answer.code, answer.sequence, answer.description)),
+                    "A simulated negate was reused instead of counting the other available resource.");
+                foreach (bool paused in trial.SubmitVisiblePlanningReaction(selected, () => false)) { }
+                Drive(trial, IsIdle);
+                Require(!trial.SpeculationUncertain,
+                    "The verified public response prevented the planner from examining the rest of the line.");
+            }
+            Require(used.Select(answer => answer.Item1).ToHashSet().SetEquals(new[] { Baronne, quasar }) &&
+                trial.Players[1].lp == 8000 && trial.RetryCount == 0 && ReferenceEquals(native.ActivePrompt, idle),
+                "The two public negates did not resolve separately in the planning copy.");
+            using var unplanned = native.ReplayForPlanning(() => false);
+            Require(unplanned != null, "Could not restore the unexpected-response fixture.");
+            unplanned.BeginSpeculation(0, stopAfterTurn: true);
+            SubmitIdle(unplanned, 5, Upstart);
+            var chain = Drive(unplanned, choice => choice.messageType == YgoConstants.MSG_SELECT_CHAIN && choice.playerId == 1);
+            unplanned.SubmitResponseInt(DuelTactics.FindPublicPlanningNegate(unplanned, chain, 0));
+            Require(unplanned.SpeculationUncertain, "An unplanned opposing activation did not stop speculation.");
+            Debug.Log("[VERIFY PUBLIC PLANNING NEGATION] Two native public responses were verified without mutating the live duel.");
+        }
+
+        private static void VerifyDetachedPlanningReplay()
+        {
+            using var live = new DuelSession(recordPlanningReplay: true);
+            Require(live.StartNewDuel(Deck(Upstart), Empty, Deck(GeminiElf), Empty,
+                seed: new[] { 212UL, 41UL, 29UL, 7UL }), "Could not start the detached planning fixture.");
+            Drive(live, IsIdle);
+            SubmitIdle(live, 5, Upstart);
+            var originalPrompt = Drive(live, IsIdle);
+            ulong originalState = ComboSearch.Fingerprint(live, originalPrompt);
+            var restore = live.CapturePlanningReplay();
+            Require(restore != null && restore(() => true) == null, "An expired replay was allowed to start.");
+            var worker = Task.Run(() => YgoNativeBridge.RunIsolatedPlanning(() =>
+            {
+                using var replica = restore(() => false);
+                Require(replica != null && ComboSearch.Fingerprint(replica, replica.ActivePrompt) == originalState &&
+                    replica.Players[1].lp == 9000, "The worker reconstructed a different prompt or board.");
+                using var branch = replica.ReplayForPlanning(() => false);
+                Require(branch != null && branch.NativePtr != replica.NativePtr, "The detached replay could not explore a native branch.");
+                SubmitIdle(branch, 5, Upstart);
+                Drive(branch, IsIdle);
+                Require(branch.Players[1].lp == 10000 && replica.Players[1].lp == 9000,
+                    "The detached branch mutated its starting position.");
+                return replica.ActivePrompt;
+            }, null));
+
+            // The worker has a snapshot of the first activation even if the live duel is advanced and disposed.
+            SubmitIdle(live, 5, Upstart);
+            Drive(live, IsIdle);
+            Require(live.Players[1].lp == 10000, "The live duel could not advance during detached planning.");
+            live.Dispose();
+            Require(worker.GetAwaiter().GetResult() is { } replicaPrompt && !ReferenceEquals(replicaPrompt, originalPrompt),
+                "The worker used the live prompt instance instead of its own prompt.");
+            Debug.Log("[VERIFY DETACHED PLANNING] Live and background duels advanced separately, including a nested native branch.");
+        }
+
+        private static void VerifyCostedBreakerPriority()
+        {
+            using var duel = new DuelSession();
+            typeof(DuelSession).GetProperty(nameof(DuelSession.TurnNumber)).SetValue(duel, 2);
+            typeof(DuelSession).GetProperty(nameof(DuelSession.CurrentPhase)).SetValue(duel, YgoConstants.PHASE_MAIN1);
+            var prompt = new DuelPrompt { playerId = 0, canBp = true, messageType = YgoConstants.MSG_SELECT_IDLECMD };
+            var hand = duel.Players[0].hand;
+            var rival = duel.Players[1];
+            var blocker = new LiveCardState { code = DuelAiPolicy.Mirrorjade, controller = 1,
+                type = YgoConstants.TYPE_MONSTER | YgoConstants.TYPE_EFFECT, position = YgoConstants.POS_FACEUP_ATTACK };
+            rival.mzone[0] = blocker;
+            rival.mzone[1] = new LiveCardState { code = GeminiElf, controller = 1, position = YgoConstants.POS_FACEUP_ATTACK };
+            prompt.summonable.Add(new SelectableCardItem { code = Stratos, location = YgoConstants.LOCATION_HAND, sequence = 1 });
+            foreach (uint code in new[] { DuelTactics.ForbiddenDroplet, DuelAiPolicy.SuperPoly })
+            {
+                hand.Clear();
+                hand.Add(new LiveCardState { code = code });
+                hand.Add(new LiveCardState { code = Stratos });
+                prompt.activatable.Clear();
+                prompt.activatable.Add(new SelectableCardItem { code = code, location = YgoConstants.LOCATION_HAND });
+                Require(DuelTactics.ChooseBoardBreaker(duel, prompt, (_, _) => true) == null,
+                    $"{code} automatically discarded the only starter.");
+                hand.Add(new LiveCardState { code = GeminiElf });
+                Require(DuelTactics.ChooseBoardBreaker(duel, prompt, (_, _) => true) == 5,
+                    $"{code} skipped the breaker despite an available payment and follow-up.");
+                hand.RemoveAt(2);
+                blocker.code = Baronne;
+                Require(DuelTactics.ChooseBoardBreaker(duel, prompt, (_, _) => true) == null,
+                    $"{code} spent the only starter to answer a permission boss without projection.");
+                prompt.summonable.Clear();
+                hand[1].code = GeminiElf;
+                Require(DuelTactics.ChooseBoardBreaker(duel, prompt, (_, _) => true) == 5,
+                    $"{code} did not prioritize the permission boss with a disposable cost.");
+                blocker.code = DuelAiPolicy.Mirrorjade;
+                prompt.summonable.Add(new SelectableCardItem { code = Stratos, location = YgoConstants.LOCATION_HAND, sequence = 1 });
+            }
+            var droplet = new SelectableCardItem { code = DuelTactics.ForbiddenDroplet, location = YgoConstants.LOCATION_HAND };
+            Require(!DuelTactics.CanProjectCostedBreakerLethal(duel, prompt, droplet),
+                "A breaker alone should not be considered a battle finish.");
+            duel.Players[0].mzone[0] = FieldMonster(Stratos);
+            rival.lp = 1500;
+            Require(DuelTactics.CanProjectCostedBreakerLethal(duel, prompt, droplet),
+                "A possible finish after enemy suppression was not left to native projection.");
+
+            const uint starvingVenom = 41209827;
+            var fusion = new SelectableCardItem { code = DuelAiPolicy.SuperPoly, location = YgoConstants.LOCATION_HAND };
+            duel.Players[0].extra.Add(FieldMonster(starvingVenom));
+            rival.mzone[0] = FieldMonster(10802915);
+            rival.mzone[1] = FieldMonster(46986414, 1);
+            rival.lp = 4300;
+            Require(DuelTactics.CanProjectCostedBreakerLethal(duel, prompt, fusion),
+                "Super Polymerization did not reserve a possible win from the opponent's materials and the remaining attacker.");
+            rival.lp = 8000;
+            Require(!DuelTactics.CanProjectCostedBreakerLethal(duel, prompt, fusion),
+                "Super Polymerization queued a finish beyond the available attack ceiling.");
+            hand.Clear();
+            hand.Add(new LiveCardState { code = DuelAiPolicy.SuperPoly });
+            hand.Add(new LiveCardState { code = Stratos });
+            prompt.summonable.Clear();
+            prompt.activatable.Clear();
+            prompt.activatable.Add(fusion);
+            prompt.canEp = true;
+            var unplanned = new TacticalAI(DuelAiPolicy.LoadIncluded()) { Difficulty = AIDifficulty.Master };
+            Require((Read(unplanned.ComputeResponse(duel, prompt)) & 0xffff) != 5,
+                "The fallback main phase used Super Polymerization without a live follow-up or a permission boss.");
         }
 
         private static void VerifyGxResponses()
@@ -183,11 +720,35 @@ namespace YGOPortable.Editor
             var attack = new SelectableCardItem { code = attacker.code, location = YgoConstants.LOCATION_MZONE };
             battle.attackable.Add(attack);
             Require(Read(Smart().ComputeResponse(duel, battle)) == 2, "The AI attacked into Yubel's lethal reflection.");
+            typeof(DuelSession).GetProperty(nameof(DuelSession.TurnNumber)).SetValue(duel, 2);
+            rival.szone[0] = pain;
+            rival.mzone[1] = FieldMonster(GeminiElf, 1);
+            var master = new TacticalAI(null) { Difficulty = AIDifficulty.Master };
+            Require(Read(master.ComputeResponse(duel, idle)) == 7 && Read(master.ComputeResponse(duel, battle)) == 2,
+                "The AI entered Battle Phase to attack a weaker monster it was not allowed to target.");
+            var replay = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_YESNO, promptDesc = YgoConstants.DESC_ATTACK_REPLAY };
+            Require(Read(master.ComputeResponse(duel, replay)) == 0, "The AI confirmed a replay against a forced reflector.");
+            pain.effectsDisabled = true;
+            Require(Read(master.ComputeResponse(duel, idle)) == 6, "A disabled attack restriction still blocked a safe attack.");
+            pain.effectsDisabled = false;
+            rival.szone[0] = rival.mzone[1] = null;
             own.mzone[0] = yubel;
             own.szone[0] = pain;
             rival.mzone[0] = attacker;
             attack.code = yubel.code;
             Require(Read(Smart().ComputeResponse(duel, battle)) == 1, "Yubel did not exploit Nightmare Pain's reflection.");
+            own.szone[0] = null;
+            own.mzone[0] = FieldMonster(Baronne);
+            own.mzone[1] = FieldMonster(86066372, 1);
+            own.mzone[1].attack = 4300;
+            rival.mzone[0] = FieldMonster(60303688);
+            rival.lp = 6200;
+            Require(!DuelCombat.CanCloseBattleFromMain(duel, 0),
+                "Extra Deck attackers were allowed to destroy the conditionally protected defender.");
+            own.mzone[2] = new LiveCardState { code = 3285552, type = YgoConstants.TYPE_TOKEN,
+                sequence = 2, attack = 2000, position = YgoConstants.POS_FACEUP_ATTACK };
+            Require(DuelCombat.CanCloseBattleFromMain(duel, 0),
+                "The lethal solver missed using a token to remove a defender protected only against Extra Deck monsters.");
             Debug.Log("[VERIFY GX AI BATTLE] Open lethal, Yubel defense and Nightmare Pain retaliation passed.");
         }
 
@@ -285,6 +846,82 @@ namespace YGOPortable.Editor
             }
         }
 
+        private static void VerifyNativeExtraDeckAceTrades()
+        {
+            const uint stardust = 44508094, mist = 9348522, plaguespreader = 33420078, underclock = 77058170;
+            const uint blueEyes = 89631139, alternative = 38517737, giantKiller = 88120966, darkfluid = 68934651;
+            const uint domitianus = 33652635, bestiari = 41470137, gyzarus = 48156348;
+            foreach (var (ace, material, summon, upgrade) in new (uint, uint, uint, bool)[]
+            {
+                (stardust, DuelTactics.EffectVeiler, mist, false),
+                (blueEyes, alternative, giantKiller, false),
+                (darkfluid, DuelTactics.EffectVeiler, underclock, false),
+                (domitianus, bestiari, gyzarus, false),
+                (stardust, plaguespreader, Baronne, true),
+            })
+            {
+                using var duel = new DuelSession(recordPlanningReplay: true);
+                var deck = Deck(GeminiElf).Append(material).ToArray();
+                Require(duel.StartNewDuel(Deck(GeminiElf), Empty, deck, new[] { summon }, p0GoesFirst: false,
+                    seed: new[] { 317UL, 43UL, 13UL, 61UL }, opponentOpening: new DuelOpening(8000, 5, ace, deckMonster: material)),
+                    $"Could not start Extra Deck ace fixture {summon}.");
+                Drive(duel, IsIdle);
+                SubmitIdle(duel, 0, GeminiElf);
+                var prompt = Drive(duel, IsIdle);
+                int index = prompt.spSummonable.FindIndex(card => card.code == summon);
+                Require(index >= 0, $"The engine must offer Extra Deck summon {summon} using ace {ace}.");
+                using (var projection = duel.ReplayForPlanning(() => false))
+                {
+                    Require(projection != null, $"Could not replay material fixture {ace} -> {summon}.");
+                    var trace = new List<string>();
+                    bool paid = false;
+                    projection.OnCardMoved += move =>
+                    {
+                        if (move.code != ace || move.fromLoc != YgoConstants.LOCATION_MZONE) return;
+                        trace.Add($"{move.fromLoc}/{move.fromSeq}/{move.fromPos}->{move.toLoc}, reason={move.reason:x}, source={move.SourceReadout?.code}");
+                        paid |= DuelAiPolicy.SpentEstablishedFieldAce(move, projection.SelectionChainLink);
+                    };
+                    projection.BeginSpeculation(0, stopAfterTurn: true);
+                    double before = ComboSearch.BoardValue(projection, 0, canBattle: false, master: true);
+                    projection.SubmitResponseInt((index << 16) | 1);
+                    Drive(projection, IsIdle);
+                    double after = ComboSearch.BoardValue(projection, 0, canBattle: false, master: true);
+                    Require(paid && (upgrade ? after > before : after < before),
+                        $"Fixture {ace} -> {summon} did not observe a scored material trade ({before:F2}->{after:F2}; {string.Join(" | ", trace)}).");
+                }
+                var master = new TacticalAI(DuelAiPolicy.LoadIncluded(), searchCombos: true) { Difficulty = AIDifficulty.Master };
+                int response = Read(master.ComputeResponse(duel, prompt));
+                Require(master.SimulatedComboBranches > 0 && (upgrade ? response == ((index << 16) | 1) : response == 7),
+                    $"Unexpected Extra Deck material decision for {ace} -> {summon}, response {response}, branches {master.SimulatedComboBranches}.");
+                duel.SubmitResponseInt(response);
+                Drive(duel, IsIdle);
+                var field = duel.Players[0].mzone;
+                Require(duel.RetryCount == 0 && field.Any(card => card?.code == (upgrade ? summon : ace)) &&
+                    !field.Any(card => card?.code == (upgrade ? ace : summon)),
+                    $"Extra Deck ace fixture {ace} -> {summon} resolved to a different board.");
+                Debug.Log($"[VERIFY MASTER EXTRA ACE] {ace} -> {summon}, verified upgrade={upgrade}, retry=0.");
+            }
+
+            const uint polymerization = 24094653, firstOfTheDragons = 10817524;
+            using var fusion = new DuelSession(recordPlanningReplay: true);
+            Require(fusion.StartNewDuel(Deck(GeminiElf), Empty, Deck(polymerization).Append(blueEyes).ToArray(),
+                new[] { firstOfTheDragons }, p0GoesFirst: false, seed: new[] { 317UL, 43UL, 13UL, 61UL },
+                opponentOpening: new DuelOpening(8000, 5, blueEyes, deckMonster: blueEyes)),
+                "Could not start the activated Fusion fixture.");
+            var fusionPrompt = Drive(fusion, IsIdle);
+            Require(fusionPrompt.activatable.Any(card => card.code == polymerization &&
+                DuelAiPolicy.NeedsAceFusionProjection(fusion.Players[0], card)), "An actual Fusion activation was not checked for ace costs.");
+            var fusionMaster = new TacticalAI(DuelAiPolicy.LoadIncluded(), searchCombos: true) { Difficulty = AIDifficulty.Master };
+            int fusionResponse = Read(fusionMaster.ComputeResponse(fusion, fusionPrompt));
+            Require(fusionResponse == 7 && fusionMaster.SimulatedComboBranches > 0,
+                $"Master activated an unprofitable Fusion using two Blue-Eyes, response {fusionResponse}.");
+            fusion.SubmitResponseInt(fusionResponse);
+            Drive(fusion, IsIdle);
+            Require(fusion.Players[0].mzone.Count(card => card?.code == blueEyes) == 2 && fusion.RetryCount == 0,
+                "The activated Fusion fixture did not preserve both established monsters.");
+            Debug.Log("[VERIFY MASTER EXTRA ACE] A Fusion Spell using two established monsters was declined, retry=0.");
+        }
+
         private static void VerifyAdditionalRitualAces()
         {
             const uint ritual = DuelAiPolicy.MachineAngelRitual, idaten = 3629090, summonedSkull = 70781052;
@@ -330,6 +967,24 @@ namespace YGOPortable.Editor
             board.hand.Add(FieldMonster(DuelAiPolicy.Benten));
             Require(DuelTactics.CanActivate(merciful, active, magnificent), "Magnificent Machine Angel rejected a spare Benten.");
             Debug.Log("[VERIFY GX RITUAL ACE] Merciful and Magnificent Machine Angel preserved a lone Dakini.");
+        }
+
+        private static void VerifySearchedReplacementProof()
+        {
+            const uint searched = 24215921;
+            var move = new CardMoveEvent { code = searched, fromCon = 1, fromLoc = YgoConstants.LOCATION_HAND,
+                toCon = 1, toLoc = YgoConstants.LOCATION_MZONE, toPos = YgoConstants.POS_FACEUP_DEFENSE,
+                reason = YgoConstants.REASON_SPSUMMON };
+            var effect = new ChainLinkInfo { code = searched, triggerPlayer = 1, triggerLoc = YgoConstants.LOCATION_HAND };
+            Require(AiBattleProbe.ConfirmsSearchedReplacement(move, effect, 1, searched),
+                "The searched card's own resolved hand effect did not count as a special-summon replacement.");
+            Require(!AiBattleProbe.ConfirmsSearchedReplacement(move, effect, 0, searched) &&
+                !AiBattleProbe.ConfirmsSearchedReplacement(move, effect, 1, searched + 1) &&
+                !AiBattleProbe.ConfirmsSearchedReplacement(move, null, 1, searched),
+                "A different card, player, or unobserved effect was credited for the replacement.");
+            effect.negated = true;
+            Require(!AiBattleProbe.ConfirmsSearchedReplacement(move, effect, 1, searched),
+                "A negated hand effect was credited for the replacement.");
         }
 
         private static void VerifyGxSelfDamageAndDestruction()
@@ -559,6 +1214,20 @@ namespace YGOPortable.Editor
             own.mzone[1] = FieldMonster(spirit, 1);
             Require(DuelTactics.CanActivate(duel, idle, search), "Nightmare Pain rejected the Spirit of Yubel destruction trigger.");
             Require(ChooseCost(pain, DuelTactics.Destroy, unicorn, spirit), "Nightmare Pain destroyed Unicorn instead of Spirit of Yubel.");
+            duel.CurrentChain.Clear();
+            own.mzone[0] = FieldMonster(40044918);
+            own.mzone[1] = FieldMonster(10802915, 1);
+            rival.mzone[0] = null;
+            rival.lp = 1000;
+            idle.canBp = true;
+            Require(!DuelTactics.CanSpendMasterInterruption(duel, idle, search),
+                "Master traded a body for an optional search with a battle finish available.");
+            rival.lp = 8000;
+            idle.canBp = false;
+            own.mzone[0] = null;
+            Require(!DuelTactics.CanSpendMasterInterruption(duel, idle, search) &&
+                DuelTactics.CanSpendMasterInterruption(duel, idle, search, projected: true),
+                "An unproven search spent the only defender, or was not offered for native projection.");
 
             own.mzone[0] = FieldMonster(horn);
             own.mzone[1] = null;

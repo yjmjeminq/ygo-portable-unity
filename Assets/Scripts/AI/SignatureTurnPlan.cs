@@ -78,8 +78,11 @@ namespace YGOPortable.AI
 
         // Red Dragon Archfiend / Resonator (Jack Atlas)
         private const uint SoulResonator = 62991792;
+        private const uint VisionResonator = 98396890;
+        private const uint CallResonator = 23008320;
         private const uint BoneArchfiend = 25784595;
         private const uint CrimsonGaia = 98173209;
+        private const uint RedRisingDragon = 66141736;
         internal const uint ScarredDragonArchfiend = 87451661;
         internal const uint RedDragonAbyss = 9753964;
         private const uint RedDragonBane = 36857073;
@@ -100,6 +103,24 @@ namespace YGOPortable.AI
         private const uint FirewallDarkfluid = 68934651;
         private const uint FirewallDragon = 5043010;
         private const uint AccesscodeTalker = 86066372;
+
+        // Branded / Despia
+        private const uint Aluber = 62962630, BrandedOpening = 36637374, BrandedFusion = 44362883;
+        private const uint Cartesia = 95515789, Mirrorjade = 44146295, BrandedInRed = 82738008;
+
+        // Kashtira
+        private const uint Wraitsoth = 71832012, KashtiraUnicorn = 68304193, KashtiraFenrir = 32909498;
+        private const uint KashtiraTheosis = 34447918, KashtiraBirth = 69540484, KashtiraRiseheart = 31149212;
+        private const uint KashtiraShangriIra = 73542331, KashtiraAriseHeart = 48626373;
+
+        // Fiendsmith
+        private const uint FiendsmithEngraver = 60764609, FiendsmithTract = 98567237;
+        private const uint FiendsmithRequiem = 2463794, FiendsmithSequence = 49867899;
+        private const uint FiendsmithDesirae = 82135803, WaveHighKingCaesar = 79559912;
+
+        // Yubel
+        private const uint NightmareThrone = 93729896, SpiritGates = 80312545;
+        private const uint NightmarePain = 65261141, PhantomOfYubel = 80453041, SpiritOfYubel = 90829280;
 
         private const uint MonarchDomain = 84171830, MonarchPantheism = 22842126, MonarchPrime = 54241725;
         private const uint GracefulCharity = 79571449;
@@ -416,17 +437,23 @@ namespace YGOPortable.AI
             if (ryzeal.HasValue) return ryzeal;
 
             // 5. Red Dragon Archfiend / Resonator line:
-            //    Turn 1 prioritizes Abyss (omni-negate); Going 2nd against multiple monsters prioritizes Scarlight/Hot Red board wipe or Supernova!
+            //    Search starters first (Crimson Gaia / Call Resonator), summon Soul Resonator / Bone Archfiend,
+            //    climb via Red Rising Dragon -> Scarred Dragon Archfiend -> Abyss / Supernova!
             var rdaBoss = (isBreakerTurn && rivalMonsters >= 2)
                 ? (ExtraSpecial(RedSupernova) ?? ExtraSpecial(ScarlightOrHotRed) ?? ExtraSpecial(RedDragonAbyss) ?? ExtraSpecial(RedDragonBane))
                 : (ExtraSpecial(RedSupernova) ?? ExtraSpecial(RedDragonAbyss) ?? ExtraSpecial(RedDragonBane) ?? ExtraSpecial(ScarlightOrHotRed));
             var rdaMove =
-                Normal(SoulResonator)
+                Effect(CrimsonGaia, YgoConstants.LOCATION_HAND)
+                ?? Effect(CrimsonGaia, YgoConstants.LOCATION_SZONE)
+                ?? Effect(CallResonator, YgoConstants.LOCATION_HAND)
+                ?? Normal(SoulResonator)
                 ?? Effect(BoneArchfiend, YgoConstants.LOCATION_HAND)
                 ?? Effect(BoneArchfiend, YgoConstants.LOCATION_GRAVE)
                 ?? Effect(BoneArchfiend, YgoConstants.LOCATION_MZONE)
+                ?? Special(VisionResonator)
                 ?? rdaBoss
-                ?? (!prompt.canBp ? ExtraSpecial(ScarredDragonArchfiend) : null);
+                ?? ExtraSpecial(ScarredDragonArchfiend)
+                ?? ExtraSpecial(RedRisingDragon);
             if (rdaMove.HasValue) return rdaMove;
 
             // 6. Manjoume Light and Darkness Dragonlord & Playmaker Cyberse Link Climb
@@ -450,6 +477,52 @@ namespace YGOPortable.AI
                 ?? Effect(SplashMage, YgoConstants.LOCATION_MZONE);
             if (laddOrCyberseMove.HasValue) return laddOrCyberseMove;
 
+            // 7. Branded / Despia Executor: Opening -> Aluber -> Branded Fusion -> Cartesia -> Mirrorjade
+            var brandedMove =
+                Effect(BrandedOpening, YgoConstants.LOCATION_HAND)
+                ?? Normal(Aluber)
+                ?? Effect(BrandedFusion, YgoConstants.LOCATION_HAND)
+                ?? Special(Cartesia)
+                ?? Effect(Cartesia, YgoConstants.LOCATION_HAND)
+                ?? ExtraSpecial(Mirrorjade);
+            if (brandedMove.HasValue) return brandedMove;
+
+            // 8. Kashtira Executor: Wraitsoth -> Unicorn/Fenrir free Special + search -> Theosis -> Birth -> Riseheart -> Shangri-Ira / Arise-Heart
+            var kashtiraMove =
+                Effect(Wraitsoth, YgoConstants.LOCATION_HAND)
+                ?? Special(KashtiraUnicorn)
+                ?? Special(KashtiraFenrir)
+                ?? Effect(KashtiraUnicorn, YgoConstants.LOCATION_MZONE)
+                ?? Effect(KashtiraFenrir, YgoConstants.LOCATION_MZONE)
+                ?? Effect(KashtiraTheosis, YgoConstants.LOCATION_HAND)
+                ?? Effect(KashtiraBirth, YgoConstants.LOCATION_HAND)
+                ?? Effect(KashtiraBirth, YgoConstants.LOCATION_SZONE)
+                ?? Effect(KashtiraRiseheart, YgoConstants.LOCATION_HAND)
+                ?? Effect(KashtiraRiseheart, YgoConstants.LOCATION_MZONE)
+                ?? ExtraSpecial(KashtiraAriseHeart)
+                ?? ExtraSpecial(KashtiraShangriIra);
+            if (kashtiraMove.HasValue) return kashtiraMove;
+
+            // 9. Fiendsmith Executor: Engraver -> Tract -> Requiem -> Sequence -> Desirae / Caesar
+            var fiendsmithMove =
+                Effect(FiendsmithEngraver, YgoConstants.LOCATION_HAND)
+                ?? Effect(FiendsmithTract, YgoConstants.LOCATION_HAND)
+                ?? ExtraSpecial(FiendsmithDesirae)
+                ?? ExtraSpecial(WaveHighKingCaesar)
+                ?? Effect(FiendsmithSequence, YgoConstants.LOCATION_MZONE)
+                ?? ExtraSpecial(FiendsmithSequence)
+                ?? Effect(FiendsmithRequiem, YgoConstants.LOCATION_MZONE)
+                ?? ExtraSpecial(FiendsmithRequiem);
+            if (fiendsmithMove.HasValue) return fiendsmithMove;
+
+            // 10. Yubel Executor: Nightmare Throne -> Spirit Gates -> Nightmare Pain -> Phantom of Yubel
+            var yubelMove =
+                Effect(NightmareThrone, YgoConstants.LOCATION_HAND)
+                ?? Effect(SpiritGates, YgoConstants.LOCATION_HAND)
+                ?? Effect(NightmarePain, YgoConstants.LOCATION_HAND)
+                ?? ExtraSpecial(PhantomOfYubel);
+            if (yubelMove.HasValue) return yubelMove;
+
             return null;
         }
 
@@ -468,11 +541,19 @@ namespace YGOPortable.AI
             // Stardust / Synchron
             JunkConverter, JunkSynchron, Doppelwarrior, StardustIlluminate,
             // Red Dragon Archfiend
-            SoulResonator, BoneArchfiend,
+            SoulResonator, BoneArchfiend, VisionResonator, CrimsonGaia, CallResonator,
             // Galaxy / Photon
             GalaxyHundred, GalaxySummoner, GalaxyExpedition, GalaxyZero,
             // Manjoume LADD
             LightEndSublimation, DarkEndEvaporation, DragonsMirror,
+            // Branded / Despia
+            BrandedFusion, BrandedOpening, Aluber, Cartesia, BrandedInRed,
+            // Kashtira
+            KashtiraTheosis, KashtiraUnicorn, KashtiraFenrir, KashtiraBirth, KashtiraRiseheart,
+            // Fiendsmith
+            FiendsmithEngraver, FiendsmithTract,
+            // Yubel
+            NightmareThrone, SpiritGates, SpiritOfYubel, NightmarePain,
         };
 
         internal static int? ChooseCard(DuelSession session, DuelPrompt prompt)

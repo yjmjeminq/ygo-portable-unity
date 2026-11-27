@@ -54,8 +54,11 @@ namespace YGOPortable.AI
 
         internal static bool AddsLethalUpkeep(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
         {
-            if (duel.CurrentPhase != YgoConstants.PHASE_MAIN2 || duel.TurnPlayer != prompt.playerId ||
-                prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD || !prompt.canEp || effect.controller != prompt.playerId)
+            if (!IsOwnMainPhase(duel, prompt.playerId) ||
+                prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD || effect.controller != prompt.playerId)
+                return false;
+            if (duel.CurrentPhase == YgoConstants.PHASE_MAIN1 && prompt.canBp &&
+                DuelCombat.CanCloseBattleFromMain(duel, prompt.playerId))
                 return false;
 
             int addedDamage = StandbyDamage(effect.code);
@@ -67,7 +70,7 @@ namespace YGOPortable.AI
             if (!placingContract) return false;
 
             int scheduled = ScheduledUpkeep(own);
-            if (scheduled >= own.lp || scheduled + addedDamage < own.lp) return false;
+            if (scheduled + addedDamage < own.lp) return false;
 
             return !HasActiveUpkeepPrevention(own);
         }

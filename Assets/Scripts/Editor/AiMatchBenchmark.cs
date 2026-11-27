@@ -60,6 +60,14 @@ namespace YGOPortable.Editor
             ("GX/Cyber Angel–Fiendsmith", 69103, 20685, YgoConstants.SUMMON_TYPE_RITUAL),
         };
 
+        private static readonly (string Era, int FirstDeck, int SecondDeck, uint Method)[] MasterFixtures =
+        {
+            ("GX/White Asuka–HERO", 69014, 20689, YgoConstants.SUMMON_TYPE_RITUAL),
+            ("GX/Darkness–Kashtira", 69032, 20674, YgoConstants.SUMMON_TYPE_XYZ),
+            ("GX/Branded–Kashtira", 69033, 20674, YgoConstants.SUMMON_TYPE_FUSION),
+            ("GX/Branded–HERO", 50698, 20689, YgoConstants.SUMMON_TYPE_FUSION),
+        };
+
         internal readonly struct Pilot
         {
             internal readonly Func<DuelSession, DuelPrompt, byte[]> Choose;
@@ -67,6 +75,9 @@ namespace YGOPortable.Editor
             internal readonly Func<int> ChosenAlternatives;
             internal readonly Func<double> MaxPlanMilliseconds;
             internal readonly Func<double> LastPlanMilliseconds;
+            internal readonly Func<double> MaxPlanningSliceMilliseconds;
+            internal readonly Func<string> MaxPlanningSliceAt;
+            internal readonly Func<(int Requested, int Accepted)> DetachedPreparation;
 
             internal Pilot(Func<DuelSession, DuelPrompt, byte[]> choose, Func<int> branches, Func<int> chosenAlternatives = null)
                 : this(choose, branches, chosenAlternatives, null) { }
@@ -76,28 +87,82 @@ namespace YGOPortable.Editor
                 : this(choose, branches, chosenAlternatives, maxPlanMilliseconds, null) { }
 
             internal Pilot(Func<DuelSession, DuelPrompt, byte[]> choose, Func<int> branches,
-                Func<int> chosenAlternatives, Func<double> maxPlanMilliseconds, Func<double> lastPlanMilliseconds)
+                Func<int> chosenAlternatives, Func<double> maxPlanMilliseconds, Func<double> lastPlanMilliseconds,
+                Func<double> maxPlanningSliceMilliseconds = null, Func<string> maxPlanningSliceAt = null,
+                Func<(int Requested, int Accepted)> detachedPreparation = null)
             {
                 Choose = choose;
                 Branches = branches;
                 ChosenAlternatives = chosenAlternatives;
                 MaxPlanMilliseconds = maxPlanMilliseconds;
                 LastPlanMilliseconds = lastPlanMilliseconds;
+                MaxPlanningSliceMilliseconds = maxPlanningSliceMilliseconds;
+                MaxPlanningSliceAt = maxPlanningSliceAt;
+                DetachedPreparation = detachedPreparation;
             }
         }
 
         internal static Pilot TimedPilot(Func<DuelSession, DuelPrompt, byte[]> choose,
-            Func<DuelSession, DuelPrompt, bool> prepare, Func<int> branches, Func<int> chosenAlternatives)
+            Func<DuelSession, DuelPrompt, bool> prepare, Func<int> branches, Func<int> chosenAlternatives,
+            Func<(int Requested, int Accepted)> detachedPreparation = null)
         {
-            double maxPlanMs = 0, lastPlanMs = 0;
+            bool measureAnswerSlice = detachedPreparation != null;
+            int.TryParse(Environment.GetEnvironmentVariable("YGO_BENCH_FRAME_RATE"), out int frameRate);
+            double frameMilliseconds = frameRate > 0 ? 1000.0 / frameRate : 0;
+            double maxPlanMs = 0, lastPlanMs = 0, maxSliceMs = 0;
+            string maxSliceAt = null;
+            string longestOperation = null;
+            long longestTicks = 0;
+            void ObserveOperation(string name, long ticks)
+            {
+                if (ticks <= longestTicks) return;
+                longestOperation = name;
+                longestTicks = ticks;
+            }
+            Action<string, long> observe = ObserveOperation;
             return new Pilot((duel, prompt) =>
             {
                 long started = Stopwatch.GetTimestamp();
-                while (!prepare(duel, prompt)) { }
+                bool ready;
+                byte[] answer = null;
+                int sliceIndex = 0;
+                do
+                {
+                    longestOperation = null;
+                    longestTicks = 0;
+                    var previousObserver = DuelSession.ObservePlanningOperation;
+                    long slice = Stopwatch.GetTimestamp();
+                    DuelSession.ObservePlanningOperation = observe;
+                    try
+                    {
+                        ready = prepare(duel, prompt);
+                        if (ready && measureAnswerSlice) answer = choose(duel, prompt);
+                    }
+                    finally { DuelSession.ObservePlanningOperation = previousObserver; }
+                    double elapsed = (Stopwatch.GetTimestamp() - slice) * 1000.0 / Stopwatch.Frequency;
+                    if (elapsed > maxSliceMs)
+                    {
+                        maxSliceMs = elapsed;
+                        maxSliceAt = $"T{duel.TurnNumber} phase={duel.CurrentPhase} prompt={prompt.messageType} slice={sliceIndex}";
+                        if (longestOperation != null)
+                            maxSliceAt += $"; longest measured operation: {longestOperation} ({longestTicks * 1000.0 / Stopwatch.Frequency:F2}ms)";
+                    }
+                    sliceIndex++;
+                    if (!ready)
+                    {
+                        if (frameRate > 0)
+                        {
+                            double elapsedDecision = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+                            if (sliceIndex * frameMilliseconds > elapsedDecision)
+                                System.Threading.Thread.Sleep((int)Math.Ceiling(sliceIndex * frameMilliseconds - elapsedDecision));
+                        }
+                        else if (measureAnswerSlice) System.Threading.Thread.Sleep(1);
+                    }
+                } while (!ready);
                 lastPlanMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
                 maxPlanMs = Math.Max(maxPlanMs, lastPlanMs);
-                return choose(duel, prompt);
-            }, branches, chosenAlternatives, () => maxPlanMs, () => lastPlanMs);
+                return measureAnswerSlice ? answer : choose(duel, prompt);
+            }, branches, chosenAlternatives, () => maxPlanMs, () => lastPlanMs, () => maxSliceMs, () => maxSliceAt, detachedPreparation);
         }
 
         [Serializable]
@@ -127,14 +192,16 @@ namespace YGOPortable.Editor
         {
             public int deck, level, decisions, branches, chosenAlternatives, retries, endTurns, openings, threatsSpent, lethalMisses;
             public int exposedAttackers, selfDestruction, wastedHandtraps;
+            public int temporaryCombatWaste, reflectedBattleDefeats, openingReadyInteractions;
             public int completedTurns, emptyFieldEndTurns, emptyMonsterEndTurns, trackedResponses;
             public int provenMissedBattleWins, battleFinishes;
-            public int equipRuleLosses, selfDestructionWithoutEquipRuleLoss;
+            public int equipRuleLosses, selfDestructionWithoutEquipRuleLoss, sameTurnSelfDestructionReplacements;
             public int selfDefeatTurn, selfDefeatDamage;
             public uint selfDefeatEffect;
             public int unusedDevelopmentEndTurns, unusedDevelopmentOptions;
             public int unusedDevelopmentEndTurnsOnLoss, unusedDevelopmentOptionsOnLoss;
             public int linkMaterialDowngrades, higherLinkMaterialsSpent;
+            public int uncompensatedAceTrades;
             public int slowestTurn, slowestMessage, slowestPhase, slowestStep;
             public int slowestOrdinaryTurn, slowestOrdinaryMessage, slowestOrdinaryPhase, slowestOrdinaryStep;
             public bool reachedMain, methodAvailable, methodReached, aceReached;
@@ -143,7 +210,9 @@ namespace YGOPortable.Editor
             public bool ordinaryTimingSeparated;
             public uint method;
             public uint[] initial;
-            public double decisionMs, slowestMs, maxPlanMs, boardTotal, earlyBoard;
+            public double decisionMs, slowestMs, maxPlanMs, maxPlanningSliceMs, boardTotal, earlyBoard;
+            public string maxPlanningSliceAt;
+            public int detachedRequested, detachedAccepted;
             public double ordinaryDecisionMs, slowestOrdinaryMs;
             public string style;
             public string[] earlyActions, failures;
@@ -152,6 +221,17 @@ namespace YGOPortable.Editor
             public UnusedDevelopmentTrace[] unusedDevelopmentTraces;
             public LinkMaterialDowngradeTrace[] linkMaterialDowngradeTraces;
             public FieldCostTrace[] fieldCosts;
+            public AceMaterialTradeTrace[] aceMaterialTrades;
+        }
+
+        [Serializable]
+        private sealed class AceMaterialTradeTrace
+        {
+            public int turn, phase, step;
+            public uint ace, method;
+            public double before, after;
+            public bool scored, interrupted, uncompensated;
+            internal int InterruptionsAtStart;
         }
 
         [Serializable]
@@ -172,6 +252,17 @@ namespace YGOPortable.Editor
             public int turn, opposingRemovals, draws, lpSwing;
             public bool resolved;
             public List<uint> destroyed = new(), fieldArrivals = new(), handArrivals = new();
+        }
+
+        private sealed class FieldReplacement
+        {
+            internal byte owner;
+            internal int turn, phase, previousMonsters;
+            internal ChainLinkInfo searchEffect;
+            internal uint removedCard, searchedCard;
+            internal List<LiveCardState> handBeforeSearch;
+            internal uint? summonedSlot;
+            internal bool usedElsewhere;
         }
 
         [Serializable]
@@ -245,14 +336,20 @@ namespace YGOPortable.Editor
                 bool gxSuite = Environment.GetEnvironmentVariable("YGO_BENCH_GX_SUITE") == "1";
                 bool gxFieldAudit = Environment.GetEnvironmentVariable("YGO_BENCH_GX_FIELD_AUDIT") == "1";
                 bool gxSelfPlay = Environment.GetEnvironmentVariable("YGO_BENCH_GX_SELF_PLAY") == "1";
-                if (gxSuite || gxFieldAudit)
+                bool compareMasters = Environment.GetEnvironmentVariable("YGO_BENCH_GX_MASTER_COMPARE") == "1";
+                var beforeMaster = compareMasters ? LoadPilotFactory("AiBenchmarkBaselineFactory", "CreateMaster") : null;
+                bool gxDecksLoaded = false;
+                void LoadGxDecks()
                 {
+                    if (gxDecksLoaded) return;
                     var gxDecks = StoryModeUI.LoadRpgDecks(streaming, StoryModeUI.GxRpgSeriesId);
                     if (gxDecks.Count != 37) throw new InvalidOperationException("The GX benchmark requires all 37 story decks.");
                     foreach (var deck in gxDecks) decks.Add(deck.Key, deck.Value);
                     if (!decks[51991].main.Contains(22398665u) || !decks[69033].main.Contains(44362883u))
                         throw new InvalidOperationException("The GX deck inputs lack the expected Drytron and Branded Ritual/Fusion engines.");
+                    gxDecksLoaded = true;
                 }
+                if (gxSuite || gxFieldAudit) LoadGxDecks();
                 if (Environment.GetEnvironmentVariable("YGO_BENCH_REPLAY") is { Length: > 0 } replayPath)
                 {
                     int inspect = int.TryParse(Environment.GetEnvironmentVariable("YGO_BENCH_INSPECT"), out int index) ? index : -1;
@@ -261,7 +358,9 @@ namespace YGOPortable.Editor
                     using var replayOutput = new StreamWriter(output) { AutoFlush = true };
                     foreach (string line in File.ReadLines(replayPath).Where((_, row) => row % stride == start))
                     {
-                        var replayed = ReplayRecordedMatch(JsonUtility.FromJson<Match>(line), inspect, answer, auditBattle, decks, () => nativeErrors);
+                        var match = JsonUtility.FromJson<Match>(line);
+                        if (match.era?.StartsWith("GX/", StringComparison.Ordinal) == true) LoadGxDecks();
+                        var replayed = ReplayRecordedMatch(match, inspect, answer, auditBattle, decks, () => nativeErrors);
                         replayOutput.WriteLine(JsonUtility.ToJson(replayed));
                     }
                     return;
@@ -279,7 +378,8 @@ namespace YGOPortable.Editor
                 bool captureReplays = Environment.GetEnvironmentVariable("YGO_BENCH_CAPTURE_REPLAYS") == "1";
                 bool randomOpponent = Environment.GetEnvironmentVariable("YGO_BENCH_RANDOM_OPPONENT") == "1";
                 string fixture = Environment.GetEnvironmentVariable("YGO_BENCH_FIXTURE");
-                var matchups = gxFieldAudit ? GxFieldMatchups(decks) : gxSuite ? GxMatchups :
+                var matchups = gxFieldAudit ? GxFieldMatchups(decks) :
+                    gxSuite ? compareMasters ? GxMatchups.Concat(MasterFixtures).ToArray() : GxMatchups :
                     fullSuite ? Matchups.Concat(StyleMatchups).ToArray() : styleSuite ? StyleMatchups : Matchups;
                 if (randomOpponent) Debug.Log($"[AI BENCH] Facing {RandomLegalPilot.Version} with independent fixed seeds.");
                 if (fullSuite || styleSuite)
@@ -288,15 +388,41 @@ namespace YGOPortable.Editor
                     VerifyResourceStrategy(decks, general, links);
                 }
                 bool referenceOnly = Environment.GetEnvironmentVariable("YGO_BENCH_REFERENCE_ONLY") == "1";
+                bool detachedPlanning = Environment.GetEnvironmentVariable("YGO_BENCH_DETACHED_PLANNING") == "1";
                 string previousOutput = Environment.GetEnvironmentVariable("YGO_BENCH_PREVIOUS_REPORT");
                 var previous = string.IsNullOrEmpty(previousOutput) ? null : LoadPilotFactory("AiBenchmarkPreviousFactory");
                 Pilot Candidate(int level, int tier = 1)
                 {
                     if (referenceOnly) return baseline(level);
-                    var ai = gxSelfPlay
+                    var ai = gxSelfPlay || compareMasters
                         ? new TacticalAI(general, links, searchCombos: true, planningScale: GameAppController.GxStoryPlanningScale(tier),
                             responseLimit: ComboSearch.RpgResponseLimit) { Difficulty = AIDifficulty.Master }
                         : new TacticalAI(general, links, searchCombos: true);
+                    if (detachedPlanning && ai.Difficulty == AIDifficulty.Master)
+                    {
+                        DetachedAiPlanning pending = null;
+                        int requested = 0, accepted = 0;
+                        return TimedPilot((duel, prompt) => ai.UsesDetachedPlanning(prompt)
+                                ? ai.ComputeWithoutSpeculation(duel, prompt) : ai.ComputeResponse(duel, prompt),
+                            (duel, prompt) =>
+                            {
+                                if (!ai.UsesDetachedPlanning(prompt)) return ai.AdvanceComboPlanning(duel, prompt);
+                                if (pending == null)
+                                {
+                                    pending = new DetachedAiPlanning(ai, duel, prompt);
+                                    requested++;
+                                }
+                                if (!pending.TryTake(prompt, out var prepared, out string error)) return false;
+                                pending = null;
+                                if (error != null) throw new InvalidOperationException(error);
+                                if (prepared != null)
+                                {
+                                    ai = prepared;
+                                    accepted++;
+                                }
+                                return true;
+                            }, () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives, () => (requested, accepted));
+                    }
                     return TimedPilot(ai.ComputeResponse, ai.AdvanceComboPlanning,
                         () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives);
                 }
@@ -326,6 +452,7 @@ namespace YGOPortable.Editor
                             int before = nativeErrors;
                             int rivalLevel = seat == 0 ? secondLevel : firstLevel;
                             var rival = gxSelfPlay ? Candidate(rivalLevel, (seat == 0 ? second : first).difficultyTier) :
+                                compareMasters ? beforeMaster((seat == 0 ? second : first).difficultyTier) :
                                 randomOpponent ? RandomLegalPilot.Create(randomSeed ^ (ulong)(1 - seat)) : baseline(rivalLevel);
                             var result = Play(index, seed, seat, scenario.Era, scenario.Method, first, second,
                                 seat == 0 ? tested(firstLevel) : rival, seat == 1 ? tested(secondLevel) : rival,
@@ -376,10 +503,10 @@ namespace YGOPortable.Editor
                 .ToArray();
         }
 
-        private static Func<int, Pilot> LoadPilotFactory(string name) =>
+        private static Func<int, Pilot> LoadPilotFactory(string name, string method = "Create") =>
             (Func<int, Pilot>)Delegate.CreateDelegate(typeof(Func<int, Pilot>),
                 typeof(AiMatchBenchmark).Assembly.GetType("YGOPortable.Editor." + name)?.GetMethod(
-                    "Create", BindingFlags.Public | BindingFlags.Static) ??
+                    method, BindingFlags.Public | BindingFlags.Static) ??
                 throw new InvalidOperationException($"Missing {name}. Run Tools/benchmark_duel_ai.py."));
 
         private static void VerifyOpeningHands(Match expected, Match actual)
@@ -463,7 +590,8 @@ namespace YGOPortable.Editor
         private static void InspectReplayPrompt(DuelSession duel, DuelPrompt prompt, int step, string answer)
         {
             string Describe(IReadOnlyList<SelectableCardItem> items) => string.Join(", ",
-                items.Select((item, index) => $"{index}={item.code}@{item.controller}/{item.location}/{item.sequence} desc={item.description}"));
+                items.Select((item, index) => $"{index}={CardDatabase.Get(item.code)?.name} ({item.code}) " +
+                    $"@{item.controller}/{item.location}/{item.sequence} desc={item.description}"));
             Debug.Log($"[AI REPLAY PROMPT] Step {step}, turn {duel.TurnNumber}, phase {duel.CurrentPhase}, " +
                 $"player {prompt.playerId}, message {prompt.messageType}, hint {prompt.SelectionHint}, answer {answer}.\n" +
                 $"Normal Summon: {Describe(prompt.summonable)}\nSpecial Summon: {Describe(prompt.spSummonable)}\n" +
@@ -1169,6 +1297,9 @@ namespace YGOPortable.Editor
             var exposedNextTurn = new Dictionary<(int Player, uint Slot, uint Code), ExposureTrace>();
             var arrivals = new List<CardMoveEvent>();
             var destructionTraces = new Dictionary<ChainLinkInfo, DestructionTrace>();
+            var replacements = new List<FieldReplacement>();
+            var ownDestructions = new List<(byte Owner, ChainLinkInfo Effect, LiveCardState Monster)>();
+            (byte Player, uint Attacker, uint Defender, int Turn)? reflectedAttack = null;
             var unusedDevelopment = new[] { new List<UnusedDevelopmentTrace>(), new List<UnusedDevelopmentTrace>() };
             var linkDowngrades = new[] { new List<LinkMaterialDowngradeTrace>(), new List<LinkMaterialDowngradeTrace>() };
             var pendingLinkMaterials = new[] { new List<(uint Card, int Rank)>(), new List<(uint Card, int Rank)>() };
@@ -1178,6 +1309,9 @@ namespace YGOPortable.Editor
             bool auditGx = era.StartsWith("GX/", StringComparison.Ordinal);
             var fieldCosts = new[] { new List<FieldCostTrace>(), new List<FieldCostTrace>() };
             var pendingFieldCosts = new List<(byte Owner, FieldCostTrace Trace)>();
+            var aceMaterialTrades = new[] { new List<AceMaterialTradeTrace>(), new List<AceMaterialTradeTrace>() };
+            var currentAceTrades = new[] { new List<AceMaterialTradeTrace>(), new List<AceMaterialTradeTrace>() };
+            var lastAcePosition = new (int Turn, int Phase, int Step, int Interruptions, double Score)[2];
             uint[][] fieldBefore = null;
             int[] lifeBefore = null;
             int fieldActionStep = -1, fieldActionOwner = -1, lastChoiceOwner = -1;
@@ -1194,7 +1328,21 @@ namespace YGOPortable.Editor
             duel.OnCardMoved += move =>
             {
                 TrackDestruction(duel.ResolvingChainLink, move);
+                foreach (var replacement in replacements)
+                {
+                    if (replacement.searchedCard == 0 || replacement.usedElsewhere || replacement.summonedSlot.HasValue || replacement.turn != duel.TurnNumber ||
+                        replacement.phase != duel.CurrentPhase || move.code != replacement.searchedCard) continue;
+                    if (move.fromLoc == YgoConstants.LOCATION_HAND && move.fromCon == replacement.owner)
+                    {
+                        if (AiBattleProbe.ConfirmsSearchedReplacement(move, duel.ResolvingChainLink, replacement.owner, replacement.searchedCard))
+                            replacement.summonedSlot = move.toSeq;
+                        else replacement.usedElsewhere = true;
+                    }
+                    else if (move.toLoc == YgoConstants.LOCATION_HAND && move.toCon == replacement.owner)
+                        replacement.usedElsewhere = true;
+                }
                 TrackLinkMaterialDowngrade(move);
+                if (auditGx) TrackAceMaterialTrade(move);
                 if (auditFieldCosts) TrackFieldCost(move);
                 if (move.toCon < 2 && move.toLoc == YgoConstants.LOCATION_MZONE &&
                     move.fromLoc != YgoConstants.LOCATION_MZONE && (move.toPos & YgoConstants.POS_FACEUP) != 0 &&
@@ -1241,6 +1389,12 @@ namespace YGOPortable.Editor
                     byte owner = effect.triggerPlayer;
                     bool own = move.fromCon == owner;
                     destroyed[owner] += own ? 1 : -1;
+                    if (own)
+                    {
+                        var monster = move.fromLoc == YgoConstants.LOCATION_MZONE && move.fromSeq < duel.Players[owner].mzone.Length
+                            ? move.SourceReadout ?? duel.Players[owner].mzone[move.fromSeq] : null;
+                        ownDestructions.Add((owner, effect, monster?.code == move.code ? monster : null));
+                    }
                     const uint equipRuleLoss = YgoConstants.REASON_LOST_TARGET | YgoConstants.REASON_RULE;
                     if (own && move.fromLoc == YgoConstants.LOCATION_SZONE &&
                         (move.reason & (equipRuleLoss | YgoConstants.REASON_EFFECT)) == equipRuleLoss)
@@ -1266,12 +1420,18 @@ namespace YGOPortable.Editor
             duel.OnAttackDeclared += (player, location, slot, targetPlayer, targetLocation, targetSlot) =>
             {
                 lastAttack = null;
+                reflectedAttack = null;
                 attackedExposure = null;
                 if (location == YgoConstants.LOCATION_MZONE && slot < duel.Players[player].mzone.Length &&
                     duel.Players[player].mzone[slot] is { } monster)
                 {
                     combatParticipants[player].Add((slot, monster.code));
                     lastAttack = (player, slot, monster.code);
+                    if (targetPlayer < 2 && targetPlayer != player && targetLocation == YgoConstants.LOCATION_MZONE &&
+                        targetSlot < duel.Players[targetPlayer].mzone.Length &&
+                        duel.Players[targetPlayer].mzone[targetSlot] is { } defender &&
+                        DuelCombat.ReflectsAttack(defender, DuelCombat.HasNightmarePain(duel.Players[targetPlayer])))
+                        reflectedAttack = (player, monster.code, defender.code, duel.TurnNumber);
                 }
                 if (targetPlayer < 2 && targetPlayer != player && targetLocation == YgoConstants.LOCATION_MZONE &&
                     targetSlot < duel.Players[targetPlayer].mzone.Length &&
@@ -1295,6 +1455,16 @@ namespace YGOPortable.Editor
             };
             duel.OnLifePointChange += (player, delta, life, kind) =>
             {
+                if (delta < 0 && life <= 0 && reflectedAttack is { } reflection && reflection.Player == player &&
+                    reflection.Turn == duel.TurnNumber &&
+                    (kind == LifePointChangeKind.BattleDamage ||
+                     kind is LifePointChangeKind.EffectDamage or LifePointChangeKind.Damage &&
+                     duel.ResolvingChainLink is { } reflector && reflector.code == reflection.Defender))
+                {
+                    result.sides[player].reflectedBattleDefeats++;
+                    Failure(player, "reflected_battle_defeat", $"attacker={reflection.Attacker}, defender={reflection.Defender}, damage={-delta}");
+                    reflectedAttack = null;
+                }
                 if (kind == LifePointChangeKind.BattleDamage && delta < 0 && life <= 0 &&
                     lastAttack is { } strike && player != strike.Player)
                 {
@@ -1325,6 +1495,7 @@ namespace YGOPortable.Editor
             {
                 var prompt = duel.ActivePrompt;
                 if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                if (auditGx) SampleAceMaterialTrades(prompt);
                 if (prompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD)
                 {
                     foreach (var pending in pendingLinkMaterials) pending.Clear();
@@ -1379,6 +1550,13 @@ namespace YGOPortable.Editor
                     hint = prompt.SelectionHint, answer = BitConverter.ToString(response)
                 });
                 var card = ChosenCard(prompt, command);
+                if (AiBattleProbe.TryFindDecisionBlunder(duel, prompt, response, out string blunder, out uint offendingCode) &&
+                    blunder == "temporary_combat_waste")
+                {
+                    side.temporaryCombatWaste++;
+                    Failure(player, blunder, $"card={offendingCode}, phase={duel.CurrentPhase}, step={replayStep}");
+                    Debug.LogWarning($"[AI BLUNDER] {blunder} T{turn} phase={duel.CurrentPhase} card={offendingCode} seat={player}");
+                }
                 if (auditFieldCosts && card != null)
                 {
                     lastChoiceCode = card.code;
@@ -1433,7 +1611,7 @@ namespace YGOPortable.Editor
                     selectedDefense[player].Add((prompt.promptCardCode, "summon_in_defense"));
                 bool skippedBattle = prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canBp && command == 7;
                 bool leftBattle = prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && (command & 0xffff) is 2 or 3;
-                if (auditGx && player == candidate && !provenMissedBattleTurns[player].Contains(turn) &&
+                if (auditGx && !provenMissedBattleTurns[player].Contains(turn) &&
                     (skippedBattle || leftBattle || prompt.IsAttackTargetSelection ||
                         prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && prompt.attackable.Count > 1) &&
                     AiBattleProbe.TryProveMissedLethal(duel, prompt, response, out string proof))
@@ -1463,8 +1641,12 @@ namespace YGOPortable.Editor
                     side.trackedResponses++;
 
                 double beforeBoard = Board(own);
+                int beforeMonsters = own.mzone.Count(monster => monster != null);
+                var beforeHand = own.hand;
+                int phase = duel.CurrentPhase;
                 Array.Clear(destroyed, 0, destroyed.Length);
                 Array.Clear(lostEquipTargets, 0, lostEquipTargets.Length);
+                ownDestructions.Clear();
                 duel.SubmitResponse(response);
                 side.retries += duel.RetryCount - before;
                 if (duel.RetryCount != before) Failure(player, "engine_retry", $"prompt={prompt.messageType}, hint={prompt.SelectionHint}, answer={BitConverter.ToString(response)}");
@@ -1473,6 +1655,29 @@ namespace YGOPortable.Editor
                     side.selfDestruction++;
                     if (destroyed[player] > lostEquipTargets[player]) side.selfDestructionWithoutEquipRuleLoss++;
                     Failure(player, "self_destruction", $"own net field losses={destroyed[player]}, choice={card?.code ?? 0}");
+                    WatchSearchedReplacement(player, turn, phase, beforeMonsters, beforeHand);
+                }
+                for (int i = replacements.Count - 1; i >= 0; i--)
+                {
+                    var replacement = replacements[i];
+                    if (replacement.searchedCard == 0 && destructionTraces.TryGetValue(replacement.searchEffect, out var search) && search.resolved)
+                    {
+                        uint searched = search.handArrivals.Count == 1 ? search.handArrivals[0] : 0;
+                        if (searched != 0 && searched != replacement.removedCard &&
+                            replacement.handBeforeSearch.All(item => item.code != searched) &&
+                            duel.Players[replacement.owner].hand.Count(item => item.code == searched) == 1)
+                            replacement.searchedCard = searched;
+                        else replacement.usedElsewhere = true;
+                    }
+                    if (replacement.summonedSlot is uint slot && duel.Players[replacement.owner] is { } endingField &&
+                        slot < endingField.mzone.Length && endingField.mzone[slot] is { IsFaceUp: true } summoned &&
+                        summoned.code == replacement.searchedCard && endingField.mzone.Count(monster => monster != null) >= replacement.previousMonsters)
+                    {
+                        result.sides[replacement.owner].sameTurnSelfDestructionReplacements++;
+                    }
+                    else if (!replacement.usedElsewhere && !replacement.summonedSlot.HasValue &&
+                        replacement.turn == duel.TurnNumber && replacement.phase == duel.CurrentPhase) continue;
+                    replacements.RemoveAt(i);
                 }
                 if (duel.TurnNumber != turn || duel.IsFinished)
                 {
@@ -1487,6 +1692,8 @@ namespace YGOPortable.Editor
                     double board = Board(field);
                     ending.boardTotal += board;
                     ending.endTurns++;
+                    if (turn == 1 && duel.TurnNumber != turn)
+                        ending.openingReadyInteractions = DuelAiPolicy.ReadyInteractionCount(duel, (byte)turnPlayer, inspectPrivateCards: true);
                     if (duel.TurnNumber != turn)
                     {
                         ending.completedTurns++;
@@ -1549,6 +1756,8 @@ namespace YGOPortable.Editor
             result.finalLife = duel.Players.Select(field => field.lp).ToArray();
             result.capped = !duel.IsFinished && duel.RetryCount == 0 && (!openingOnly || duel.TurnNumber <= 2);
             if (auditFieldCosts) CompleteFieldCosts();
+            if (auditGx)
+                for (byte seat = 0; seat < 2; seat++) FinishAceMaterialTrades(seat);
             for (int player = 0; player < 2; player++)
             {
                 var side = result.sides[player];
@@ -1558,11 +1767,16 @@ namespace YGOPortable.Editor
                 side.planTimingAvailable = pilots[player].MaxPlanMilliseconds != null;
                 side.ordinaryTimingSeparated = pilots[player].LastPlanMilliseconds != null;
                 side.maxPlanMs = pilots[player].MaxPlanMilliseconds?.Invoke() ?? 0;
+                side.maxPlanningSliceMs = pilots[player].MaxPlanningSliceMilliseconds?.Invoke() ?? 0;
+                side.maxPlanningSliceAt = pilots[player].MaxPlanningSliceAt?.Invoke();
+                if (pilots[player].DetachedPreparation?.Invoke() is { } detached)
+                    (side.detachedRequested, side.detachedAccepted) = detached;
                 side.openings = side.reachedMain ? 1 : 0;
                 bool lost = result.winner == 1 - player;
                 side.unusedDevelopmentEndTurns = unusedDevelopment[player].Count;
                 side.unusedDevelopmentOptions = unusedDevelopment[player].Sum(trace => trace.options.Length);
                 side.unusedDevelopmentEndTurnsOnLoss = lost ? side.unusedDevelopmentEndTurns : 0;
+                side.aceMaterialTrades = aceMaterialTrades[player].ToArray();
                 side.unusedDevelopmentOptionsOnLoss = lost ? side.unusedDevelopmentOptions : 0;
                 foreach (var trace in unusedDevelopment[player]) trace.eventualLoss = lost;
                 side.unusedDevelopmentTraces = unusedDevelopment[player].ToArray();
@@ -1583,8 +1797,69 @@ namespace YGOPortable.Editor
             result.replay = responses?.ToArray();
             return result;
 
+            void WatchSearchedReplacement(byte player, int turn, int phase, int beforeMonsters, List<LiveCardState> beforeHand)
+            {
+                if (duel.TurnNumber != turn || duel.CurrentPhase != phase || ownDestructions.Count != 1 ||
+                    phase is not (YgoConstants.PHASE_MAIN1 or YgoConstants.PHASE_MAIN2)) return;
+                var loss = ownDestructions[0];
+                if (loss.Owner != player || loss.Monster == null || DuelTactics.IsEstablishedFieldAce(loss.Monster)) return;
+                replacements.Add(new FieldReplacement { owner = player, turn = turn, phase = phase,
+                    previousMonsters = beforeMonsters, searchEffect = loss.Effect, removedCard = loss.Monster.code, handBeforeSearch = beforeHand });
+            }
+
             static uint[] FieldCodes(PlayerFieldSnapshot snapshot) => snapshot.mzone.Concat(snapshot.szone)
                 .Where(card => card != null).Select(card => card.code).ToArray();
+
+            void TrackAceMaterialTrade(CardMoveEvent move)
+            {
+                byte owner = move.fromCon;
+                if (owner != duel.TurnPlayer || owner >= 2 ||
+                    (move.reason & (YgoConstants.REASON_RELEASE | YgoConstants.REASON_MATERIAL | YgoConstants.REASON_COST)) == 0 ||
+                    !DuelAiPolicy.SpentEstablishedFieldAce(move, duel.SelectionChainLink)) return;
+                var position = lastAcePosition[owner];
+                if (position.Turn != duel.TurnNumber) return;
+                currentAceTrades[owner].Add(new AceMaterialTradeTrace
+                {
+                    turn = position.Turn, phase = position.Phase, step = position.Step,
+                    ace = move.code, method = move.MaterialMethod, before = position.Score,
+                    InterruptionsAtStart = position.Interruptions,
+                });
+            }
+
+            void SampleAceMaterialTrades(DuelPrompt prompt)
+            {
+                for (byte seat = 0; seat < 2; seat++)
+                    if (currentAceTrades[seat].Count > 0 && currentAceTrades[seat][0].turn != duel.TurnNumber)
+                        FinishAceMaterialTrades(seat);
+                byte player = prompt.playerId;
+                if (player != duel.TurnPlayer || prompt.messageType is not
+                    (YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD)) return;
+                double score = ComboSearch.BoardValue(duel, player, canBattle: false, master: true);
+                foreach (var trade in currentAceTrades[player])
+                {
+                    trade.after = score;
+                    trade.scored = true;
+                    trade.interrupted |= duel.TurnInterruptions > trade.InterruptionsAtStart;
+                }
+                lastAcePosition[player] = (duel.TurnNumber, duel.CurrentPhase, responseIndex, duel.TurnInterruptions, score);
+            }
+
+            void FinishAceMaterialTrades(byte player)
+            {
+                foreach (var trade in currentAceTrades[player])
+                {
+                    trade.uncompensated = trade.scored && !trade.interrupted && !(duel.IsFinished && duel.Winner == player) &&
+                        trade.after < trade.before - .08;
+                    if (trade.uncompensated)
+                    {
+                        result.sides[player].uncompensatedAceTrades++;
+                        Failure(player, "ace_material_downgrade", $"ace={trade.ace}, method=0x{trade.method:x}, " +
+                            $"turn={trade.turn}, phase={trade.phase}, step={trade.step}, board={trade.before:F2}->{trade.after:F2}");
+                    }
+                    aceMaterialTrades[player].Add(trade);
+                }
+                currentAceTrades[player].Clear();
+            }
 
             void TrackFieldCost(CardMoveEvent move)
             {

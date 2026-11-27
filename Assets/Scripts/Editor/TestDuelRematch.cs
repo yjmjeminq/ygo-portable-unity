@@ -118,7 +118,7 @@ namespace YGOPortable.Editor
                 var replay = (RectTransform)panel.Find("PersonalReplay");
                 var label = difficulty.Find("Label/Text").GetComponent<Text>();
                 var toggle = difficulty.Find("BtnDiff/B").GetComponent<Button>();
-                Require(toggle.IsActive() && toggle.IsInteractable() && label.text.Contains("마스터 (0.6초 수읽기)") &&
+                Require(toggle.IsActive() && toggle.IsInteractable() && label.text.Contains("마스터 (최대 1초 수읽기)") &&
                     speed.anchorMin.y > difficulty.anchorMax.y && difficulty.anchorMin.y > replay.anchorMax.y,
                     "The difficulty control was missing, overlapped other rows, or showed the wrong default.");
                 toggle.onClick.Invoke();

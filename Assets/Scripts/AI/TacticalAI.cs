@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using YGOPortable.Core;
@@ -56,17 +57,21 @@ namespace YGOPortable.AI
         private uint _lastAnnouncedEffect, _calledByTarget;
         private uint _accesscodeSpentAttributes;
         private bool? _linkDeck;
-        private readonly Dictionary<string, int> _effectCounts = new Dictionary<string, int>();
-        private readonly HashSet<uint> _repositionedSeqs = new HashSet<uint>();
+        private Dictionary<string, int> _effectCounts = new Dictionary<string, int>();
+        private HashSet<uint> _repositionedSeqs = new HashSet<uint>();
         private readonly DuelAiPolicy _policy;
         private readonly LinkComboPolicy _linkPolicy;
-        private readonly ComboSearch _comboSearch;
+        private ComboSearch _comboSearch;
         private bool _comboProjection;
         private bool _checkedIdleRecovery;
         private DuelPrompt _preparingCombo;
         private IEnumerator<bool> _comboPreparation;
         private readonly bool _tacticalRules;
         private bool _checkedDirectAttackOrder;
+        private DuelPrompt _preparedBattlePrompt;
+        private (int Attacker, uint? Target)? _preparedBattleLethal;
+        private int? _verifiedDirectAttacker;
+        private bool _verifiedBattleTarget;
         private DuelPrompt _effectWinPrompt;
         private bool _verifiedEffectWin;
         private bool _usedBait;
@@ -74,6 +79,7 @@ namespace YGOPortable.AI
         private int? _baitAction;
         private DuelPrompt _extensionPrompt;
         private DuelTactics.ExtensionRisk _extensionRisk;
+        private bool _skipSpeculation;
 
         public TacticalAI() { }
 
@@ -110,6 +116,13 @@ namespace YGOPortable.AI
         }
 
         public byte[] ComputeResponse(DuelSession session, DuelPrompt prompt) => ComputeComboResponse(session, prompt, null);
+
+        internal byte[] ComputeWithoutSpeculation(DuelSession session, DuelPrompt prompt)
+        {
+            _skipSpeculation = true;
+            try { return ComputeResponse(session, prompt); }
+            finally { _skipSpeculation = false; }
+        }
 
         internal byte[] ComputeComboResponse(DuelSession session, DuelPrompt prompt, int? plannedMainAction)
         {
@@ -164,6 +177,10 @@ namespace YGOPortable.AI
                         return BitConverter.GetBytes(0);
                     if (UsesTacticalRules && DuelTactics.ChooseResolutionYesNo(session, prompt) is int answer)
                         return BitConverter.GetBytes(answer);
+                    if (UsesTacticalRules && prompt.IsAttackReplayChoice &&
+                        DuelCombat.ForcesReflectorTargets(session.Players[1 - prompt.playerId]) &&
+                        !DuelCombat.ShouldContinueAttack(session, prompt.playerId, _attackerSequence))
+                        return BitConverter.GetBytes(0);
                     return BitConverter.GetBytes(prompt.IsDirectAttackChoice && _plannedAttackTargetSequence != uint.MaxValue ? 0 : 1);
 
                 case YgoConstants.MSG_SELECT_OPTION:
@@ -266,6 +283,9 @@ namespace YGOPortable.AI
                         _ => 500,
                     };
                     int developmentBonus = develops ? command == 5 ? 370 : 260 : 0;
+                    if (Difficulty == AIDifficulty.Master && command == 5 &&
+                        ComboSearch.IsPublicFieldDraw(session.Players[prompt.playerId], item))
+                        developmentBonus = Math.Max(developmentBonus, 480);
                     choices.Add(((i << 16) | command, priority + developmentBonus));
                 }
             }
@@ -324,8 +344,15 @@ namespace YGOPortable.AI
             (command != 1 || (CanUseSpecialSummon(session.Players[prompt.playerId], item, planLinks, projected) &&
                 (!UsesTacticalRules || (!DuelTactics.HasLethalSpecialSummonBurn(session, prompt.playerId) &&
                     DuelTactics.CanSummonRedDragonSafely(session, prompt, item.code))))) &&
-            (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item) &&
-                CanEndMainPhaseWithEffect(session, prompt, item) &&
+            (command != 5 || (CanActivate(session, prompt, item, projected) && CanPlayFieldSpell(session, prompt, item) &&
+                (projected || Difficulty != AIDifficulty.Master || !UsesTacticalRules ||
+                    !DuelAiPolicy.NeedsAceFusionProjection(session.Players[prompt.playerId], item)) &&
+                (projected || Difficulty != AIDifficulty.Master || !UsesTacticalRules ||
+                    item.code is not (DuelTactics.ForbiddenDroplet or DuelAiPolicy.SuperPoly) ||
+                    DuelTactics.CanSpendUnplannedBreaker(session, prompt, item,
+                        (action, alternative) => CanUseMainAction(session, prompt, planLinks, action, alternative, projected: true))) &&
+                (CanEndMainPhaseWithEffect(session, prompt, item) || projected && Difficulty == AIDifficulty.Master &&
+                    DuelTactics.CanProjectCostedBreakerLethal(session, prompt, item)) &&
                 (!UsesTacticalRules || !DddTurnPlan.ReserveScalesForGilgamesh(session, prompt, item))));
 
         private static bool CanRevealThreeBlueEyes(DuelSession duel, byte player)
@@ -348,6 +375,8 @@ namespace YGOPortable.AI
 
         private bool CanUseSpecialSummon(PlayerFieldSnapshot own, SelectableCardItem item, bool planLinks, bool projected)
         {
+            if (!projected && UsesTacticalRules && Difficulty == AIDifficulty.Master &&
+                DuelAiPolicy.NeedsAceMaterialProjection(own, item)) return false;
             if (UsesTacticalRules && LinkComboPolicy.NeedsMaterialProjection(own, item) &&
                 (UsesComboPlanning || LinkComboPolicy.HasAceAtRisk(own, LinkComboPolicy.Rank(item.code)))) return projected;
             return !planLinks || LinkComboPolicy.CanUseSummon(own, item);
@@ -361,6 +390,9 @@ namespace YGOPortable.AI
                 // right before ending the turn or in Main Phase 2.
                 // Keep them set in backrow or in hand as interruptions for the opponent's upcoming turn!
                 if (session.CurrentPhase == YgoConstants.PHASE_MAIN2) return false;
+                if (Difficulty == AIDifficulty.Master && prompt.canBp &&
+                    DuelTactics.HasPublicMonsterBlocker(session, prompt.playerId) && ComboSearch.CanDevelop(prompt))
+                    return true;
                 if (prompt.canEp && (!prompt.canBp || !HasWorthwhileAttack(session, prompt.playerId)))
                     return false;
             }
@@ -376,22 +408,130 @@ namespace YGOPortable.AI
                 (card.IsTrap || (card.type & YgoConstants.TYPE_QUICKPLAY) != 0));
         }
 
-        internal bool AdvanceComboPlanning(DuelSession session, DuelPrompt prompt)
+        internal bool UsesDetachedPlanning(DuelPrompt prompt) => Difficulty == AIDifficulty.Master && _comboSearch != null &&
+            prompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD;
+
+        internal TacticalAI ForkForDetachedPlanning()
+        {
+            var copy = (TacticalAI)MemberwiseClone();
+            copy._effectCounts = new Dictionary<string, int>(_effectCounts);
+            copy._repositionedSeqs = new HashSet<uint>(_repositionedSeqs);
+            copy._comboSearch = _comboSearch?.ForkForDetachedPlanning();
+            copy._comboPreparation = null;
+            return copy;
+        }
+
+        internal void RebindPreparedPrompt(DuelPrompt replica, DuelPrompt live)
+        {
+            if (ReferenceEquals(_preparingCombo, replica)) _preparingCombo = live;
+            if (ReferenceEquals(_preparedBattlePrompt, replica)) _preparedBattlePrompt = live;
+            if (ReferenceEquals(_effectWinPrompt, replica)) _effectWinPrompt = live;
+            if (ReferenceEquals(_baitPrompt, replica)) _baitPrompt = live;
+            if (ReferenceEquals(_extensionPrompt, replica)) _extensionPrompt = live;
+            _comboSearch?.RebindPreparedPrompt(replica, live);
+        }
+
+        internal bool AdvanceComboPlanning(DuelSession session, DuelPrompt prompt) =>
+            AdvanceComboPlanning(session, prompt, ComboSearch.MasterSearchDeadlineMilliseconds);
+
+        internal bool AdvanceComboPlanning(DuelSession session, DuelPrompt prompt, int masterBudget)
         {
             if (!ReferenceEquals(_preparingCombo, prompt))
             {
-                _comboPreparation?.Dispose();
-                _comboPreparation = null;
+                CancelComboPlanning();
                 _preparingCombo = prompt;
                 ResetTurnState(session.TurnNumber);
-                if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && CanSearchCombo(session, prompt, PlanLinks(session, prompt)))
-                    _comboPreparation = _comboSearch.Prepare(session, prompt, this).GetEnumerator();
+                if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && _comboSearch != null)
+                    _comboPreparation = PrepareMainDecision(session, prompt, masterBudget).GetEnumerator();
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && _comboSearch != null &&
+                    Difficulty == AIDifficulty.Master && UsesTacticalRules)
+                    _comboPreparation = PrepareBattleDecision(session, prompt).GetEnumerator();
             }
             if (_comboPreparation == null) return true;
             if (_comboPreparation.MoveNext()) return false;
             _comboPreparation.Dispose();
             _comboPreparation = null;
             return true;
+        }
+
+        internal void CancelComboPlanning()
+        {
+            ReleaseDetachedIterator();
+            _preparingCombo = null;
+            _preparedBattlePrompt = null;
+        }
+
+        internal void ReleaseDetachedIterator()
+        {
+            _comboPreparation?.Dispose();
+            _comboPreparation = null;
+        }
+
+        private IEnumerable<bool> PrepareBattleDecision(DuelSession session, DuelPrompt prompt)
+        {
+            _preparedBattlePrompt = prompt;
+            _verifiedDirectAttacker = null;
+            _verifiedBattleTarget = false;
+            var clock = Stopwatch.StartNew();
+            long sliceStarted = 0;
+            bool SliceDue() => clock.ElapsedMilliseconds - sliceStarted >= ComboSearch.PlanningSliceMilliseconds;
+
+            _preparedBattleLethal = DuelCombat.FindLethal(session, prompt, _attackerSequence);
+            if (_preparedBattleLethal is { } lethal)
+            {
+                if (_checkedDirectAttackOrder || lethal.Target != null) yield break;
+                foreach (int? attacker in DuelCombat.VerifyDirectAttackOrderInSlices(session, prompt, lethal.Attacker, this, SliceDue))
+                {
+                    if (attacker.HasValue) { _verifiedDirectAttacker = attacker; yield break; }
+                    yield return true;
+                    sliceStarted = clock.ElapsedMilliseconds;
+                }
+                yield break;
+            }
+
+            bool canLeave = prompt.canM2 || prompt.canEp;
+            if ((canLeave && _battleActions >= 25) || NextBattleEffect(session, prompt) >= 0) yield break;
+            int index = DuelCombat.ChooseAttacker(session, prompt, !canLeave);
+            if (index < 0 || DuelCombat.AllocateExtraBattleRemoval(session, prompt, index, _attackerSequence) is not { } allocation ||
+                allocation.Attacker == index) yield break;
+            foreach (bool? verified in DuelCombat.VerifyAllocatedTargetInSlices(session, prompt, allocation.Attacker, allocation.Target, SliceDue))
+            {
+                if (verified.HasValue) { _verifiedBattleTarget = verified.Value; yield break; }
+                yield return true;
+                sliceStarted = clock.ElapsedMilliseconds;
+            }
+        }
+
+        private IEnumerable<bool> PrepareMainDecision(DuelSession session, DuelPrompt prompt, int masterBudget)
+        {
+            bool master = Difficulty == AIDifficulty.Master;
+            var clock = master ? Stopwatch.StartNew() : null;
+            bool planLinks = PlanLinks(session, prompt);
+            if (master && !ReferenceEquals(_effectWinPrompt, prompt) && !HasVisibleBattleWin(session, prompt) &&
+                FindPotentialEffectWin(session, prompt, planLinks) is { } effect)
+            {
+                _effectWinPrompt = prompt;
+                _verifiedEffectWin = false;
+                long sliceStarted = 0;
+                bool SliceDue() => clock.ElapsedMilliseconds - sliceStarted >= ComboSearch.PlanningSliceMilliseconds;
+                foreach (bool? verified in DuelCombat.VerifyEffectWinInSlices(session, prompt, effect.Command,
+                    this, effect.AllowBattle, SliceDue))
+                {
+                    if (verified.HasValue)
+                    {
+                        _verifiedEffectWin = verified.Value;
+                        break;
+                    }
+                    yield return true;
+                    sliceStarted = clock.ElapsedMilliseconds;
+                }
+                if (SliceDue()) yield return true;
+            }
+
+            if (!CanSearchCombo(session, prompt, planLinks)) yield break;
+            int remaining = master ? (int)Math.Max(0, masterBudget - clock.ElapsedMilliseconds) : masterBudget;
+            foreach (bool paused in _comboSearch.Prepare(session, prompt, this, remaining))
+                yield return paused;
         }
 
         private bool CanSearchCombo(DuelSession session, DuelPrompt prompt, bool planLinks) =>
@@ -401,6 +541,11 @@ namespace YGOPortable.AI
             ReferenceEquals(session.ActivePrompt, prompt) && (IsRecovering(session, prompt) || planLinks ||
                 DddTurnPlan.IsDddDeck(session.Players[prompt.playerId]) ||
                 ComboSearch.CanDevelop(prompt) ||
+                Difficulty == AIDifficulty.Master && prompt.activatable.Any(item =>
+                    item.controller == prompt.playerId &&
+                    (DuelTactics.CanProjectCostedBreakerLethal(session, prompt, item) ||
+                     DuelAiPolicy.NeedsAceFusionProjection(session.Players[prompt.playerId], item) ||
+                     ComboSearch.IsPublicFieldDraw(session.Players[prompt.playerId], item))) ||
                 prompt.summonable.Any(item => DuelTactics.NeedsTributeProjection(session, prompt, item)));
 
         private bool IsRecovering(DuelSession session, DuelPrompt prompt) =>
@@ -418,7 +563,7 @@ namespace YGOPortable.AI
             int? preparation = plannedMainAction == null && UsesTacticalRules && !fallback && _actionsThisTurn < 48
                 ? ChoosePriorityMainAction(s, p, planLinks) : null;
             if (preparation == null && plannedMainAction == null && CanSearchCombo(s, p, planLinks))
-                plannedMainAction = _comboSearch.Choose(s, p, this);
+                plannedMainAction = _skipSpeculation ? _comboSearch.TakePreparedAction(s, p) : _comboSearch.Choose(s, p, this);
 
             _unselectCount = 0;
             _actionsThisTurn++;
@@ -447,6 +592,9 @@ namespace YGOPortable.AI
                     int draw = p.activatable.FindIndex(effect => effect.code == PotOfGreed && CanUse(5, effect));
                     if (draw >= 0) return EncodeIdleAction(s, p, 5, draw);
                 }
+                if (plannedMainAction == null && Difficulty == AIDifficulty.Master &&
+                    DuelTactics.ChooseRecoverySummon(s, p, CanUse) is int recovery)
+                    return EncodeIdleAction(s, p, 0, recovery >> 16);
                 return FinishMainPhase(s, p, p.canBp && HasWorthwhileAttack(s, p.playerId), preserveHand: true);
             }
             else if (((planLinks ? _linkPolicy.Choose(s, p, CanUse, _comboProjection) : null) ?? ChoosePlannedIdle(s, p, CanUse)) is int planned)
@@ -488,35 +636,54 @@ namespace YGOPortable.AI
                 ExtensionRisk(s, p) != DuelTactics.ExtensionRisk.None);
         }
 
-        private int? ChoosePriorityMainAction(DuelSession session, DuelPrompt prompt, bool planLinks)
+        private (int Command, bool AllowBattle)? FindPotentialEffectWin(DuelSession session, DuelPrompt prompt, bool planLinks)
         {
-            bool CanUse(int command, SelectableCardItem item) => CanUseMainAction(session, prompt, planLinks, command, item);
-            int? potentialWin = DuelTactics.FindGiftCardWin(session, prompt, CanUse);
-            bool allowBattle = false;
-            if (potentialWin == null && !_comboProjection && prompt.canBp &&
+            int? gift = DuelTactics.FindGiftCardWin(session, prompt,
+                (command, item) => CanUseMainAction(session, prompt, planLinks, command, item));
+            if (gift.HasValue) return (gift.Value, false);
+            if (!_comboProjection && prompt.canBp &&
                 session.Players[1 - prompt.playerId].szone.All(card => card == null))
             {
                 int bond = prompt.activatable.FindIndex(item => item.code == DuelAiPolicy.PowerBond);
                 if (bond >= 0 && !DuelAiPolicy.CanRiskPowerBond(session, prompt))
-                {
-                    potentialWin = (bond << 16) | 5;
-                    allowBattle = true;
-                }
+                    return ((bond << 16) | 5, true);
             }
-            if (potentialWin is int effectWin)
+            return null;
+        }
+
+        private int? ChoosePriorityMainAction(DuelSession session, DuelPrompt prompt, bool planLinks)
+        {
+            bool CanUse(int command, SelectableCardItem item) => CanUseMainAction(session, prompt, planLinks, command, item);
+            if (FindPotentialEffectWin(session, prompt, planLinks) is { } effectWin)
             {
-                if (_comboProjection) return effectWin;
+                if (_comboProjection) return effectWin.Command;
                 if (!ReferenceEquals(_effectWinPrompt, prompt))
                 {
                     _effectWinPrompt = prompt;
-                    _verifiedEffectWin = DuelCombat.VerifyEffectWin(session, prompt, effectWin, this, allowBattle);
+                    _verifiedEffectWin = !_skipSpeculation && DuelCombat.VerifyEffectWin(session, prompt, effectWin.Command, this, effectWin.AllowBattle);
                 }
-                if (_verifiedEffectWin) return effectWin;
+                if (_verifiedEffectWin) return effectWin.Command;
             }
 
             if (DddTurnPlan.ChooseUpkeepRescue(session, prompt,
                 CanUse) is int rescue)
                 return rescue;
+
+            if (UsesTacticalRules && Difficulty == AIDifficulty.Master &&
+                DuelTactics.ChooseBoardBreaker(session, prompt, CanUse) is int breaker)
+            {
+                if (!_comboProjection && !_usedBait &&
+                    DuelTactics.ShouldBaitBeforeBreaker(session, prompt, prompt.activatable[breaker >> 16]))
+                {
+                    if (!ReferenceEquals(_baitPrompt, prompt))
+                    {
+                        _baitPrompt = prompt;
+                        _baitAction = DuelTactics.ChooseGoingSecondBait(session, prompt, CanUse);
+                    }
+                    if (_baitAction is int breakerBait) return breakerBait;
+                }
+                return breaker;
+            }
 
             if (session.CurrentPhase == YgoConstants.PHASE_MAIN1 && session.TurnPlayer == prompt.playerId)
             {
@@ -702,6 +869,10 @@ namespace YGOPortable.AI
 
         private byte[] StartBattle(DuelSession session, DuelPrompt prompt)
         {
+            if (UsesTacticalRules && prompt.canEp &&
+                DuelCombat.ForcesReflectorTargets(session.Players[1 - prompt.playerId]) &&
+                !HasWorthwhileAttack(session, prompt.playerId))
+                return EndMainPhase(session, prompt);
             // An attacker cannot change its position after battle. Close a threatened lethal lane first.
             if (UsesTacticalRules && DuelTactics.ChooseDefensiveReposition(session, prompt, beforeBattle: true) is int defender)
                 return EncodeIdleAction(session, prompt, 2, defender);
@@ -776,7 +947,7 @@ namespace YGOPortable.AI
                 ?? PendulumTurnPlan.ChooseIdle(session, prompt, canUse);
         }
 
-        private bool CanActivate(DuelSession session, DuelPrompt prompt, SelectableCardItem item) =>
+        private bool CanActivate(DuelSession session, DuelPrompt prompt, SelectableCardItem item, bool projected = false) =>
             DuelAiPolicy.CanActivateRitual(session.Players[prompt.playerId], item) &&
             (!UsesTacticalRules ||
                 (!DuelAiPolicy.IsDrytronReleaseEffect(item.code) ||
@@ -784,7 +955,9 @@ namespace YGOPortable.AI
                 (item.code != DuelTactics.Accesscode || item.description != (((ulong)DuelTactics.Accesscode << 20) | 1) ||
                     CanPayForAccesscode(session.Players[prompt.playerId]))) &&
             SynchroTurnPlan.CanActivate(session, prompt, item) && (UsesTacticalRules
-                ? DuelTactics.CanActivate(session, prompt, item)
+                ? DuelTactics.CanActivate(session, prompt, item) &&
+                    (Difficulty != AIDifficulty.Master || DuelTactics.CanSpendBattleTrick(session, prompt, item) &&
+                        DuelTactics.CanSpendMasterInterruption(session, prompt, item, projected))
                 : !DuelTactics.IsTemporaryFieldNegation(item) || DuelTactics.CanSpendFieldNegation(session, prompt, item));
 
         private bool CanPayForAccesscode(PlayerFieldSnapshot own) => own.grave.Concat(own.mzone.Where(card =>
@@ -883,6 +1056,11 @@ namespace YGOPortable.AI
             return BitConverter.GetBytes((index << 16) | command);
         }
 
+        private static string BattleEffectKey(SelectableCardItem item) => $"bpact:{item.code}:{item.description}:{item.sequence}";
+
+        private int NextBattleEffect(DuelSession duel, DuelPrompt prompt) =>
+            prompt.activatable.FindIndex(item => CanActivate(duel, prompt, item) && !_effectCounts.ContainsKey(BattleEffectKey(item)));
+
         private byte[] BuildBattleCmd(DuelSession s, DuelPrompt p, bool fallback)
         {
             _battleActions++;
@@ -890,12 +1068,14 @@ namespace YGOPortable.AI
             _attackerSequence = uint.MaxValue;
             _plannedAttackTargetSequence = uint.MaxValue;
             bool canLeaveBattle = p.canM2 || p.canEp;
-            if (UsesTacticalRules && !fallback &&
-                DuelCombat.FindLethal(s, p, _comboProjection ? uint.MaxValue : previousAttacker) is { } lethal)
+            bool prepared = ReferenceEquals(_preparedBattlePrompt, p);
+            if (UsesTacticalRules && !fallback && (prepared ? _preparedBattleLethal :
+                DuelCombat.FindLethal(s, p, _comboProjection ? uint.MaxValue : previousAttacker)) is { } lethal)
             {
                 int attacker = lethal.Attacker;
                 if (_comboSearch != null && !_checkedDirectAttackOrder && lethal.Target == null &&
-                    DuelCombat.VerifyDirectAttackOrder(s, p, attacker, this) is int verified)
+                    (prepared ? _verifiedDirectAttacker :
+                        _skipSpeculation ? null : DuelCombat.VerifyDirectAttackOrder(s, p, attacker, this)) is int verified)
                 {
                     _checkedDirectAttackOrder = true;
                     attacker = verified;
@@ -907,18 +1087,12 @@ namespace YGOPortable.AI
             if (canLeaveBattle && (fallback || _battleActions > 25))
                 return BitConverter.GetBytes(p.canM2 ? 2 : 3);
 
-            if (p.activatable.Count > 0)
+            int effect = NextBattleEffect(s, p);
+            if (effect >= 0)
             {
-                for (int i = 0; i < p.activatable.Count; i++)
-                {
-                    var act = p.activatable[i];
-                    if (!CanActivate(s, p, act)) continue;
-                    string key = $"bpact:{act.code}:{act.description}:{act.sequence}";
-                    if (_effectCounts.ContainsKey(key)) continue;
-                    BumpKey(key);
-                    _attackerSequence = previousAttacker;
-                    return BitConverter.GetBytes((i << 16) | 0);
-                }
+                BumpKey(BattleEffectKey(p.activatable[effect]));
+                _attackerSequence = previousAttacker;
+                return BitConverter.GetBytes(effect << 16);
             }
 
             if (UsesTacticalRules)
@@ -929,7 +1103,8 @@ namespace YGOPortable.AI
                     DuelCombat.AllocateExtraBattleRemoval(s, p, index, previousAttacker) is { } allocation &&
                     // For the existing attacker, the target prompt can reject the alternative without changing the attack.
                     (_comboProjection || allocation.Attacker == index ||
-                        DuelCombat.VerifyAllocatedTarget(s, p, allocation.Attacker, allocation.Target)))
+                        (prepared ? _verifiedBattleTarget : !_skipSpeculation &&
+                            DuelCombat.VerifyAllocatedTarget(s, p, allocation.Attacker, allocation.Target))))
                 {
                     index = allocation.Attacker;
                     _plannedAttackTargetSequence = allocation.Target;
@@ -1121,7 +1296,7 @@ namespace YGOPortable.AI
         private int DecideEffectYesNo(DuelSession s, DuelPrompt p)
         {
             if (p.IsDirectAttackChoice) return _plannedAttackTargetSequence == uint.MaxValue ? 1 : 0;
-            if (UsesTacticalRules && !DuelTactics.CanActivate(s, p, new SelectableCardItem
+            if (UsesTacticalRules && !CanActivate(s, p, new SelectableCardItem
                 {
                     code = p.promptCardCode, controller = p.playerId, location = p.promptLoc, sequence = p.promptSeq,
                     description = p.promptEffectDesc != 0 ? p.promptEffectDesc : p.promptDesc,
@@ -1148,6 +1323,9 @@ namespace YGOPortable.AI
             }
 
             ulong hint = UsesTacticalRules ? p.SelectionHint : s.LastHintMsg;
+            if (UsesTacticalRules && Difficulty == AIDifficulty.Master &&
+                DuelTactics.ChooseBattleTrickTarget(s, p) is int combatTarget && combatTarget >= 0)
+                return PackIndexList(new[] { combatTarget });
             uint effect = SelectionEffect(s, p);
             if (UsesTacticalRules && effect == DuelTactics.Accesscode && hint == DuelTactics.Banish &&
                 p.min == 1 && p.max == 1 && p.candidates.Count != 0 && p.candidates.All(card => card.controller == p.playerId))
@@ -1333,6 +1511,9 @@ namespace YGOPortable.AI
             }
             if (p.candidates.Count > 0)
             {
+                if (UsesTacticalRules && Difficulty == AIDifficulty.Master &&
+                    DuelTactics.ChooseBattleTrickTarget(s, p) is int combatTarget && combatTarget >= 0)
+                    return PackTwoInts(1, combatTarget);
                 uint effect = SelectionEffect(s, p);
                 if (ShouldRankThemedMaterials(effect, p.SelectionHint) ||
                     (UsesTacticalRules && p.SelectionHint == DuelTactics.SendToGrave && effect == DuelTactics.ForbiddenDroplet))
@@ -1404,12 +1585,27 @@ namespace YGOPortable.AI
             if (keepRitualAces)
                 order = order.OrderByDescending(i => DuelTactics.SummonMaterialPriority(
                     s, p.playerId, p.candidates[i], effect, DuelTactics.Release));
+            else if (UsesTacticalRules)
+                order = order.OrderByDescending(i => DuelTactics.SelectionPriority(
+                    s, p.playerId, p.candidates[i], p.SelectionHint != 0 ? p.SelectionHint : 512));
             int[] indices = order.ToArray();
             if (keepRitualAces)
             {
                 var own = s.Players[p.playerId];
                 var reserveAce = indices.Where(i => !DuelAiPolicy.IsProtectedRitualMaterial(own, p.playerId, p.candidates[i])).ToArray();
                 if (reserveAce.Length != indices.Length && Select(reserveAce) is { } safe) return safe;
+            }
+            else if (UsesTacticalRules)
+            {
+                var own = s.Players[p.playerId];
+                var reserveFieldAce = indices.Where(i =>
+                {
+                    var cand = p.candidates[i];
+                    return cand.controller != p.playerId || cand.location != YgoConstants.LOCATION_MZONE ||
+                        cand.sequence >= own.mzone.Length || !DuelTactics.IsEstablishedFieldAce(own.mzone[cand.sequence]);
+                }).ToArray();
+                if (reserveFieldAce.Length > 0 && reserveFieldAce.Length != indices.Length && Select(reserveFieldAce) is { } safeSynchro)
+                    return safeSynchro;
             }
 
             return Select(indices) ?? PackIndexList(Enumerable.Range(0, Math.Min(n, Math.Max(1, minCnt))));
@@ -1595,11 +1791,12 @@ namespace YGOPortable.AI
             var own = s.Players[playerId];
             var rival = s.Players[opp];
             var oppMons = rival.mzone.Where(m => m != null).ToList();
+            bool forcedTargets = DuelCombat.ForcesReflectorTargets(rival);
             foreach (var m in own.mzone)
             {
                 if (m?.IsFaceUp != true || !m.IsAttack) continue;
                 if (oppMons.Count == 0 && DuelCombat.HasWorthwhileDirectAttack(m)) return true;
-                if (oppMons.Any(om => DuelCombat.HasFavorableBattle(m, om, own, rival))) return true;
+                if (oppMons.Any(om => DuelCombat.HasFavorableBattle(m, om, own, rival, forcedTargets))) return true;
             }
             return false;
         }

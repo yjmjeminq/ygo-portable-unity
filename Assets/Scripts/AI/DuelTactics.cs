@@ -5,7 +5,7 @@ using YGOPortable.Core;
 
 namespace YGOPortable.AI
 {
-    internal static class DuelTactics
+    internal static partial class DuelTactics
     {
         internal const ulong Release = 500, Discard = 501, Destroy = 502, Banish = 503, SendToGrave = 504,
             ReturnToHand = 505, AddToHand = 506, ReturnToDeck = 507, Negate = 575, ApplyTo = 577, ReturnToGrave = 579;
@@ -601,6 +601,7 @@ namespace YGOPortable.AI
             {
                 if (source.triggerLoc == YgoConstants.LOCATION_MZONE && source.triggerSeq < rival.mzone.Length &&
                     rival.mzone[source.triggerSeq] is { IsFaceUp: true, effectsDisabled: false } active && active.code == source.code &&
+                    !HasPendingFieldAnswer(duel, prompt.playerId, source.triggerPlayer, source.triggerLoc, source.triggerSeq, includeNegation: true) &&
                     (effect.code != InfiniteImpermanence || active.code != BlueEyesTyrant)) return true;
 
                 if (effect.code == InfiniteImpermanence && effect.location == YgoConstants.LOCATION_SZONE &&
@@ -958,14 +959,18 @@ namespace YGOPortable.AI
 
         internal static float ControlChainPriority(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
         {
-            if (DuelDeckStrategy.For(duel, prompt.playerId) == DuelDeckStyle.Development ||
-                duel.TurnPlayer == prompt.playerId || CardDatabase.Get(effect.code) is not CardInfo card ||
+            if (duel.TurnPlayer == prompt.playerId || CardDatabase.Get(effect.code) is not CardInfo card ||
                 !LinkComboPolicy.IsInteractive(card)) return 0;
+            bool isDevelopment = DuelDeckStrategy.For(duel, prompt.playerId) == DuelDeckStyle.Development;
             var target = duel.CurrentChain.LastOrDefault();
             if (target == null || target.triggerPlayer == prompt.playerId || target.negated)
-                return (prompt.hintTimingOther & (YgoConstants.TIMING_SPSUMMON | YgoConstants.TIMING_ATTACK)) == 0 ? -.65f : 0;
+            {
+                if (isDevelopment) return (prompt.hintTimingOther & (YgoConstants.TIMING_SPSUMMON | YgoConstants.TIMING_ATTACK)) != 0 ? .35f : 0f;
+                return (prompt.hintTimingOther & (YgoConstants.TIMING_SPSUMMON | YgoConstants.TIMING_ATTACK)) == 0 ? -.65f : 0f;
+            }
             uint effectTypes = CardDatabase.Get(target.code)?.DeckEffectCategories ?? 0;
-            return (effectTypes & Development) != 0 ? 1.1f : -.2f;
+            if ((effectTypes & Development) != 0) return 1.1f;
+            return isDevelopment ? 0f : -.2f;
         }
 
         private static bool HasReadyNegation(DuelSession duel, byte player, bool monsters)
@@ -1111,7 +1116,25 @@ namespace YGOPortable.AI
         {
             if (!ResponseNegates.Contains(response.code) || duel.CurrentChain.LastOrDefault() is not
                 { negated: false } source || source.triggerPlayer == prompt.playerId) return 0;
-            if (response.code == AshBlossom && source.code == OriginalSinfulSpoils) return 4f;
+            if (response.code == AshBlossom)
+            {
+                if (source.code is OriginalSinfulSpoils or MaxxC or DuelAiPolicy.BrandedFusion or DuelAiPolicy.FusionDestiny or
+                    55144522 or 79571449 or 8949584 or 98567237 or 34447918 or 93729896 or 96729612 or 13048472)
+                    return 4f;
+                if (source.code is Reinforcement or FossilDig or Tuning or Tenki or Terraforming or 60600126)
+                    return 2.6f;
+            }
+            if (response.code == CalledBy)
+            {
+                if (ComboSearch.IsHandDisruption(source.code) || source.code is DestroyerPhoenix or 2463794 or 60764609)
+                    return 3.5f;
+            }
+            if (response.code is EffectVeiler or InfiniteImpermanence)
+            {
+                if (source.code is Stratos or 27780618 or 62962630 or 86377375 or 92919429 or 86120751 or
+                    49867899 or 32909498 or 68304193 or 23893227 or 70534340 or 87746184)
+                    return 3.2f;
+            }
             uint categories = CardDatabase.Get(source.code)?.DeckEffectCategories ?? 0;
             return (categories & Development) != 0 ? 1.8f : 0f;
         }
@@ -1131,6 +1154,24 @@ namespace YGOPortable.AI
 
         internal static bool IsRemoval(ulong hint) => hint is Destroy or Banish or SendToGrave or ReturnToHand or
             ReturnToDeck or Negate or ReturnToGrave;
+
+        internal static bool HasPendingFieldAnswer(DuelSession duel, byte player, byte targetController, uint targetLocation,
+            uint targetSequence, bool includeNegation, bool skipSelectionLink = false)
+        {
+            const uint removal = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3);
+            foreach (var link in duel.CurrentChain)
+            {
+                if (link.triggerPlayer != player || link.negated || link.Resolved || link.PublicTargets == null ||
+                    skipSelectionLink && ReferenceEquals(link, duel.SelectionChainLink) ||
+                    CardDatabase.Get(link.code) is not { } card) continue;
+                uint relevant = removal | (includeNegation ? (1u << 8) : 0u);
+                if ((card.DeckEffectCategories & relevant) != 0 &&
+                    link.PublicTargets.Contains((targetController, targetLocation, targetSequence))) return true;
+            }
+            return false;
+        }
+
+        internal static bool IsResponseNegate(uint code) => ResponseNegates.Contains(code);
 
         internal static int? ChooseOption(DuelSession duel, DuelPrompt prompt)
         {
@@ -1179,6 +1220,11 @@ namespace YGOPortable.AI
                 YgoConstants.LOCATION_SZONE when option.sequence < side.szone.Length => side.szone[option.sequence],
                 _ => null,
             };
+            if (!own && live != null && IsRemoval(hint) &&
+                (hint == Negate && live.effectsDisabled ||
+                    HasPendingFieldAnswer(duel, player, option.controller, option.location, option.sequence,
+                        includeNegation: hint == Negate, skipSelectionLink: true)))
+                return -15000;
             bool visible = own || live?.IsFaceUp == true || option.location == YgoConstants.LOCATION_GRAVE;
             var card = visible ? CardDatabase.Get(option.code) : null;
             int attack = live != null && visible ? live.attack : card?.atk ?? 1000;
@@ -1218,13 +1264,85 @@ namespace YGOPortable.AI
                 int copies = side.hand.Count(candidate => candidate.code == option.code);
                 int score = -value + (copies > 1 ? 1400 : 0);
                 if (GraveyardBeneficiaries.Contains(option.code)) score += 3500;
+                else if (DuelAiPolicy.HasGraveyardValue(card)) score += 2400;
                 if (DuelDeckStrategy.For(duel, player) == DuelDeckStyle.Lock && DuelDeckStrategy.IsKeyPiece(option.code))
                     score -= 9000;
                 if (option.location == YgoConstants.LOCATION_HAND && ProtectInHand.Contains(option.code) && copies <= 1)
                     score -= 2500;
-                if (card != null && card.IsMonster && !card.IsExtra && card.level >= 5)
+                if (option.location == YgoConstants.LOCATION_DECK && ProtectInHand.Contains(option.code))
+                    score -= 3500;
+                if (card != null && card.IsMonster && !card.IsExtra && card.level >= 5 && !DuelAiPolicy.CanSelfSpecialFromHand(card))
                     score += 800;
                 return score;
+            }
+            // Universal smart deck-search ranking (hint == AddToHand):
+            // Prioritize missing combo spells, playable starters/extenders, Synchro/Ritual missing halves,
+            // and avoid searching unplayable high-level bricks just because they have high printed ATK.
+            if (hint == AddToHand && own && option.location == YgoConstants.LOCATION_DECK && card != null)
+            {
+                bool alreadyInHand = side.hand.Any(h => h.code == option.code);
+                uint cats = card.DeckEffectCategories;
+                int searchScore = 10000 + (alreadyInHand ? -900 : 1200);
+                if (card.IsSpell || card.IsTrap)
+                {
+                    if ((cats & (Development | (1u << 4))) != 0) searchScore += 3200;
+                    else if ((cats & ((1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 8))) != 0) searchScore += 1800;
+                    else searchScore += 900;
+                    bool isRitualSpell = (card.type & YgoConstants.TYPE_RITUAL) != 0;
+                    if (isRitualSpell && side.hand.Any(h => (CardDatabase.Get(h.code)?.type & YgoConstants.TYPE_RITUAL) != 0 &&
+                        CardDatabase.Get(h.code)?.IsMonster == true))
+                        searchScore += 2600;
+                }
+                else if (card.IsMonster)
+                {
+                    bool isRitual = (card.type & YgoConstants.TYPE_RITUAL) != 0;
+                    bool isTuner = (card.type & YgoConstants.TYPE_TUNER) != 0;
+                    bool selfSpecial = DuelAiPolicy.CanSelfSpecialFromHand(card);
+                    if (isRitual)
+                    {
+                        bool hasRitualSpell = side.hand.Any(h => CardDatabase.Get(h.code) is { IsSpell: true } sp &&
+                            (sp.type & YgoConstants.TYPE_RITUAL) != 0);
+                        searchScore += hasRitualSpell ? 2800 : 800;
+                    }
+                    else if (card.level <= 4 || selfSpecial)
+                    {
+                        searchScore += (cats & Development) != 0 ? 2700 : 1200;
+                        if (selfSpecial) searchScore += 700;
+                    }
+                    else
+                    {
+                        // Penalize unplayable Level 5+ bricks unless they have a hand/GY engine effect
+                        // or are an iconic theme signature material (Blue-Eyes, Dark Magician, Neos, Yubel, Kashtira).
+                        bool iconicSignature = option.code is 89631139 or 46986414 or 38033120 or 89943723 or
+                            74677422 or 70095154 or 78371393 or 90829280 or 32909498 or 68304193;
+                        searchScore += iconicSignature ? 1400 : (cats & Development) != 0 ? 400 : -1600;
+                    }
+                    if (ComboSearch.IsHandDisruption(option.code)) searchScore += 1300;
+                    // Synchro missing-half synergy (Tuner <-> non-Tuner)
+                    bool fieldHasTuner = side.mzone.Any(m => m is { IsFaceUp: true } && (m.type & YgoConstants.TYPE_TUNER) != 0);
+                    bool fieldHasNonTuner = side.mzone.Any(m => m is { IsFaceUp: true } && (m.type & (YgoConstants.TYPE_TUNER | YgoConstants.TYPE_LINK | YgoConstants.TYPE_XYZ)) == 0);
+                    if (fieldHasTuner && !fieldHasNonTuner && !isTuner && (card.level <= 4 || selfSpecial)) searchScore += 1300;
+                    else if (fieldHasNonTuner && !fieldHasTuner && isTuner && (card.level <= 4 || selfSpecial)) searchScore += 1300;
+                    searchScore += Math.Min(1200, Math.Max(0, card.atk) / 3);
+                }
+                return searchScore;
+            }
+            // Universal smart Special Summon / GY Revival / Deck Recruit ranking (hint == 509):
+            if (hint == 509 && own && card != null)
+            {
+                int ssScore = 10000 + value;
+                if (LinkComboPolicy.IsInteractive(card)) ssScore += 1400;
+                if ((card.DeckEffectCategories & (1u << 8)) != 0) ssScore += 1200;
+                if ((card.DeckEffectCategories & Development) != 0) ssScore += 900;
+                return ssScore;
+            }
+            if (own && hint is Release or 511 or 512 or 513 or 533)
+            {
+                int matScore = -5000 - value;
+                if (live != null && IsEstablishedFieldAce(live)) matScore -= 8000;
+                if (live != null && (live.type & YgoConstants.TYPE_TOKEN) != 0) matScore += 1500;
+                if (DuelAiPolicy.HasGraveyardValue(card)) matScore += 1200;
+                return matScore;
             }
             if (IsRemoval(hint) || hint is Release or 511 or 512 or 513 or 533)
                 return own ? -5000 - value : 10000 + value;
@@ -1232,6 +1350,7 @@ namespace YGOPortable.AI
         }
 
         internal static bool IsEstablishedFieldAce(LiveCardState card) => card != null &&
+            card.code is not (DuelAiPolicy.Albion or DuelAiPolicy.Lubellion or Sunrise or 49867899 or 2463794) &&
             (DuelAiPolicy.IsEstablishedRitualAce(card) ||
                 card.code is 80453041 or 87182127 or 1948619 || card.attack >= 2500 ||
                 CardDatabase.Get(card.code) is { IsExtra: true } info &&
@@ -1431,9 +1550,11 @@ namespace YGOPortable.AI
         internal static int? ChooseDefensiveReposition(DuelSession duel, DuelPrompt prompt, bool beforeBattle = false)
         {
             int opponent = 1 - prompt.playerId;
-            int threat = StrongestAttacker(duel.Players[opponent]);
+            var rival = duel.Players[opponent];
+            int threat = StrongestAttacker(rival);
             if (!beforeBattle) threat = Math.Max(threat, duel.PotentialReturningAttack(opponent));
-            if (threat <= 0) return null;
+            bool rivalCanSummon = !beforeBattle && (rival.hand.Count > 0 || rival.szone.Any(c => c != null));
+            if (threat <= 0 && !rivalCanSummon) return null;
             var own = duel.Players[prompt.playerId];
             if (beforeBattle && StrongestAttacker(own) >= threat) return null;
             for (int i = 0; i < prompt.repositionable.Count; i++)
@@ -1442,9 +1563,13 @@ namespace YGOPortable.AI
                 if (option.controller != prompt.playerId || option.sequence >= own.mzone.Length)
                     continue;
                 var card = own.mzone[option.sequence];
+                if (card?.IsFaceUp != true || !card.IsAttack || (card.type & YgoConstants.TYPE_LINK) != 0)
+                    continue;
                 // Defense Position can protect LP even when the monster will still be destroyed.
-                if (card?.IsFaceUp == true && card.IsAttack && (card.type & YgoConstants.TYPE_LINK) == 0 &&
-                    card.attack < threat && (!beforeBattle || threat - Math.Max(0, card.attack) >= own.lp))
+                if (threat > 0 && card.attack < threat && (!beforeBattle || threat - Math.Max(0, card.attack) >= own.lp))
+                    return i;
+                // Even into an empty board, don't leave a fragile <= 1200 ATK starter exposed in Attack Position.
+                if (rivalCanSummon && card.attack <= 1200 && card.defense >= card.attack)
                     return i;
             }
             return null;

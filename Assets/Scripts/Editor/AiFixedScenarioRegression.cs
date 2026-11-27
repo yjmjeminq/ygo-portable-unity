@@ -21,7 +21,11 @@ namespace YGOPortable.Editor
     /// </summary>
     public static class AiFixedScenarioRegression
     {
-        [Serializable] private sealed class FilePin { public string path, sha256, alternateSha256; }
+        [Serializable] private sealed class FilePin
+        {
+            public string path, sha256, alternateSha256;
+            public string[] compatibleSha256;
+        }
         [Serializable] private sealed class Manifest
         {
             public int schemaVersion;
@@ -119,7 +123,8 @@ namespace YGOPortable.Editor
                         pin.path.EndsWith(".json", StringComparison.Ordinal);
                     string actual = Hash(file, normalizeFixtureLines: fixture);
                     Require(string.Equals(actual, pin.sha256, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(actual, pin.alternateSha256, StringComparison.OrdinalIgnoreCase),
+                        string.Equals(actual, pin.alternateSha256, StringComparison.OrdinalIgnoreCase) ||
+                        pin.compatibleSha256?.Contains(actual, StringComparer.OrdinalIgnoreCase) == true,
                         $"Pinned native/card/fixture data changed: {pin.path}; expected {pin.sha256}, actual {actual}.");
                 }
                 report.fixtureManifestSha256 = Hash(manifestPath);
@@ -362,6 +367,8 @@ namespace YGOPortable.Editor
                     byte[] answer = pilot[prompt.playerId].ComputeResponse(duel, prompt);
                     double computeMs = computeClock.Elapsed.TotalMilliseconds;
                     Require(answer?.Length > 0, "Smart AI returned no native response.");
+                    Require(!AiBattleProbe.TryFindDecisionBlunder(duel, prompt, answer, out var blunder, out uint offendingCode),
+                        $"AI blunder {blunder}, card={offendingCode}, turn={duel.TurnNumber}, phase={duel.CurrentPhase}.");
                     gate.Choice(duel, prompt, answer, result.liveResponses);
                     var accepted = Row(duel, prompt, answer, fixture.resume + result.liveResponses, false);
                     accepted.planMs = planMs;
