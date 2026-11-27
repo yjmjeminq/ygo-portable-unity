@@ -93,6 +93,7 @@ namespace YGOPortable.UI
             private StoryDialogueLine[] _dialogue;
             private Action _onEnd;
             private Action _onSkip;
+            private Action<int> _onPage;
             private Func<string> _summary;
             private StoryChoice[] _choices;
             private Action<int> _confirmDeck;
@@ -138,6 +139,7 @@ namespace YGOPortable.UI
             private Action _branch;
             private bool _waitingBranch;
             private bool IsGxDialogue => _rpg && _rpgAssetFolder == "GX";
+            private bool IsBeyondDestinyDialogue => _onPage != null && _rpgAssetFolder == BeyondDestinyCampaign.AssetFolder;
 
             internal bool IsOpen => _root.activeSelf;
             internal GameObject ActiveRoot => _logRoot.activeSelf ? _logRoot : _pickerRoot.activeSelf ? _pickerRoot :
@@ -297,7 +299,8 @@ namespace YGOPortable.UI
                 string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
                 string preferredRpgBackdrop = null, int rpgEpisode = 0,
                 int playAsCharacterId = 0, string rpgAssetFolder = null,
-                string originalProtagonist = null, string opponentName = null, bool waitForOpponentGreeting = false)
+                string originalProtagonist = null, string opponentName = null, bool waitForOpponentGreeting = false,
+                Action<int> onPage = null)
             {
                 Close();
                 _field = field;
@@ -351,6 +354,8 @@ namespace YGOPortable.UI
                 _dialogue = lines;
                 _onEnd = onEnd;
                 _onSkip = onSkip;
+                _onPage = onPage;
+                _stage.color = IsBeyondDestinyDialogue ? new Color(.88f, .92f, .98f) : new Color(.60f, .67f, .77f);
                 _root.SetActive(true);
                 _readThrough = 0;
                 BindLine(0);
@@ -417,6 +422,7 @@ namespace YGOPortable.UI
                 _advanceTime = float.NegativeInfinity;
                 _onEnd = null;
                 _onSkip = null;
+                _onPage = null;
                 _choices = null;
                 _summary = null;
                 _branch = null;
@@ -627,7 +633,7 @@ namespace YGOPortable.UI
                 _index = index;
                 _readThrough = Math.Max(_readThrough, index);
                 var line = _dialogue[index];
-                bool showSceneTime = IsGxDialogue && !string.IsNullOrWhiteSpace(line.sceneTime);
+                bool showSceneTime = (IsGxDialogue || IsBeyondDestinyDialogue) && !string.IsNullOrWhiteSpace(line.sceneTime);
                 _sceneTimeBadge.gameObject.SetActive(showSceneTime);
                 _sceneTime.text = showSceneTime ? line.sceneTime : string.Empty;
                 if (showSceneTime) _sceneTimeBadge.alpha = Application.isPlaying ? 0f : 1f;
@@ -657,7 +663,15 @@ namespace YGOPortable.UI
                 _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
                 if (_rpg && _field == null)
                     SetSprite(_stage, (line.SceneMapPath is string map ? LoadRpgSprite(map) : null) ?? _defaultRpgStage);
-                if (_rpg)
+                if (IsBeyondDestinyDialogue)
+                {
+                    ShowBust(_hero, _heroPrevious, LoadStoryPortrait(line.storyHeroPortrait), ref _heroFade, ref _heroSlide);
+                    ShowBust(_opponent, _opponentPrevious, LoadStoryPortrait(line.storyGuestPortrait),
+                        ref _opponentFade, ref _opponentSlide);
+                    _opponentSpeaking = !narration && !_heroSpeaking && line.storyGuestPortrait != null;
+                    _speakerUsesPaintedExpression = true;
+                }
+                else if (_rpg)
                 {
                     if (_heroSpeaking || _hero.sprite == null)
                         ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
@@ -688,6 +702,7 @@ namespace YGOPortable.UI
                 _visible = 0;
                 _previous.interactable = index > 0;
                 RefreshStageCaption();
+                if (playStageMotion) _onPage?.Invoke(index);
             }
 
             private void Reveal(int count)
@@ -1098,6 +1113,9 @@ namespace YGOPortable.UI
                     LoadBust($"Standing/full_{key}", emotion);
             }
 
+            private Sprite LoadStoryPortrait(string stem) =>
+                stem == null ? null : LoadRpgSprite(stem + ".png", waistUp: true);
+
             private Sprite LoadBust(string stem, string emotion)
             {
                 return LoadExpression(stem, emotion) ?? LoadRpgSprite(stem + ".png", waistUp: true);
@@ -1112,7 +1130,7 @@ namespace YGOPortable.UI
                 bool continuing = _showCutscene;
                 _showCutscene = false;
                 if (string.IsNullOrEmpty(id) || id.Any(c => !char.IsLetterOrDigit(c) && c != '_' && c != '-')) return;
-                var picture = LoadRpgSprite($"Cutscenes/{id}.{(_rpgAssetFolder == "GX" ? "png" : "jpg")}");
+                var picture = LoadRpgSprite($"Cutscenes/{id}.{(IsGxDialogue || IsBeyondDestinyDialogue ? "png" : "jpg")}");
                 if (picture == null) return;
                 if (_cutsceneImage.sprite != picture)
                 {
@@ -1158,6 +1176,7 @@ namespace YGOPortable.UI
                             var rect = new Rect(0f, 0f, texture.width, texture.height);
                             sprite = waistUp ? RpgDialoguePortrait.Crop(texture, rect, Path.GetFileNameWithoutExtension(name)) :
                                 Sprite.Create(texture, rect, Vector2.one * .5f, 100f, 0, SpriteMeshType.FullRect);
+                            if (IsBeyondDestinyDialogue && sprite != null) sprite.name = Path.GetFileNameWithoutExtension(name);
                             if (waistUp && sprite.texture == texture) texture.Apply(false, true);
                         }
                     }

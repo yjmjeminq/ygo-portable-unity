@@ -6,7 +6,8 @@
       "path": "Maps/spot_neodomino_rain_alley.png",
       "backgroundKeys": [
         "beyond_destiny_ep_01_scene_01_bg_1",
-        "beyond_destiny_ep_01_scene_02_bg_1"
+        "beyond_destiny_ep_01_scene_02_bg_1",
+        "beyond_destiny_ep_14_scene_05_bg_1"
       ],
       "source": "ImageGen built-in",
       "resolution": [
@@ -57,7 +58,9 @@
         "beyond_destiny_ep_10_scene_02_bg_1",
         "beyond_destiny_ep_10_scene_03_bg_1",
         "beyond_destiny_ep_10_scene_05_bg_1",
-        "beyond_destiny_ep_32_scene_03_bg_1"
+        "beyond_destiny_ep_32_scene_03_bg_1",
+        "beyond_destiny_ep_06_scene_04_bg_1",
+        "beyond_destiny_ep_06_scene_05_bg_1"
       ],
       "source": "ImageGen built-in",
       "resolution": [
@@ -141,7 +144,8 @@
         "beyond_destiny_ep_24_scene_03_bg_1",
         "beyond_destiny_ep_24_scene_04_bg_1",
         "beyond_destiny_ep_24_scene_05_bg_1",
-        "beyond_destiny_ep_32_scene_02_bg_1"
+        "beyond_destiny_ep_32_scene_02_bg_1",
+        "beyond_destiny_ep_22_scene_03_bg_1"
       ],
       "source": "ImageGen built-in",
       "resolution": [
@@ -315,6 +319,176 @@
         941
       ],
       "prompt": "Illustration-story, original Beyond Destiny game background art. Commercial hand-painted Korean animation environment with sober clean linework and realistic layered spaces, slightly elevated three-quarter 2.5D game camera, fully drawn full-bleed 16:9. Leave the foreground floor for SD staging and keep objects physically consistent. Restrained color and distinctive setting lighting. No main figures, text, watermark, HUD, frames, or existing game level recreation. Quiet private hospital room across the same hospital corridor. Pale clean wood, large windows with yellow early sunlight through horizontal blinds, simple unoccupied medical bed positioned back-right, rail and monitor tucked in place, open central floor reflecting the daylight. Contemplative and restrained. No body or injury depiction."
+    },
+    {
+      "path": "Maps/spot_satellite_violet_ruins.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_16_scene_05_bg_1",
+        "beyond_destiny_ep_17_scene_01_bg_1",
+        "beyond_destiny_ep_17_scene_02_bg_1",
+        "beyond_destiny_ep_18_scene_01_bg_1",
+        "beyond_destiny_ep_18_scene_02_bg_1",
+        "beyond_destiny_ep_18_scene_03_bg_1",
+        "beyond_destiny_ep_18_scene_04_bg_1",
+        "beyond_destiny_ep_18_scene_05_bg_1",
+        "beyond_destiny_ep_19_scene_01_bg_1",
+        "beyond_destiny_ep_19_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Original Beyond Destiny 2.5D map, widescreen 16:9 hand-painted Korean cinematic animation background. Fine clean outlines and painted volumetric light, realistic proportions and surface materials, slightly elevated camera. Open contiguous walkable floor spans the lower half where possible for variable-size SD character staging. Consistent visual language of a futuristic coastal city. No main figures, text, HUD, logos, copied game art, or borders. A ruined coastal industrial suburb at night. Jagged cut basalt and broken concrete flyovers form a narrow but continuous walkway from foreground diagonally into middle ground. Distant half-collapsed refinery and four distinctive dark control towers. Thick pale violet fog lit from sparse pools of unnatural purple fire well away from the open path. Very subtle dark storm clouds, a few red warning lights and crumbling warehouse structures, original project setting."
+    },
+    {
+      "path": "Maps/spot_old_moment_plaza.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_20_scene_01_bg_1",
+        "beyond_destiny_ep_20_scene_03_bg_1",
+        "beyond_destiny_ep_20_scene_04_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Original Beyond Destiny 2.5D map, widescreen 16:9 hand-painted Korean cinematic animation background. Fine clean outlines and painted volumetric light, realistic proportions and surface materials, slightly elevated camera. Open contiguous walkable floor spans the lower half where possible for variable-size SD character staging. Consistent visual language of a futuristic coastal city. No main figures, text, HUD, logos, copied game art, or borders. A vast abandoned industrial reactor plaza in the ruined side of an original futuristic coastal city; gigantic vertical round fusion containment columns, empty basalt paving and segmented steel conduits, a far-off brilliant white-gold beam emerging at the core through dark storm clouds. Low warm orange reflections mingle with cold titanium blue. No recognizable monsters. Solid traversable paving lower half."
+    },
+    {
+      "path": "Maps/spot_daedalus_bridge_rain.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_15_scene_01_bg_1",
+        "beyond_destiny_ep_15_scene_02_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Original Beyond Destiny 2.5D map, widescreen 16:9 hand-painted Korean cinematic animation background. Fine clean outlines and painted volumetric light, realistic proportions and surface materials, slightly elevated camera. Open contiguous walkable floor spans the lower half where possible for variable-size SD character staging. Consistent visual language of a futuristic coastal city. No main figures, text, HUD, logos, copied game art, or borders. An almost empty elevated bridge over black water far outside a futuristic coastal city at drizzly night. A concrete pedestrian service lane spans the lower frame, angled toward an isolated working amber streetlamp and steel cable railings. Across the dark water a distinct distant city silhouette blurred by rain and lavender fog. Silver rain, asphalt and pavers damp. No vehicles."
+    },
+    {
+      "path": "Maps/spot_daedalus_bridge_dawn.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_20_scene_05_bg_1",
+        "beyond_destiny_ep_37_scene_01_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Original Beyond Destiny 2.5D map, widescreen 16:9 hand-painted Korean cinematic animation background. Fine clean outlines and painted volumetric light, realistic proportions and surface materials, slightly elevated camera. Open contiguous walkable floor spans the lower half where possible for variable-size SD character staging. Consistent visual language of a futuristic coastal city. No main figures, text, HUD, logos, copied game art, or borders. A broad long sweeping monumental white cable-stayed bridge joining two rebuilt sides of a futuristic coastal Japanese city, serene blue sky at gold sunrise, golden sun glazing the steel horizon. A clear open lower pedestrian service lane, understated elegant railings. Far mist softens modern city towers, inviting restrained hope and peace. No vehicles or figures."
+    },
+    {
+      "path": "Maps/spot_epilogue_apartment.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_37_scene_01_bg_2",
+        "beyond_destiny_ep_37_scene_02_bg_1",
+        "beyond_destiny_ep_37_scene_03_bg_1",
+        "beyond_destiny_ep_37_scene_04_bg_1",
+        "beyond_destiny_ep_37_scene_05_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Original Beyond Destiny 2.5D map, widescreen 16:9 hand-painted Korean cinematic animation background. Fine clean outlines and painted volumetric light, realistic proportions and surface materials, slightly elevated camera. Open contiguous walkable floor spans the lower half where possible for variable-size SD character staging. Consistent visual language of a futuristic coastal city. No main figures, text, HUD, logos, copied game art, or borders. Sunlit modern Korean apartment living room with a city and coastal bridge panorama through broad rear windows. Open-plan wood floor and calm cream walls, a mist-blue sofa and low table with closed blank-cover study books neatly off to left, simple white-oak dining table and kitchen worktop on right, clean foreground walking floor. Warm golden afternoon reflecting off satin finished natural wood, lived-in but tidy. Fully architectural background, no residents or text."
+    },
+    {
+      "path": "Maps/spot_city_overlook.png",
+      "backgroundKeys": [
+        "beyond_destiny_ep_23_scene_02_bg_1",
+        "beyond_destiny_ep_23_scene_03_bg_1",
+        "beyond_destiny_ep_23_scene_04_bg_1",
+        "beyond_destiny_ep_26_scene_03_bg_1"
+      ],
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Original Beyond Destiny 2.5D map, widescreen 16:9 hand-painted Korean cinematic animation background. Fine clean outlines and painted volumetric light, realistic proportions and surface materials, slightly elevated camera. Open contiguous walkable floor spans the lower half where possible for variable-size SD character staging. Consistent visual language of a futuristic coastal city. No main figures, text, HUD, logos, copied game art, or borders. A quiet elevated coastal overlook above a futuristic city at deep blue night. Old wood-and-steel public bench to middle right, a single warm amber street lamp, wet low stone paving with a broad safe open walking floor across lower frame, low railing at edge, cool hazy skyline and bay below. Delicate light reflections and a few crisp stars, atmosphere of intimate calm without figures."
+    }
+  ],
+  "characters": [
+    {
+      "path": "Characters_Standing/hero.png",
+      "actor": "hero",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case illustration-story, full-length transparent 8-head visual novel standing sprite for original Beyond Destiny. Original adult Korean man, named Yun, age 24, lean medium-tall athletic build, short tousled jet-black hair with soft right-side part and exactly one small curved fringe strand at left brow, charcoal gray eyes, unsmiling and observant, slate-gray shirt beneath long weathered black raincoat with slim muted aubergine interior lining, dark cargo trousers, close-cut black leather boots, plain black fingerless gloves, subtle pale barcode-shaped healed burn scar visible just below left collarbone, no writing or graphic injury. Entire hair, arms, coat sides and shoe soles inside canvas with modest breathing room, 3/4 turned slightly camera-right, one relaxed hand holding edge of coat. Clean premium Korean animation art, gentle cell shading in muted steel blue and gray, neutral subtle ambient edge light suitable to composite on many settings. Crisp transparent edge, truly transparent empty background. No panels, logos, letters, weapons, scene behind him, or copying any existing comic, anime, or videogame character."
+    },
+    {
+      "path": "Characters_SD/hero.png",
+      "actor": "hero",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "prompt": "Use case illustration-story, 2.5D exploration game sprite sheet, genuinely transparent RGBA. Original adult Korean man, named Yun, age 24, lean medium-tall athletic build, short tousled jet-black hair with soft right-side part and exactly one small curved fringe strand at left brow, charcoal gray eyes, unsmiling and observant, slate-gray shirt beneath long weathered black raincoat with slim muted aubergine interior lining, dark cargo trousers, close-cut black leather boots, plain black fingerless gloves, subtle pale barcode-shaped healed burn scar visible just below left collarbone, no writing or graphic injury. Adapt into a finely illustrated compact 3.2-head SD field character with unmistakable matching silhouette and hairstyle. Precisely 3 columns by 4 rows, equal transparent gutters and all sprites separate inside their cell. Row 1 front with idle, step left, step right. Row 2 left profile with idle, step left, step right. Row 3 right profile with idle, step left, step right. Row 4 rear with idle, step left, step right. Preserve model/same boots coat length between cells. Feet align at bottom of each cell with transparent margins. Clean anime watercolor and strong leg separation. No scene, text, guide lines, shadows, bounding boxes, accessories, or watermark.",
+      "grid": [
+        3,
+        4
+      ]
+    },
+    {
+      "path": "Characters_Standing/aki.png",
+      "key": "aki_clean",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Edit the supplied original Beyond Destiny standing sprite. Remove just the dark red facial visor so we can see both eyes, face and brow. Give her two naturally symmetrical dark rose-amber eyes, a reserved alert expression, and natural facial features, no blush, no overlay or effects. Preserve the very same full-body subject proportions, short asymmetrical wine-red bob haircut, coat and silver leaf-shaped clasps, color palette, gloves, boots and pose. Retain genuinely transparent clean alpha outside the silhouette without any translucent haze or gradient. Preserve adequate margins above the hair and below the soles."
+    },
+    {
+      "path": "Characters_Standing/aki_masked.png",
+      "key": "aki_masked",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Original Beyond Destiny game illustration, Korean commercial animation with clean subtle linework, dimensional believable anime anatomy and brushed cel shading, restrained dark neutral values. Keep face and full shoes inside the canvas, generous transparent margin top and bottom. No text, watermark, logos, or copied commercial character asset. Full-body 8-head standing sprite, genuinely transparent RGBA, slight three-quarter turn facing screen-left. Adult woman Aki, around 21, dark red wine-colored hair swept into a neck-length asymmetric bob with a single narrow longer strand beside the jaw, rose-amber eyes, slim athletic build. High charcoal collar and fitted long asymmetric oxblood coat with a split coat-tail and understated curved leaf-stitch silver buckles, cream undershirt, plain fitted black pants and oxblood boots. An original smooth red ceramic eye-and-brow visor mask with faceted silver edge and restrained dark rose foliate engraving, lower face exposed and composed, soft black hood swept back enough to read the hair silhouette. Same proportions and silhouette as the unmasked design."
+    },
+    {
+      "path": "Characters_Standing/arcadia_member.png",
+      "key": "arcadia_member",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Original Beyond Destiny game illustration, Korean commercial animation with clean subtle linework, dimensional believable anime anatomy and brushed cel shading, restrained dark neutral values. Keep face and full shoes inside the canvas, generous transparent margin top and bottom. No text, watermark, logos, or copied commercial character asset. Full-body 8-head standing sprite with actual transparent RGBA. An adult East Asian male junior agent of a clandestine fictional research facility, swept-back ash black medium-short hair, tired worried gray eyes, rumpled rain-damp tailored charcoal business suit, thin black necktie over an ivory shirt, short rain-gloss dress boots. Side-facing three-quarter pose with shoulders tense, palms slightly open, no weapon, no injuries. Feet grounded, full silhouette visible."
+    }
+  ],
+  "cutscenes": [
+    {
+      "path": "Cutscenes/ep01_backlash.png",
+      "key": "ep01_backlash",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Widescreen full-bleed original Korean animation event CG in a rain-soaked abandoned steel warehouse at night. Yun, adult Korean man age 24, lean athletic, short tousled black side-parted hair, charcoal gray eyes, weathered long black raincoat with dull purple lining, charcoal shirt, black gloves and a subtle healed pale scar near the left collarbone. Facing him is Adult woman Aki, around 21, dark red wine-colored hair swept into a neck-length asymmetric bob with a single narrow longer strand beside the jaw, rose-amber eyes, slim athletic build. High charcoal collar and fitted long asymmetric oxblood coat with a split coat-tail and understated curved leaf-stitch silver buckles, cream undershirt, plain fitted black pants and oxblood boots. She wears an original faceted dark carmine ceramic eye visor. Over shoulder oblique camera, both characters fully visible from waist up near opposite sides of frame. The air between them forms a suspended swirl of rain droplets and elegant ribbon-like violet light curving away from the protagonists; sparse carmine thorn-like holographic traces in far warehouse rafters. Cinematic ambient cool blue and amber edged light with readable faces, no actual weapon or visible injury, no captions, no HUD, no text, no copied game asset."
+    },
+    {
+      "path": "Cutscenes/ep02_bandage.png",
+      "key": "ep02_bandage",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "A widescreen original Beyond Destiny narrative event CG, restrained commercial Korean anime illustration with realistic anatomy. Private dim retro-futuristic stadium waiting room, cool shaft of light from corridor, polished concrete and dark lockers in soft focus. A young adult woman with an asymmetric neck-length wine-red bob, wary rose-amber eyes and high charcoal collar oxblood long coat with silver leaf clasps carefully wraps an ivory cloth bandage around the palm of adult Korean man Yun seated beside her, lean adult with short tousled black side-parted hair and worn black coat with subtle aubergine lining. Focus on the artfully held hands and their quiet expressions, show both heads clearly and no visible gore, use believable fingers and cloth tension. Cool cyan edge light, one amber reflection, no words, no frame, no logos or copied commercial assets."
     }
   ]
 }

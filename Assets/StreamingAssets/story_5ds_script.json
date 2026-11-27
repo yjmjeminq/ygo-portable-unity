@@ -1204,7 +1204,7 @@
       "beyond_destiny_ep_37_scene_05_sfx_1": "보글보글... (스튜 끓는 소리), 주방에서 들려오는 아키와 셰리의 유쾌한 웃음소리"
     }
   },
-  "mappedBackgrounds": 105,
+  "mappedBackgrounds": 135,
   "episodes": [
     {
       "id": "beyond_destiny_ep_01",
@@ -6576,7 +6576,8 @@
               "text": "피트 출구로 향하는 어두운 통로 경계.",
               "key": "beyond_destiny_ep_06_scene_04_bg_1",
               "line": 134,
-              "source": "* BG: 피트 출구로 향하는 어두운 통로 경계.\n"
+              "source": "* BG: 피트 출구로 향하는 어두운 통로 경계.\n",
+              "assetPath": "Maps/spot_kaiba_dome_corridor.png"
             },
             {
               "kind": "music",
@@ -6658,7 +6659,8 @@
               "line": 162,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_kaiba_dome_corridor.png"
         },
         {
           "id": "beyond_destiny_ep_06_scene_05",
@@ -6678,7 +6680,8 @@
               "text": "지하 피트 복도. 주인공의 그림자가 길게 늘어진다.",
               "key": "beyond_destiny_ep_06_scene_05_bg_1",
               "line": 165,
-              "source": "* BG: 지하 피트 복도. 주인공의 그림자가 길게 늘어진다.\n"
+              "source": "* BG: 지하 피트 복도. 주인공의 그림자가 길게 늘어진다.\n",
+              "assetPath": "Maps/spot_kaiba_dome_corridor.png"
             },
             {
               "kind": "music",
@@ -6761,7 +6764,8 @@
               "line": 184,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_kaiba_dome_corridor.png"
         }
       ]
     },
@@ -13328,7 +13332,8 @@
               "text": "부슬비가 내리기 시작하는 어두운 뒷골목. 가로등 불빛 아래 빗방울이 은빛으로 흩날린다.",
               "key": "beyond_destiny_ep_14_scene_05_bg_1",
               "line": 149,
-              "source": "* BG: 부슬비가 내리기 시작하는 어두운 뒷골목. 가로등 불빛 아래 빗방울이 은빛으로 흩날린다.\n"
+              "source": "* BG: 부슬비가 내리기 시작하는 어두운 뒷골목. 가로등 불빛 아래 빗방울이 은빛으로 흩날린다.\n",
+              "assetPath": "Maps/spot_neodomino_rain_alley.png"
             },
             {
               "kind": "music",
@@ -13398,7 +13403,8 @@
               "line": 167,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_neodomino_rain_alley.png"
         }
       ]
     },
@@ -13429,7 +13435,8 @@
               "text": "비가 내리는 한적한 외곽 고가다리. 멀리 시티의 화려한 불빛이 빗물 너머로 희미하게 보이고, 앞쪽으로는 어두운 황무지와 새틀라이트 방면의 도로가 뻗어 있다.",
               "key": "beyond_destiny_ep_15_scene_01_bg_1",
               "line": 11,
-              "source": "* BG: 비가 내리는 한적한 외곽 고가다리. 멀리 시티의 화려한 불빛이 빗물 너머로 희미하게 보이고, 앞쪽으로는 어두운 황무지와 새틀라이트 방면의 도로가 뻗어 있다.\n"
+              "source": "* BG: 비가 내리는 한적한 외곽 고가다리. 멀리 시티의 화려한 불빛이 빗물 너머로 희미하게 보이고, 앞쪽으로는 어두운 황무지와 새틀라이트 방면의 도로가 뻗어 있다.\n",
+              "assetPath": "Maps/spot_daedalus_bridge_rain.png"
             },
             {
               "kind": "music",
@@ -13503,7 +13510,8 @@
               "line": 39,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_daedalus_bridge_rain.png"
         },
         {
           "id": "beyond_destiny_ep_15_scene_02",
@@ -13523,7 +13531,8 @@
               "text": "비 내리는 고가다리 중앙. 가로등 불빛 아래 마주 선 두 사람.",
               "key": "beyond_destiny_ep_15_scene_02_bg_1",
               "line": 42,
-              "source": "* BG: 비 내리는 고가다리 중앙. 가로등 불빛 아래 마주 선 두 사람.\n"
+              "source": "* BG: 비 내리는 고가다리 중앙. 가로등 불빛 아래 마주 선 두 사람.\n",
+              "assetPath": "Maps/spot_daedalus_bridge_rain.png"
             },
             {
               "kind": "music",
@@ -13615,7 +13624,8 @@
               "line": 71,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_daedalus_bridge_rain.png"
         },
         {
           "id": "beyond_destiny_ep_15_scene_03",
@@ -13768,7 +13778,8 @@
               "line": 120,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_daedalus_bridge_rain.png"
         },
         {
           "id": "beyond_destiny_ep_15_scene_04",
@@ -13900,7 +13911,8 @@
               "line": 158,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_daedalus_bridge_rain.png"
         },
         {
           "id": "beyond_destiny_ep_15_scene_05",
@@ -14058,7 +14070,8 @@
               "line": 202,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_daedalus_bridge_rain.png"
         }
       ]
     },
@@ -14747,7 +14760,8 @@
               "text": "급격히 어두워진 밤하늘. 새틀라이트 방면의 대지 위로 거대한 보랏빛 불꽃의 문양(지상화)이 불길하게 타오르기 시작한다.",
               "key": "beyond_destiny_ep_16_scene_05_bg_1",
               "line": 191,
-              "source": "* BG: 급격히 어두워진 밤하늘. 새틀라이트 방면의 대지 위로 거대한 보랏빛 불꽃의 문양(지상화)이 불길하게 타오르기 시작한다.\n"
+              "source": "* BG: 급격히 어두워진 밤하늘. 새틀라이트 방면의 대지 위로 거대한 보랏빛 불꽃의 문양(지상화)이 불길하게 타오르기 시작한다.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -14877,7 +14891,8 @@
               "line": 227,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         }
       ]
     },
@@ -14908,7 +14923,8 @@
               "text": "폐허가 된 새틀라이트 외곽의 낡은 창고 터. 멀리 구 모멘트 제어탑 주변으로 기괴한 보랏빛 지상화가 밤하늘을 붉고 검게 물들이고 있다.",
               "key": "beyond_destiny_ep_17_scene_01_bg_1",
               "line": 11,
-              "source": "* BG: 폐허가 된 새틀라이트 외곽의 낡은 창고 터. 멀리 구 모멘트 제어탑 주변으로 기괴한 보랏빛 지상화가 밤하늘을 붉고 검게 물들이고 있다.\n"
+              "source": "* BG: 폐허가 된 새틀라이트 외곽의 낡은 창고 터. 멀리 구 모멘트 제어탑 주변으로 기괴한 보랏빛 지상화가 밤하늘을 붉고 검게 물들이고 있다.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -14955,7 +14971,8 @@
               "line": 29,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_17_scene_02",
@@ -14975,7 +14992,8 @@
               "text": "모닥불이 보이지 않는 어두운 고가도로 난간. 발아래로 보랏빛 안개가 깔린 새틀라이트 폐허가 펼쳐져 있다.",
               "key": "beyond_destiny_ep_17_scene_02_bg_1",
               "line": 32,
-              "source": "* BG: 모닥불이 보이지 않는 어두운 고가도로 난간. 발아래로 보랏빛 안개가 깔린 새틀라이트 폐허가 펼쳐져 있다.\n"
+              "source": "* BG: 모닥불이 보이지 않는 어두운 고가도로 난간. 발아래로 보랏빛 안개가 깔린 새틀라이트 폐허가 펼쳐져 있다.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -15101,7 +15119,8 @@
               "line": 71,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_17_scene_03",
@@ -15224,7 +15243,8 @@
               "line": 108,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_17_scene_04",
@@ -15384,7 +15404,8 @@
               "line": 159,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_17_scene_05",
@@ -15500,7 +15521,8 @@
               "line": 190,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         }
       ]
     },
@@ -15531,7 +15553,8 @@
               "text": "먹구름과 보랏빛 섬광이 뒤덮인 새틀라이트의 폐허. 사방의 네 개 제어탑에서 거대한 보라색 불꽃의 결계가 하늘 높이 치솟아 있다.",
               "key": "beyond_destiny_ep_18_scene_01_bg_1",
               "line": 11,
-              "source": "* BG: 먹구름과 보랏빛 섬광이 뒤덮인 새틀라이트의 폐허. 사방의 네 개 제어탑에서 거대한 보라색 불꽃의 결계가 하늘 높이 치솟아 있다.\n"
+              "source": "* BG: 먹구름과 보랏빛 섬광이 뒤덮인 새틀라이트의 폐허. 사방의 네 개 제어탑에서 거대한 보라색 불꽃의 결계가 하늘 높이 치솟아 있다.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -15590,7 +15613,8 @@
               "line": 31,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_18_scene_02",
@@ -15610,7 +15634,8 @@
               "text": "도마뱀의 지상화 결계로 이어지는 좁은 폐허 협곡 길목. 앞쪽을 가로막고 선 주인공과, 그 앞을 에워싼 검은 로브의 하수인들.",
               "key": "beyond_destiny_ep_18_scene_02_bg_1",
               "line": 34,
-              "source": "* BG: 도마뱀의 지상화 결계로 이어지는 좁은 폐허 협곡 길목. 앞쪽을 가로막고 선 주인공과, 그 앞을 에워싼 검은 로브의 하수인들.\n"
+              "source": "* BG: 도마뱀의 지상화 결계로 이어지는 좁은 폐허 협곡 길목. 앞쪽을 가로막고 선 주인공과, 그 앞을 에워싼 검은 로브의 하수인들.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -15708,7 +15733,8 @@
               "line": 65,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_18_scene_03",
@@ -15728,7 +15754,8 @@
               "text": "보랏빛 안개가 깔린 폐허 협곡의 듀얼 필드.",
               "key": "beyond_destiny_ep_18_scene_03_bg_1",
               "line": 68,
-              "source": "* BG: 보랏빛 안개가 깔린 폐허 협곡의 듀얼 필드.\n"
+              "source": "* BG: 보랏빛 안개가 깔린 폐허 협곡의 듀얼 필드.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -16189,7 +16216,8 @@
               "line": 202,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_18_scene_04",
@@ -16209,7 +16237,8 @@
               "text": "연기가 자욱한 폐허 협곡. 지휘관이 의식을 잃고 쓰러져 있고, 남은 하수인들이 공포에 질려 뒷걸음질 치고 있다.",
               "key": "beyond_destiny_ep_18_scene_04_bg_1",
               "line": 205,
-              "source": "* BG: 연기가 자욱한 폐허 협곡. 지휘관이 의식을 잃고 쓰러져 있고, 남은 하수인들이 공포에 질려 뒷걸음질 치고 있다.\n"
+              "source": "* BG: 연기가 자욱한 폐허 협곡. 지휘관이 의식을 잃고 쓰러져 있고, 남은 하수인들이 공포에 질려 뒷걸음질 치고 있다.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -16289,7 +16318,8 @@
               "line": 229,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_18_scene_05",
@@ -16309,7 +16339,8 @@
               "text": "멀리 거대한 보랏빛 도마뱀 문양이 타오르는 폐허의 광장. 그 상공에 기괴한 거대 괴물(지박신 코카라이아)의 실루엣이 어른거린다.",
               "key": "beyond_destiny_ep_18_scene_05_bg_1",
               "line": 232,
-              "source": "* BG: 멀리 거대한 보랏빛 도마뱀 문양이 타오르는 폐허의 광장. 그 상공에 기괴한 거대 괴물(지박신 코카라이아)의 실루엣이 어른거린다.\n"
+              "source": "* BG: 멀리 거대한 보랏빛 도마뱀 문양이 타오르는 폐허의 광장. 그 상공에 기괴한 거대 괴물(지박신 코카라이아)의 실루엣이 어른거린다.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -16382,7 +16413,8 @@
               "line": 253,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         }
       ]
     },
@@ -16413,7 +16445,8 @@
               "text": "하늘이 먹구름으로 뒤덮인 폐허의 광장. 거대한 보랏빛 불꽃 벽이 원형으로 타오르며 듀얼 필드를 감싸고 있고, 그 위로 거대한 도마뱀 형태의 지박신(코카라이아)이 위협적으로 솟아 있다.",
               "key": "beyond_destiny_ep_19_scene_01_bg_1",
               "line": 11,
-              "source": "* BG: 하늘이 먹구름으로 뒤덮인 폐허의 광장. 거대한 보랏빛 불꽃 벽이 원형으로 타오르며 듀얼 필드를 감싸고 있고, 그 위로 거대한 도마뱀 형태의 지박신(코카라이아)이 위협적으로 솟아 있다.\n"
+              "source": "* BG: 하늘이 먹구름으로 뒤덮인 폐허의 광장. 거대한 보랏빛 불꽃 벽이 원형으로 타오르며 듀얼 필드를 감싸고 있고, 그 위로 거대한 도마뱀 형태의 지박신(코카라이아)이 위협적으로 솟아 있다.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -16523,7 +16556,8 @@
               "line": 41,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_19_scene_02",
@@ -16669,7 +16703,8 @@
               "line": 80,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_19_scene_03",
@@ -16759,7 +16794,8 @@
               "line": 105,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_19_scene_04",
@@ -16894,7 +16930,8 @@
               "line": 142,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         },
         {
           "id": "beyond_destiny_ep_19_scene_05",
@@ -16914,7 +16951,8 @@
               "text": "보랏빛 불꽃 벽이 연기처럼 사라지고, 먹구름 사이로 미세한 빛줄기가 스며드는 폐허 광장.",
               "key": "beyond_destiny_ep_19_scene_05_bg_1",
               "line": 145,
-              "source": "* BG: 보랏빛 불꽃 벽이 연기처럼 사라지고, 먹구름 사이로 미세한 빛줄기가 스며드는 폐허 광장.\n"
+              "source": "* BG: 보랏빛 불꽃 벽이 연기처럼 사라지고, 먹구름 사이로 미세한 빛줄기가 스며드는 폐허 광장.\n",
+              "assetPath": "Maps/spot_satellite_violet_ruins.png"
             },
             {
               "kind": "music",
@@ -17035,7 +17073,8 @@
               "line": 179,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_satellite_violet_ruins.png"
         }
       ]
     },
@@ -17066,7 +17105,8 @@
               "text": "새틀라이트 중심부, 거대한 구 모멘트 원자로 주변. 밤하늘에 거대한 황금 콘도르의 지상화가 불타오르고 있으며, 그 위로 명계의 문이 열려 거대한 어둠의 신(명계의 왕)이 깨어나려 하고 있다.",
               "key": "beyond_destiny_ep_20_scene_01_bg_1",
               "line": 11,
-              "source": "* BG: 새틀라이트 중심부, 거대한 구 모멘트 원자로 주변. 밤하늘에 거대한 황금 콘도르의 지상화가 불타오르고 있으며, 그 위로 명계의 문이 열려 거대한 어둠의 신(명계의 왕)이 깨어나려 하고 있다.\n"
+              "source": "* BG: 새틀라이트 중심부, 거대한 구 모멘트 원자로 주변. 밤하늘에 거대한 황금 콘도르의 지상화가 불타오르고 있으며, 그 위로 명계의 문이 열려 거대한 어둠의 신(명계의 왕)이 깨어나려 하고 있다.\n",
+              "assetPath": "Maps/spot_old_moment_plaza.png"
             },
             {
               "kind": "music",
@@ -17161,7 +17201,8 @@
               "line": 35,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_old_moment_plaza.png"
         },
         {
           "id": "beyond_destiny_ep_20_scene_02",
@@ -17278,7 +17319,8 @@
               "line": 71,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_old_moment_plaza.png"
         },
         {
           "id": "beyond_destiny_ep_20_scene_03",
@@ -17298,7 +17340,8 @@
               "text": "어두운 먹구름을 뚫고 거대한 붉은 용이 하늘을 가르며 비상한다. 하늘 전체가 눈부신 황금빛과 백색 섬광으로 물든다.",
               "key": "beyond_destiny_ep_20_scene_03_bg_1",
               "line": 74,
-              "source": "* BG: 어두운 먹구름을 뚫고 거대한 붉은 용이 하늘을 가르며 비상한다. 하늘 전체가 눈부신 황금빛과 백색 섬광으로 물든다.\n"
+              "source": "* BG: 어두운 먹구름을 뚫고 거대한 붉은 용이 하늘을 가르며 비상한다. 하늘 전체가 눈부신 황금빛과 백색 섬광으로 물든다.\n",
+              "assetPath": "Maps/spot_old_moment_plaza.png"
             },
             {
               "kind": "music",
@@ -17387,7 +17430,8 @@
               "line": 104,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_old_moment_plaza.png"
         },
         {
           "id": "beyond_destiny_ep_20_scene_04",
@@ -17407,7 +17451,8 @@
               "text": "아침 햇살이 쏟아져 내리는 구 모멘트 외곽 광장. 폐허 위로 황금빛 여명이 부드럽게 내려앉는다.",
               "key": "beyond_destiny_ep_20_scene_04_bg_1",
               "line": 107,
-              "source": "* BG: 아침 햇살이 쏟아져 내리는 구 모멘트 외곽 광장. 폐허 위로 황금빛 여명이 부드럽게 내려앉는다.\n"
+              "source": "* BG: 아침 햇살이 쏟아져 내리는 구 모멘트 외곽 광장. 폐허 위로 황금빛 여명이 부드럽게 내려앉는다.\n",
+              "assetPath": "Maps/spot_old_moment_plaza.png"
             },
             {
               "kind": "music",
@@ -17540,7 +17585,8 @@
               "line": 143,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_old_moment_plaza.png"
         },
         {
           "id": "beyond_destiny_ep_20_scene_05",
@@ -17560,7 +17606,8 @@
               "text": "새틀라이트와 네오 도미노 시티를 잇는 부서진 고가다리 끝. 수평선 너머로 눈부신 황금빛 태양이 떠오르며 두 도시를 하나로 비추고 있다.",
               "key": "beyond_destiny_ep_20_scene_05_bg_1",
               "line": 146,
-              "source": "* BG: 새틀라이트와 네오 도미노 시티를 잇는 부서진 고가다리 끝. 수평선 너머로 눈부신 황금빛 태양이 떠오르며 두 도시를 하나로 비추고 있다.\n"
+              "source": "* BG: 새틀라이트와 네오 도미노 시티를 잇는 부서진 고가다리 끝. 수평선 너머로 눈부신 황금빛 태양이 떠오르며 두 도시를 하나로 비추고 있다.\n",
+              "assetPath": "Maps/spot_daedalus_bridge_dawn.png"
             },
             {
               "kind": "music",
@@ -17722,7 +17769,8 @@
               "line": 194,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_daedalus_bridge_dawn.png"
         }
       ]
     },
@@ -18897,7 +18945,8 @@
               "text": "자판기 불빛만 은은하게 켜져 있는 서킷 피트 구역. 밤하늘에는 별빛과 네오 도미노 시티의 야경이 어우러져 있다.",
               "key": "beyond_destiny_ep_22_scene_03_bg_1",
               "line": 111,
-              "source": "* BG: 자판기 불빛만 은은하게 켜져 있는 서킷 피트 구역. 밤하늘에는 별빛과 네오 도미노 시티의 야경이 어우러져 있다.\n"
+              "source": "* BG: 자판기 불빛만 은은하게 켜져 있는 서킷 피트 구역. 밤하늘에는 별빛과 네오 도미노 시티의 야경이 어우러져 있다.\n",
+              "assetPath": "Maps/spot_night_circuit.png"
             },
             {
               "kind": "music",
@@ -19043,7 +19092,8 @@
               "line": 160,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_night_circuit.png"
         },
         {
           "id": "beyond_destiny_ep_22_scene_04",
@@ -19461,7 +19511,8 @@
               "text": "도시의 야경이 멀리 펼쳐진 고요한 전망대. 가로등 불빛 하나가 길게 그림자를 드리우고 있다.",
               "key": "beyond_destiny_ep_23_scene_02_bg_1",
               "line": 53,
-              "source": "* BG: 도시의 야경이 멀리 펼쳐진 고요한 전망대. 가로등 불빛 하나가 길게 그림자를 드리우고 있다.\n"
+              "source": "* BG: 도시의 야경이 멀리 펼쳐진 고요한 전망대. 가로등 불빛 하나가 길게 그림자를 드리우고 있다.\n",
+              "assetPath": "Maps/spot_city_overlook.png"
             },
             {
               "kind": "music",
@@ -19592,7 +19643,8 @@
               "line": 96,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_city_overlook.png"
         },
         {
           "id": "beyond_destiny_ep_23_scene_03",
@@ -19612,7 +19664,8 @@
               "text": "가로등 아래의 낡은 벤치. 멀리 네오 도미노 시티의 불빛이 보석처럼 반짝인다.",
               "key": "beyond_destiny_ep_23_scene_03_bg_1",
               "line": 99,
-              "source": "* BG: 가로등 아래의 낡은 벤치. 멀리 네오 도미노 시티의 불빛이 보석처럼 반짝인다.\n"
+              "source": "* BG: 가로등 아래의 낡은 벤치. 멀리 네오 도미노 시티의 불빛이 보석처럼 반짝인다.\n",
+              "assetPath": "Maps/spot_city_overlook.png"
             },
             {
               "kind": "music",
@@ -19722,7 +19775,8 @@
               "line": 135,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_city_overlook.png"
         },
         {
           "id": "beyond_destiny_ep_23_scene_04",
@@ -19742,7 +19796,8 @@
               "text": "[이벤트 CG 연출] 가로등 아래, 벤치에 앉은 주인공의 쇄골 흉터 위로 천천히 고개를 숙이는 아키. 밤바람에 붉은 머리카락이 흩날린다.",
               "key": "beyond_destiny_ep_23_scene_04_bg_1",
               "line": 138,
-              "source": "* BG: [이벤트 CG 연출] 가로등 아래, 벤치에 앉은 주인공의 쇄골 흉터 위로 천천히 고개를 숙이는 아키. 밤바람에 붉은 머리카락이 흩날린다.\n"
+              "source": "* BG: [이벤트 CG 연출] 가로등 아래, 벤치에 앉은 주인공의 쇄골 흉터 위로 천천히 고개를 숙이는 아키. 밤바람에 붉은 머리카락이 흩날린다.\n",
+              "assetPath": "Maps/spot_city_overlook.png"
             },
             {
               "kind": "music",
@@ -19904,7 +19959,8 @@
               "line": 191,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_city_overlook.png"
         }
       ]
     },
@@ -21655,7 +21711,8 @@
               "text": "창고 옥상. 바다에서 불어오는 차가운 밤바람 속에 두 사람이 마주 서 있다.",
               "key": "beyond_destiny_ep_26_scene_03_bg_1",
               "line": 74,
-              "source": "* BG: 창고 옥상. 바다에서 불어오는 차가운 밤바람 속에 두 사람이 마주 서 있다.\n"
+              "source": "* BG: 창고 옥상. 바다에서 불어오는 차가운 밤바람 속에 두 사람이 마주 서 있다.\n",
+              "assetPath": "Maps/spot_city_overlook.png"
             },
             {
               "kind": "music",
@@ -21792,7 +21849,8 @@
               "line": 125,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_city_overlook.png"
         },
         {
           "id": "beyond_destiny_ep_26_scene_04",
@@ -31131,7 +31189,8 @@
               "text": "푸른 하늘과 눈부신 햇살 아래, 새틀라이트와 네오 도미노 시티를 잇는 거대한 다이달로스 브릿지와 활기찬 도시 전경. 평화로운 바람에 하얀 구름이 천천히 흘러간다.",
               "key": "beyond_destiny_ep_37_scene_01_bg_1",
               "line": 11,
-              "source": "* BG: 푸른 하늘과 눈부신 햇살 아래, 새틀라이트와 네오 도미노 시티를 잇는 거대한 다이달로스 브릿지와 활기찬 도시 전경. 평화로운 바람에 하얀 구름이 천천히 흘러간다.\n"
+              "source": "* BG: 푸른 하늘과 눈부신 햇살 아래, 새틀라이트와 네오 도미노 시티를 잇는 거대한 다이달로스 브릿지와 활기찬 도시 전경. 평화로운 바람에 하얀 구름이 천천히 흘러간다.\n",
+              "assetPath": "Maps/spot_daedalus_bridge_dawn.png"
             },
             {
               "kind": "music",
@@ -31172,7 +31231,8 @@
               "text": "햇살이 환하게 들어오는 깔끔하고 따뜻한 아파트 거실. 창밖으로 네오 도미노 시티의 평화로운 풍경이 한눈에 내려다보인다.",
               "key": "beyond_destiny_ep_37_scene_01_bg_2",
               "line": 25,
-              "source": "* BG: 햇살이 환하게 들어오는 깔끔하고 따뜻한 아파트 거실. 창밖으로 네오 도미노 시티의 평화로운 풍경이 한눈에 내려다보인다.\n"
+              "source": "* BG: 햇살이 환하게 들어오는 깔끔하고 따뜻한 아파트 거실. 창밖으로 네오 도미노 시티의 평화로운 풍경이 한눈에 내려다보인다.\n",
+              "assetPath": "Maps/spot_epilogue_apartment.png"
             },
             {
               "kind": "sound",
@@ -31196,7 +31256,8 @@
               "line": 29,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_daedalus_bridge_dawn.png"
         },
         {
           "id": "beyond_destiny_ep_37_scene_02",
@@ -31216,7 +31277,8 @@
               "text": "햇살이 비치는 아파트 거실 테이블. 두꺼운 의학 전공 서적과 필기 노트들이 가지런히 펼쳐져 있다.",
               "key": "beyond_destiny_ep_37_scene_02_bg_1",
               "line": 32,
-              "source": "* BG: 햇살이 비치는 아파트 거실 테이블. 두꺼운 의학 전공 서적과 필기 노트들이 가지런히 펼쳐져 있다.\n"
+              "source": "* BG: 햇살이 비치는 아파트 거실 테이블. 두꺼운 의학 전공 서적과 필기 노트들이 가지런히 펼쳐져 있다.\n",
+              "assetPath": "Maps/spot_epilogue_apartment.png"
             },
             {
               "kind": "music",
@@ -31326,7 +31388,8 @@
               "line": 66,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_epilogue_apartment.png"
         },
         {
           "id": "beyond_destiny_ep_37_scene_03",
@@ -31346,7 +31409,8 @@
               "text": "아파트 현관과 거실.",
               "key": "beyond_destiny_ep_37_scene_03_bg_1",
               "line": 69,
-              "source": "* BG: 아파트 현관과 거실.\n"
+              "source": "* BG: 아파트 현관과 거실.\n",
+              "assetPath": "Maps/spot_epilogue_apartment.png"
             },
             {
               "kind": "music",
@@ -31457,7 +31521,8 @@
               "line": 101,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_epilogue_apartment.png"
         },
         {
           "id": "beyond_destiny_ep_37_scene_04",
@@ -31477,7 +31542,8 @@
               "text": "아늑한 아파트 주방과 식탁.",
               "key": "beyond_destiny_ep_37_scene_04_bg_1",
               "line": 104,
-              "source": "* BG: 아늑한 아파트 주방과 식탁.\n"
+              "source": "* BG: 아늑한 아파트 주방과 식탁.\n",
+              "assetPath": "Maps/spot_epilogue_apartment.png"
             },
             {
               "kind": "music",
@@ -31635,7 +31701,8 @@
               "line": 152,
               "source": "------------------------------------------------------------------------\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_epilogue_apartment.png"
         },
         {
           "id": "beyond_destiny_ep_37_scene_05",
@@ -31655,7 +31722,8 @@
               "text": "노을이 따뜻하게 물들어가는 아파트 거실과 베란다 창가. 주방에서 맛있는 음식 냄새와 두 사람의 웃음소리가 은은하게 퍼져 나온다.",
               "key": "beyond_destiny_ep_37_scene_05_bg_1",
               "line": 155,
-              "source": "* BG: 노을이 따뜻하게 물들어가는 아파트 거실과 베란다 창가. 주방에서 맛있는 음식 냄새와 두 사람의 웃음소리가 은은하게 퍼져 나온다.\n"
+              "source": "* BG: 노을이 따뜻하게 물들어가는 아파트 거실과 베란다 창가. 주방에서 맛있는 음식 냄새와 두 사람의 웃음소리가 은은하게 퍼져 나온다.\n",
+              "assetPath": "Maps/spot_epilogue_apartment.png"
             },
             {
               "kind": "music",
@@ -31774,7 +31842,8 @@
               "line": 195,
               "source": "========================================================================\n"
             }
-          ]
+          ],
+          "backgroundPath": "Maps/spot_epilogue_apartment.png"
         }
       ]
     }

@@ -85,7 +85,7 @@ namespace YGOPortable.UI
             {
                 AppScreen.CardShop => _shopButton,
                 AppScreen.DeckEditor => _deckEditorButton,
-                AppScreen.StoryMode or AppScreen.TagForceWorld => _gxRpgWorldButton,
+                AppScreen.StoryMode or AppScreen.TagForceWorld or AppScreen.Campaigns or AppScreen.BeyondDestiny => _gxRpgWorldButton,
                 AppScreen.ArchetypeCodex => _codexButton,
                 AppScreen.Ranked => _rankedButton,
                 _ => _freeDuelButton,
@@ -128,7 +128,7 @@ namespace YGOPortable.UI
             int row = 0;
             Button AddRow(string name, string label, Action action, bool campaign = false) =>
                 AddMenuEntry(menu, name, .835f - row++ * .126f, label, action, campaign);
-            _gxRpgWorldButton = AddRow("GxRpgWorld", "GX RPG · 여왕의 대관식", _app.OpenGxRpgField, campaign: true);
+            _gxRpgWorldButton = AddRow("GxRpgWorld", "스토리 RPG", () => _app.ShowScreen(AppScreen.Campaigns), campaign: true);
             _rankedButton = AddRow("Ranked", "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
             _freeDuelButton = AddRow("FreeDuel", "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
             _deckEditorButton = AddRow("DeckEditor", "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));

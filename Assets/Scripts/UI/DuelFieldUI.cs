@@ -107,6 +107,8 @@ namespace YGOPortable.UI
         private double _oppDisplayLp;
         private int _myTargetLp;
         private int _oppTargetLp;
+        private DuelArenaGround _arenaGround;
+        private Text _mySpeed, _oppSpeed;
         private RectTransform _myLpFeedbackAnchor;
         private RectTransform _oppLpFeedbackAnchor;
 
@@ -377,6 +379,7 @@ namespace YGOPortable.UI
 
         public void UnbindSession()
         {
+            SetRidingPresentation(false, null);
             if (_session != null)
             {
                 _session.OnCardLocationsChanged -= HandleCardLocationsChanged;
@@ -811,6 +814,7 @@ namespace YGOPortable.UI
 
             var bg = DuelUiKit.FillRect("ArenaGround", root);
             var ground = bg.gameObject.AddComponent<DuelArenaGround>();
+            _arenaGround = ground;
             ground.texture = DuelVisualAssets.ArenaBackdrop ?? DuelStyle.Stone;
             ground.raycastTarget = false;
 
@@ -828,12 +832,39 @@ namespace YGOPortable.UI
             BuildLeftPanel(playArea);
             BuildTopHud(playArea);
             BuildBottomHudAndHands(playArea);
+            _mySpeed = BuildSpeedReadout(playArea, "PlayerSpeed", new Rect(.016f, .004f, .158f, .030f));
+            _oppSpeed = BuildSpeedReadout(playArea, "OpponentSpeed", new Rect(.801f, .861f, .184f, .031f));
             BuildCardActions(playArea);
             BuildActionPopup(playArea);
             BuildCardZoomModal(root, _mobileLayout);
             BuildDuelLog(playArea);
             BuildActivationNotice(playArea);
             Root.SetActive(false);
+        }
+
+        private static Text BuildSpeedReadout(Transform parent, string id, Rect position)
+        {
+            var panel = DuelUiKit.CreateRect(id, parent, position.min, position.max, Vector2.zero, Vector2.zero);
+            AddHudSurface(panel, HudEdge, HudSurface);
+            var value = DuelUiKit.AddFittedText(panel, "Value", "", 17, 12, TextAnchor.MiddleCenter, HudText);
+            panel.gameObject.SetActive(false);
+            return value;
+        }
+
+        internal void SetRidingPresentation(bool riding, Sprite background)
+        {
+            if (_arenaGround == null) return;
+            _arenaGround.texture = background != null ? background.texture : DuelVisualAssets.ArenaBackdrop ?? DuelStyle.Stone;
+            _mySpeed?.transform.parent.gameObject.SetActive(riding);
+            _oppSpeed?.transform.parent.gameObject.SetActive(riding);
+        }
+
+        internal static int ReadSpeedCounters(PlayerFieldSnapshot player)
+        {
+            var field = player.szone[5];
+            return field?.code == StoryGimmickRuntime.SpeedWorld && field.IsFaceUp
+                ? field.Counters.Where(counter => counter.Type == StoryGimmickRuntime.SpeedCounter).Sum(counter => (int)counter.Count)
+                : 0;
         }
 
         private void BuildLeftPanel(Transform root)
@@ -1721,6 +1752,11 @@ namespace YGOPortable.UI
             byte opponent = (byte)_session.AiPlayerIndex;
             var mine = _session.Players[me];
             var theirs = _session.Players[opponent];
+            if (_mySpeed.transform.parent.gameObject.activeSelf)
+            {
+                _mySpeed.text = $"SPC {ReadSpeedCounters(mine):00} / 12";
+                _oppSpeed.text = $"SPC {ReadSpeedCounters(theirs):00} / 12";
+            }
             _handCounts[me] = mine.hand.Count;
             _handCounts[opponent] = theirs.hand.Count;
             if (!IsPresenting && _session.NativePtr != IntPtr.Zero)

@@ -310,7 +310,7 @@ namespace YGOPortable.UI
             return File.Exists(standalone) ? standalone : null;
         }
 
-        private static AudioClip ReadSound(string path, string name)
+        internal static AudioClip ReadSound(string path, string name)
         {
             if (!File.Exists(path)) return null;
             try

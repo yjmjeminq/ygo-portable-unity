@@ -34,6 +34,7 @@ namespace YGOPortable.Editor
             bool touchLayout = Environment.GetEnvironmentVariable("YGO_GX_QA_TOUCH") == "1";
             var world = new TagForceWorldUI(app, canvas.transform, touchFieldLayout: touchLayout);
             var menu = new TitleAndMenuUI(app, canvas.transform);
+            var campaigns = new BeyondDestinyUI(app, canvas.transform);
             var modals = new DuelPromptModals(canvas.transform, null, null);
             var mobile = world.Root.transform.Find("MobileSafeArea")?.GetComponent<MobileSafeArea>();
             var panel = (mobile == null ? world.Root.transform : mobile.transform).Find("World");
@@ -42,6 +43,7 @@ namespace YGOPortable.Editor
             try
             {
                 Set("_titleAndMenu", menu);
+                Set("_beyondDestiny", campaigns);
                 Set("_tagForceWorld", world);
                 Set("_storyMode", story);
                 Set("_archetypeCodex", new ArchetypeCodexUI(canvas.transform, () => { }));
@@ -142,8 +144,13 @@ namespace YGOPortable.Editor
                         .Single(button => button.transform.parent.name == "GxRpgWorld");
                     Require(menu.MenuRoot.transform.Find("Menu/StoryMode") == null &&
                         menu.MenuRoot.transform.Find("Menu/RpgWorld") == null && gxMenu.IsInteractable(),
-                        "The main menu should offer the GX RPG as the only campaign entry.");
+                        "The main menu must have one entry for the story campaign picker.");
                     gxMenu.onClick.Invoke();
+                    var campaignOptions = campaigns.Root.GetComponentsInChildren<Button>();
+                    var gxChoice = campaignOptions.Single(button => button.GetComponentInChildren<Text>()?.text == "GX: 듀얼 아카데미아");
+                    Require(campaignOptions.Any(button => button.GetComponentInChildren<Text>()?.text == "5D’s: Beyond Destiny"),
+                        "The campaign picker lost its 5D's entry.");
+                    gxChoice.onClick.Invoke();
                     Require(world.Root.activeSelf && world.RpgCampaignId == gx && !world.CanWalk, "GX prologue did not start automatically.");
                     VerifyGxOpeningInterlude(gxScript.episodes[0]);
                     int scenes = 0, duels = 0, pov = 0, defeats = 0, retries = 0;
@@ -171,8 +178,9 @@ namespace YGOPortable.Editor
                                 Require(menu.MenuRoot.activeSelf && !world.Root.activeSelf && !storyRoot.gameObject.activeInHierarchy &&
                                     world.RpgClears == 0, "Esc restarted or cleared the mandatory GX prologue instead of leaving it.");
                                 Require(EventSystem.current.currentSelectedGameObject == gxMenu.gameObject,
-                                    "Leaving a GX story should return the main menu focus to the GX RPG entry.");
+                                    "Leaving a GX story should return main menu focus to the campaign picker entry.");
                                 gxMenu.onClick.Invoke();
+                                gxChoice.onClick.Invoke();
                                 for (int frame = 0; frame < 18 && !storyRoot.gameObject.activeInHierarchy; frame++)
                                     world.Update(.18f);
                                 VerifyDialogueStart(episode.preDialogues, episode.id);

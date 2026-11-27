@@ -79,6 +79,23 @@ function rules.riding_unicorn()
     story.playerRule(0,EFFECT_BP_FIRST_TURN,1)
 end
 
+-- These scenes begin partway through their respective riding rounds.
+local function beyondDestinyOpening(counters)
+    return function(human)
+        story.onEvent(human,EVENT_STARTUP,function()
+            for player=0,1 do
+                local field=Duel.GetFieldCard(player,LOCATION_FZONE,0)
+                if field and field:IsCode(511090001) then
+                    field:AddCounter(0x0091,counters)
+                end
+            end
+        end)
+    end
+end
+rules.riding_beyond_destiny_1=beyondDestinyOpening(1)
+rules.riding_beyond_destiny_4=beyondDestinyOpening(4)
+rules.riding_beyond_destiny_6=beyondDestinyOpening(6)
+
 function rules.riding_odin(_,ai)
     story.monsterRule(ai,EFFECT_IMMUNE_EFFECT,function(_,card)
         return card:IsCode(93483212)

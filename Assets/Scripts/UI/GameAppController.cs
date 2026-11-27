@@ -26,9 +26,11 @@ namespace YGOPortable.UI
         Tournament,
         Ranked,
         TagForceWorld,
+        Campaigns,
+        BeyondDestiny,
     }
 
-    public class GameAppController : MonoBehaviour
+    public partial class GameAppController : MonoBehaviour
     {
         public float AiStepDelay { get; set; } = 0.25f;
         public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Master;
@@ -267,6 +269,7 @@ namespace YGOPortable.UI
             _tournament = new DimensionTournamentUI(this, canvas.transform);
             _ranked = new OfflineRankedUI(this, canvas.transform);
             _tagForceWorld = new TagForceWorldUI(this, canvas.transform);
+            _beyondDestiny = new BeyondDestinyUI(this, canvas.transform);
 
             Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
             _oppSelect = new OpponentSelectUI(this, canvas.transform);
@@ -419,6 +422,8 @@ namespace YGOPortable.UI
             _archetypeCodex.Close();
             if (screen != AppScreen.Tournament) _tournament.Close();
             if (screen != AppScreen.Ranked) _ranked.Close();
+            if (screen is not (AppScreen.Campaigns or AppScreen.BeyondDestiny)) _beyondDestiny?.Close();
+            if (screen != AppScreen.BeyondDestiny) StopBeyondDestinyAudio();
             if (fieldStoryDeckEditor) _tagForceWorld.Root.SetActive(false);
             else if (screen != AppScreen.TagForceWorld && !fieldStory) _tagForceWorld?.Close();
             if (screen == AppScreen.DeckEditor && _storyDeckEditorOpen) _storyMode.SuspendForDeckEditor();
@@ -439,6 +444,7 @@ namespace YGOPortable.UI
                 _activeTournament = null;
                 _activeRanked = null;
                 _activeTagForce = null;
+                _activeBeyondDestiny = null;
                 if (_session != null)
                 {
                     _duelField.UnbindSession();
@@ -461,6 +467,10 @@ namespace YGOPortable.UI
                 _tournament.Open();
             else if (screen == AppScreen.Ranked)
                 _ranked.Open();
+            else if (screen == AppScreen.Campaigns)
+                _beyondDestiny.OpenSelection();
+            else if (screen == AppScreen.BeyondDestiny)
+                _beyondDestiny.OpenCampaign();
             else if (screen == AppScreen.TagForceWorld)
                 _tagForceWorld.Open(previousScreen is AppScreen.DeckEditor or AppScreen.Duel or AppScreen.TagForceWorld,
                     restoreRpgPage: previousScreen == AppScreen.DeckEditor && _tagForceDeckEditorOpen);
@@ -497,6 +507,7 @@ namespace YGOPortable.UI
                     AppScreen.Tournament => _tournament.Root,
                     AppScreen.Ranked => _ranked.Root,
                     AppScreen.TagForceWorld => _tagForceWorld.Root,
+                    AppScreen.Campaigns or AppScreen.BeyondDestiny => _beyondDestiny.Root,
                     _ => null,
                 };
                 if (root != null) UiEntranceMotion.Play(root, .67f, .19f);
@@ -615,18 +626,19 @@ namespace YGOPortable.UI
 
         private void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
             bool playerGoesFirst, bool isStoryDuel, float planningScale, bool isTournamentDuel = false, bool isRankedDuel = false,
-            bool isTagForceDuel = false, AIDifficulty? opponentDifficulty = null)
+            bool isTagForceDuel = false, AIDifficulty? opponentDifficulty = null, bool isBeyondDestiny = false)
         {
             bool rpgOpponent = (isStoryDuel && _storyMode.IsRpgCampaign) ||
                 (isTagForceDuel && TagForceWorldUI.IsRpgPractice(_activeTagForce?.SeriesId));
             AIDifficulty duelDifficulty = rpgOpponent ? AIDifficulty.Master : opponentDifficulty ?? AiDifficulty;
             if (rpgOpponent) planningScale = ComboSearch.MaxPlanningScale;
-            bool isCampaignMatch = isStoryDuel || isTournamentDuel || isRankedDuel || isTagForceDuel;
+            bool isCampaignMatch = isStoryDuel || isTournamentDuel || isRankedDuel || isTagForceDuel || isBeyondDestiny;
             if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
                 (isStoryDuel && _activeStoryEpisode?.charId != oppChar.id) ||
                 (isTournamentDuel && _activeTournament?.Opponent != oppChar.id) ||
                 (isRankedDuel && (_activeRanked?.Opponent.Deck != oppDeck)) ||
                 (isTagForceDuel && _activeTagForce?.Deck != oppDeck) ||
+                (isBeyondDestiny && _activeBeyondDestiny?.opponentDeckId != oppDeck.id) ||
                 (!isCampaignMatch && !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id)))
             {
                 ShowDuelStartFailure(isStoryDuel, "목록에 있는 상대와 덱을 선택하세요.", isTournamentDuel, isRankedDuel, isTagForceDuel);
@@ -640,7 +652,7 @@ namespace YGOPortable.UI
                 oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
             }
             var duelDeck = myDeck;
-            bool forcedStoryDeck = isStoryDuel && _storyMode.IsGxRpg && _activeStoryEpisode.forcedPlayerDeckId != 0;
+            bool forcedStoryDeck = isBeyondDestiny || isStoryDuel && _storyMode.IsGxRpg && _activeStoryEpisode.forcedPlayerDeckId != 0;
             string reason = "시점 전용 덱의 카드 구성을 확인하세요.";
             bool deckReady = forcedStoryDeck ? myDeck?.IsPlayable == true &&
                     myDeck.main.Concat(myDeck.extra).All(code => CardDatabase.Get(code) != null)
@@ -678,6 +690,15 @@ namespace YGOPortable.UI
             var opening = isStoryDuel ? _activeStoryPlan.Apply(raid, oppDeck, storyGimmick) : ((DuelOpening Player, DuelOpening Opponent)?)null;
             if (isTournamentDuel)
                 opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
+            if (isBeyondDestiny)
+            {
+                opening = BeyondDestinyOpening(_activeBeyondDestiny);
+                if (_activeBeyondDestiny.Riding)
+                {
+                    storyGimmick = BeyondDestinyPlayback.RidingRule(_activeBeyondDestiny);
+                    ridingMachine = "D-휠";
+                }
+            }
             _session = new DuelSession(recordPlanningReplay: planCombos, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
                 searchCombos: planCombos, planningScale: planningScale,
@@ -701,6 +722,13 @@ namespace YGOPortable.UI
                     _tagForceWorld.RpgDuelPortrait(TagForceWorldUI.StageOpponentId(_activeStoryEpisode)));
             }
             else _duelField.SetStoryPlayer(null, null);
+            if (isBeyondDestiny)
+            {
+                var art = _beyondDestiny.DuelArt(_beyondDestinyBattleMap, _beyondDestinyPlayerKey, _beyondDestinyOpponentKey);
+                _duelField.SetStoryPlayer(_beyondDestinyDuelist, art.Player);
+                _duelField.SetStoryOpponent(oppChar.name, art.Opponent);
+                _duelField.SetRidingPresentation(ridingMachine != null, art.Map);
+            }
             _duelField.RefreshChainConfirmation(ChainConfirmation);
             if (!_session.StartNewDuel(
                 duelDeck.main, duelDeck.extra,
@@ -735,6 +763,12 @@ namespace YGOPortable.UI
         private void ShowDuelStartFailure(bool isStoryDuel, string message, bool isTournamentDuel = false, bool isRankedDuel = false,
             bool isTagForceDuel = false)
         {
+            if (_activeBeyondDestiny != null)
+            {
+                ShowScreen(AppScreen.BeyondDestiny);
+                _beyondDestiny.LaunchFailed(message);
+                return;
+            }
             if (isTagForceDuel)
             {
                 ShowScreen(AppScreen.TagForceWorld);
@@ -817,6 +851,7 @@ namespace YGOPortable.UI
                     return;
                 }
                 if (_screen == AppScreen.StoryMode) _storyMode?.Update(Time.unscaledDeltaTime);
+                if (_screen == AppScreen.BeyondDestiny) _beyondDestiny?.Update(Time.unscaledDeltaTime, _menuPadInput.HeldDirection);
                 if (_screen == AppScreen.Tournament) _tournament?.Update(Time.unscaledDeltaTime);
                 if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
                 else if (_menuPad != null)
@@ -845,6 +880,7 @@ namespace YGOPortable.UI
                 _duelField.Refresh();
             }
 
+            if (TryFinishBeyondDestinyDuel()) return;
             if (_session.IsFinished)
             {
                 if (!_resultShown)
@@ -1044,6 +1080,7 @@ namespace YGOPortable.UI
                 AppScreen.Tournament => _tournament.ActiveRoot,
                 AppScreen.Ranked => _ranked.ActiveRoot,
                 AppScreen.TagForceWorld => _tagForceWorld.Root,
+                AppScreen.Campaigns or AppScreen.BeyondDestiny => _beyondDestiny.ActiveRoot,
                 _ => null,
             };
             if (page != null && page.activeInHierarchy)
@@ -1064,9 +1101,12 @@ namespace YGOPortable.UI
             bool tournament = _screen == AppScreen.Tournament;
             bool ranked = _screen == AppScreen.Ranked;
             bool tagForce = _screen == AppScreen.TagForceWorld;
-            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story || tournament || ranked || tagForce));
+            bool campaignPicker = _screen is AppScreen.Campaigns or AppScreen.BeyondDestiny;
+            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story || tournament || ranked || tagForce || campaignPicker));
             if (!frame.HasInput && !cancel) return;
             if (story && !cloudSave && !_menuPad.HasPopup && frame.Submit && _storyMode.RestoreHiddenDialogue()) return;
+            if (campaignPicker && !cloudSave && !_menuPad.HasPopup && frame.Submit && _beyondDestiny.RestoreHidden()) return;
+            if (campaignPicker && !cloudSave && !_menuPad.HasPopup && !cancel && frame.Submit && _beyondDestiny.HandleFieldSubmit()) return;
 
             GameObject scope = cloudSave ? _saveSyncMenu.Root : _screen switch
             {
@@ -1080,6 +1120,7 @@ namespace YGOPortable.UI
                 AppScreen.Tournament => _tournament.ActiveRoot,
                 AppScreen.Ranked => _ranked.ActiveRoot,
                 AppScreen.TagForceWorld => _tagForceWorld.RpgFieldMenuScope,
+                AppScreen.Campaigns or AppScreen.BeyondDestiny => _beyondDestiny.ActiveRoot,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;
@@ -1135,6 +1176,7 @@ namespace YGOPortable.UI
                 else if (tournament) _tournament.Back();
                 else if (ranked) _ranked.Back();
                 else if (tagForce) _tagForceWorld.Back();
+                else if (campaignPicker) _beyondDestiny.Back();
                 else if (_screen is AppScreen.OpponentSelect or AppScreen.ArchetypeCodex) ShowScreen(AppScreen.MainMenu);
                 else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
             }
