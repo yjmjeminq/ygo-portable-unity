@@ -64,6 +64,7 @@ namespace YGOPortable.Editor
             VerifyAdditionalRitualAces();
             VerifyGxSelfDamageAndDestruction();
             VerifyVolcanicEmperorSiege();
+            VerifyDddContractRescueSearch();
             VerifyFieldAceEffects();
             VerifyDrytronAceCosts();
             VerifyAccesscodeCosts();
@@ -472,6 +473,41 @@ namespace YGOPortable.Editor
                 "The AI treated a negated Emperor as an active burn threat.");
             Require(duel.RetryCount == 0, "The Volcanic Emperor fixture retried a response.");
             Debug.Log("[VERIFY GX VOLCANIC BURN] Fatal optional summons rejected, non-summoning effects and safe windows kept.");
+        }
+
+        private static void VerifyDddContractRescueSearch()
+        {
+            const uint gate = 46372010, lamia = 19580308, kepler = 11609969;
+            using var duel = new DuelSession();
+            var deck = Deck(kepler).Append(lamia).ToArray();
+            var extra = new uint[] { 9024198, 46593546 };
+            Require(duel.StartNewDuel(Deck(GeminiElf), Empty, deck, extra, p0GoesFirst: false,
+                seed: new[] { 17UL, 29UL, 71UL, 97UL }, opponentOpening: new DuelOpening(1500, 5, gate)),
+                "Could not start the D/D/D contract fixture.");
+            Drive(duel, IsIdle);
+            Require(duel.Players[0].lp == 500 && !duel.Players[0].hand.Any(card => card.code == lamia),
+                "The contract fixture did not start with the next standby payment lethal and Lamia in the deck.");
+            SubmitIdle(duel, 5, gate);
+            var search = Drive(duel, prompt => prompt.SelectionHint == DuelTactics.AddToHand);
+            int lamiaIndex = search.candidates.FindIndex(card => card.code == lamia);
+            Require(lamiaIndex >= 0 && DddTurnPlan.ChooseCard(duel, search) == lamiaIndex,
+                "The lethal contract searched for an extender instead of Lamia.");
+            var ai = Smart();
+            duel.SubmitResponse(ai.ComputeResponse(duel, search));
+            var main = Drive(duel, IsIdle);
+            int rescue = main.activatable.FindIndex(card => card.code == lamia);
+            Require(rescue >= 0 && BitConverter.ToInt32(ai.ComputeResponse(duel, main), 0) == ((rescue << 16) | 5),
+                "The AI did not use Lamia to remove the lethal contract during Main Phase 1.");
+            duel.SubmitResponseInt((rescue << 16) | 5);
+            var cost = Drive(duel, prompt => prompt.SelectionHint == DuelTactics.SendToGrave);
+            int gateIndex = cost.candidates.FindIndex(card => card.code == gate && card.location == YgoConstants.LOCATION_SZONE);
+            Require(gateIndex >= 0 && ai.ComputeResponse(duel, cost).SequenceEqual(DuelSession.PackCardSelection(gateIndex)),
+                "Lamia paid a harmless card rather than the lethal contract.");
+            duel.SubmitResponse(DuelSession.PackCardSelection(gateIndex));
+            Drive(duel, IsIdle);
+            Require(duel.Players[0].lp == 500 && duel.Players[0].szone.All(card => card?.code != gate) && duel.RetryCount == 0,
+                "The native engine did not resolve the contract rescue.");
+            Debug.Log("[VERIFY DDD CONTRACT RESCUE] Gate found Lamia and Lamia removed the lethal upkeep in Main Phase 1.");
         }
 
         private static void OpenGxAiFixture(DuelSession duel, uint[] deck, uint[] extra, int life, uint ace,

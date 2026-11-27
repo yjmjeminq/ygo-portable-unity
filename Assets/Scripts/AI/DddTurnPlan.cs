@@ -72,30 +72,30 @@ namespace YGOPortable.AI
             return !HasActiveUpkeepPrevention(own);
         }
 
-        private static int ScheduledUpkeep(PlayerFieldSnapshot own) => own.szone.Sum(card =>
-            card is { IsFaceUp: true, effectsDisabled: false } ? StandbyDamage(card.code) : 0);
+        private static int ScheduledUpkeep(PlayerFieldSnapshot own) => own.szone.Sum(ActiveContractDamage);
 
         private static bool HasActiveUpkeepPrevention(PlayerFieldSnapshot own) => own.mzone.Any(card =>
             card is { IsFaceUp: true, effectsDisabled: false } &&
             card.code is OracleKing or Leonidas or 12298909 or 9637706);
 
-        private static bool IsUpkeepRescueContract(LiveCardState card, int scheduled, int life) =>
-            card is { IsFaceUp: true, effectsDisabled: false } && StandbyDamage(card.code) > 0 &&
-            scheduled - StandbyDamage(card.code) < life;
+        private static int ActiveContractDamage(LiveCardState card) =>
+            card is { IsFaceUp: true, effectsDisabled: false } ? StandbyDamage(card.code) : 0;
+
+        private static bool NeedsUpkeepRescue(PlayerFieldSnapshot own) =>
+            own.lp > 0 && ScheduledUpkeep(own) >= own.lp && !HasActiveUpkeepPrevention(own);
+
+        private static bool IsOwnMainPhase(DuelSession duel, byte player) => duel.TurnPlayer == player &&
+            duel.CurrentPhase is YgoConstants.PHASE_MAIN1 or YgoConstants.PHASE_MAIN2;
 
         internal static int? ChooseUpkeepRescue(DuelSession session, DuelPrompt prompt,
             Func<int, SelectableCardItem, bool> canUse)
         {
             UpkeepRescues.Remove(session);
-            if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD || session.TurnPlayer != prompt.playerId ||
-                session.CurrentPhase != YgoConstants.PHASE_MAIN2 || !prompt.canEp)
+            if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD || !IsOwnMainPhase(session, prompt.playerId))
                 return null;
 
             var own = session.Players[prompt.playerId];
-            int scheduled = ScheduledUpkeep(own);
-            if (own.lp <= 0 || scheduled < own.lp || HasActiveUpkeepPrevention(own) ||
-                !own.mzone.Take(5).Any(card => card == null) ||
-                !own.szone.Any(card => IsUpkeepRescueContract(card, scheduled, own.lp)))
+            if (!NeedsUpkeepRescue(own) || !own.mzone.Take(5).Any(card => card == null))
                 return null;
 
             int index = prompt.activatable.FindIndex(item => item.controller == prompt.playerId && item.code == Lamia &&
@@ -119,18 +119,18 @@ namespace YGOPortable.AI
             bool knownLamia = source is { code: Lamia, negated: false } && source.triggerPlayer == prompt.playerId &&
                 source.triggerLoc is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_GRAVE;
             if ((!knownLamia && (!pending || source != null || session.CurrentChain.Count != 0)) ||
-                prompt.SelectionHint != SendToGrave || session.TurnPlayer != prompt.playerId ||
-                session.CurrentPhase != YgoConstants.PHASE_MAIN2 ||
+                prompt.SelectionHint != SendToGrave || !IsOwnMainPhase(session, prompt.playerId) ||
                 prompt.candidates.Any(item => item.controller != prompt.playerId ||
                     item.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE)))
                 return null;
 
             var own = session.Players[prompt.playerId];
-            int scheduled = ScheduledUpkeep(own);
-            if (own.lp <= 0 || scheduled < own.lp || HasActiveUpkeepPrevention(own)) return null;
-            return FindIndex(prompt.candidates, item => item.location == YgoConstants.LOCATION_SZONE &&
-                item.sequence < own.szone.Length && own.szone[item.sequence] is { } contract &&
-                contract.code == item.code && IsUpkeepRescueContract(contract, scheduled, own.lp));
+            if (!NeedsUpkeepRescue(own)) return null;
+            return Enumerable.Range(0, prompt.candidates.Count).Select(index => (index, item: prompt.candidates[index]))
+                .Where(entry => entry.item.location == YgoConstants.LOCATION_SZONE && entry.item.sequence < own.szone.Length &&
+                    own.szone[entry.item.sequence]?.code == entry.item.code && ActiveContractDamage(own.szone[entry.item.sequence]) > 0)
+                .OrderByDescending(entry => ActiveContractDamage(own.szone[entry.item.sequence]))
+                .Select(entry => (int?)entry.index).FirstOrDefault();
         }
 
         private static int StandbyDamage(uint code) => code switch
@@ -338,6 +338,9 @@ namespace YGOPortable.AI
 
             if (source.code is Gate or Solomon or CountSurveyor && OnlyFrom(YgoConstants.LOCATION_DECK))
             {
+                if (NeedsUpkeepRescue(own) && own.mzone.Take(5).Any(card => card == null) &&
+                    !HasInHand(Lamia) && !own.grave.Any(card => card.code == Lamia) && Find(Lamia) is int rescueSearch)
+                    return rescueSearch;
                 bool hasDddBody = own.mzone.Any(card => card != null && card.IsFaceUp && IsSet(card.code, DdSet));
                 bool hasPendulum = own.mzone.Concat(own.szone).Any(card =>
                     card?.IsFaceUp == true && CardDatabase.Get(card.code)?.IsPendulum == true && IsSet(card.code, DdSet));
