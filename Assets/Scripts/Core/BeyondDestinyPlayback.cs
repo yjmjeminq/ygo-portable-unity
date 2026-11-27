@@ -69,6 +69,20 @@ namespace YGOPortable.Core
             Progress = BeyondDestinyProgress.Load(saveDirectory, campaign);
         }
 
+        internal string FieldGuest()
+        {
+            foreach (var cue in Scene.events)
+            {
+                if (HasFieldPose(cue.speakerKey)) return cue.speakerKey;
+                foreach (var member in cue.cast ?? Array.Empty<BeyondDestinyCampaign.Standing>())
+                    if (HasFieldPose(member.speakerKey)) return member.speakerKey;
+            }
+            return null;
+        }
+
+        private static bool HasFieldPose(string actor) => actor is "aki" or "sherry" or "devine" or "yusei" or
+            "jack" or "crow" or "mizoguchi" or "misty" or "rex" or "zone" or "ghost_a";
+
         internal Segment Read()
         {
             var scene = Scene;
@@ -76,9 +90,14 @@ namespace YGOPortable.Core
             var audio = new List<BeyondDestinyCampaign.Cue>();
             var poses = new Dictionary<string, string>(StringComparer.Ordinal);
             var outfits = new Dictionary<string, string>(StringComparer.Ordinal);
-            for (int prior = 0; prior < Progress.sceneIndex; ++prior)
-                foreach (var priorCue in Episode.scenes[prior].events)
-                    RememberCast(priorCue, poses: null, outfits);
+            for (int chapter = 0; chapter <= Progress.episodeIndex; ++chapter)
+            {
+                var previous = _campaign.Episodes[chapter];
+                int sceneCount = chapter == Progress.episodeIndex ? Progress.sceneIndex : previous.scenes.Length;
+                for (int prior = 0; prior < sceneCount; ++prior)
+                    foreach (var priorCue in previous.scenes[prior].events)
+                        RememberCast(priorCue, poses: null, outfits);
+            }
             string map = scene.backgroundPath;
             string effect = null;
             int start = Progress.cueIndex;
@@ -116,7 +135,9 @@ namespace YGOPortable.Core
                     foreach (var stageActor in poses)
                         if (stageActor.Key != "hero") cast = Portrait(stageActor.Key, outfits.GetValueOrDefault(stageActor.Key));
                 }
-                pages.Add(new Page(checkpoint, cue, map, Portrait("hero", outfits.GetValueOrDefault("hero")),
+                string heroOutfit = Scene.id == "beyond_destiny_ep_01_scene_05" && cue.text.Contains("흉터")
+                    ? "scar" : outfits.GetValueOrDefault("hero");
+                pages.Add(new Page(checkpoint, cue, map, Portrait("hero", heroOutfit),
                     cast, cue.cutsceneKey, effect, audio.ToArray()));
                 checkpoint = index + 1;
                 audio.Clear();
@@ -201,9 +222,10 @@ namespace YGOPortable.Core
             bool everyday = pose.Contains("일상") || pose.Contains("평상복") || pose.Contains("사복");
             if (actor == "aki" && pose.Contains("가면"))
                 return pose.Contains("없") || pose.Contains("벗") || pose.Contains("해제") ? "" : "masked";
+            if (actor == "aki" && pose.Contains("라이딩 슈트")) return "riding";
             if (actor == "aki" && everyday) return "casual";
             if (actor == "sherry" && pose.Contains("타락")) return "fallen";
-            if (actor == "sherry" && everyday) return "";
+            if (actor == "sherry" && (everyday || pose.Contains("평소 복장") || pose.Contains("드레스 코트"))) return "";
             return null;
         }
 

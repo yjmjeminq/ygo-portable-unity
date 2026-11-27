@@ -12,15 +12,15 @@ namespace YGOPortable.UI
         private const string ArtRoot = "TagForce/5DS/";
         private const string WalkerPath = ArtRoot + "Characters_SD/hero.png";
         private readonly TagForceWorldImages _images = new();
-        private readonly RectTransform _root, _map, _walker, _marker;
-        private readonly Image _picture, _character;
+        private readonly RectTransform _root, _map, _walker, _guest, _marker;
+        private readonly Image _picture, _character, _guestImage;
         private readonly Text _title;
         private readonly Button _continue;
         private readonly List<Vector2> _path = new();
         private RpgFieldTerrain _terrain;
-        private Sprite[] _poses;
+        private Sprite[] _poses, _guestPoses;
         private Action _enter;
-        private Vector2 _position, _destination;
+        private Vector2 _position, _destination, _guestPosition;
         private int _step, _facing = 3;
         private float _walkTime, _clock;
         private bool _enterOnArrival;
@@ -48,10 +48,14 @@ namespace YGOPortable.UI
             alert.raycastTarget = false;
 
             _walker = DuelUiKit.CreateRect("Protagonist", _map, Vector2.zero, Vector2.zero,
-                new Vector2(-48f, 0f), new Vector2(48f, 112f));
+                new Vector2(-55f, 0f), new Vector2(55f, 132f));
             _walker.pivot = new Vector2(.5f, 0f);
             _walker.anchoredPosition = Vector2.zero;
             _character = DuelUiKit.AddImage(_walker.gameObject, null, Color.white, true, false);
+            _guest = DuelUiKit.CreateRect("StoryGuest", _map, Vector2.zero, Vector2.zero,
+                new Vector2(-55f, 0f), new Vector2(55f, 132f));
+            _guest.pivot = new Vector2(.5f, 0f);
+            _guestImage = DuelUiKit.AddImage(_guest.gameObject, null, Color.white, true, false);
             var banner = DuelUiKit.CreateMenuPanel(_map, "Location", new Vector2(.04f, .85f), new Vector2(.64f, .96f));
             RpgUiStyle.Panel(banner);
             _title = DuelUiKit.AddFittedText(banner, "Title", "", 27, 15, TextAnchor.MiddleCenter,
@@ -62,18 +66,24 @@ namespace YGOPortable.UI
             Close();
         }
 
-        internal bool Open(string path, string title, Action enter)
+        internal bool Open(string path, string title, Action enter, string guest = null)
         {
             var terrain = Terrain(path);
             if (terrain == null) return false;
             _images.BeginPage();
             _picture.sprite = _images.Get(ArtRoot + path);
             _poses = _images.GetSlices(WalkerPath, 3, 4, fitRows: true);
+            _guestPoses = guest == null ? null : _images.GetSlices(ArtRoot + $"Characters_SD/{guest}.png", 3, 4, fitRows: true);
             _images.Trim();
             if (_picture.sprite == null || _poses?.Length != 12) return false;
             _terrain = terrain;
             _position = terrain.Ground(new Vector2(.32f, .21f));
             _destination = terrain.Ground(new Vector2(.69f, .37f));
+            _guestPosition = terrain.Ground(new Vector2(.77f, .38f));
+            _guest.anchorMin = _guest.anchorMax = _guestPosition;
+            _guest.anchoredPosition = Vector2.zero;
+            _guest.localScale = Vector3.one * terrain.ScaleAt(_guestPosition.y);
+            _guest.gameObject.SetActive(_guestPoses?.Length == 12);
             _step = 0;
             _facing = 3;
             _walkTime = _clock = 0f;
@@ -91,8 +101,8 @@ namespace YGOPortable.UI
         {
             Root.SetActive(false);
             _enter = null;
-            _character.sprite = _picture.sprite = null;
-            _poses = null;
+            _character.sprite = _guestImage.sprite = _picture.sprite = null;
+            _poses = _guestPoses = null;
             _images.BeginPage();
             _images.Trim();
         }
@@ -132,6 +142,16 @@ namespace YGOPortable.UI
             _character.sprite = _poses[_facing * 3 + frame];
             _walker.anchorMin = _walker.anchorMax = _position;
             _walker.localScale = Vector3.one * _terrain.ScaleAt(_position.y);
+            if (_guestPoses?.Length == 12)
+            {
+                Vector2 facing = _position - _guestPosition;
+                int look = Mathf.Abs(facing.x) > Mathf.Abs(facing.y)
+                    ? facing.x < 0f ? 1 : 2 : facing.y < 0f ? 0 : 3;
+                _guestImage.sprite = _guestPoses[look * 3];
+                bool playerInFront = _position.y < _guestPosition.y;
+                if (playerInFront != (_walker.GetSiblingIndex() > _guest.GetSiblingIndex()))
+                    _walker.SetSiblingIndex(_guest.GetSiblingIndex());
+            }
             _marker.anchorMin = _marker.anchorMax = _destination;
             float bob = Mathf.Sin(_clock * 4f) * 4f;
             _marker.anchoredPosition = new Vector2(0f, 54f + bob);

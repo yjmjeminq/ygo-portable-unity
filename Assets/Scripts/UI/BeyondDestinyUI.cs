@@ -134,7 +134,7 @@ namespace YGOPortable.UI
                 _field.Open(scene.backgroundPath, scene.title, () =>
                 {
                     if (Save(() => _playback.UnlockLocation(scene.backgroundPath))) Resume();
-                }))
+                }, _playback.FieldGuest()))
             {
                 _panel.gameObject.SetActive(false);
                 _dialogue.Close();

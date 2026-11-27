@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 using YGOPortable.Core;
 using YGOPortable.UI;
 
@@ -112,10 +114,16 @@ namespace YGOPortable.Editor
                     opening.Pages[0].Audio.Any(cue => cue.clipKeys?.Contains("BGM_Dark_Alley_Loop") == true),
                     "The opening must pass its painted background and original music cue to the dialogue.");
                 int readable = 0, duels = 0;
+                var wardrobe = new HashSet<string>();
                 while (!playback.Progress.completed)
                 {
                     var segment = playback.Read();
                     readable += segment.Pages.Length;
+                    foreach (var page in segment.Pages)
+                    {
+                        wardrobe.Add(page.Hero);
+                        wardrobe.Add(page.Other);
+                    }
                     playback.Finish(segment);
                     if (segment.Duel == null) continue;
                     var continueFromSave = new BeyondDestinyPlayback(campaign, root);
@@ -126,6 +134,8 @@ namespace YGOPortable.Editor
                     ++duels;
                 }
                 var allCues = campaign.Episodes.SelectMany(episode => episode.scenes).SelectMany(scene => scene.events);
+                foreach (string variant in new[] { "hero_scar", "aki_masked", "aki_casual", "aki_riding", "sherry_fallen" })
+                    Require(wardrobe.Contains($"Characters_Standing/{variant}"), $"No manuscript page selected costume {variant}.");
                 Require(readable == allCues.Count(cue => cue.IsReadable), "Playback dropped or repeated source dialogue.");
                 Require(duels == 15 && playback.Progress.earnedRewards.Contains("episode_37_clear"),
                     $"Playback must reach every playable duel and its finale (actual duels: {duels}).");
@@ -190,6 +200,18 @@ namespace YGOPortable.Editor
                 field.MoveToStory();
                 for (int i = 0; i < 60 && !entered; ++i) field.Update(.05f, Vector2.zero);
                 Require(entered && !field.IsOpen, "The scene could not be reached on foot or left the field controls open.");
+                foreach (string actor in new[] { "aki", "sherry", "devine", "yusei", "jack", "crow", "mizoguchi",
+                    "misty", "rex", "zone", "ghost_a" })
+                {
+                    Require(field.Open("Maps/spot_kaiba_dome_plaza.png", "카이바 돔 스타디움", () => { }, actor),
+                        $"The field could not stage {actor}.");
+                    var guest = field.Root.transform.Find("FieldProjection/StoryGuest").GetComponent<Image>();
+                    Require(guest.isActiveAndEnabled && guest.sprite != null, $"Missing direction frames for guest {actor}.");
+                    var before = guest.sprite;
+                    for (int step = 0; step < 38; ++step) field.Update(.05f, Vector2.right);
+                    Require(guest.sprite != before, $"The field guest {actor} did not face the approaching player.");
+                    field.Close();
+                }
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }

@@ -750,6 +750,212 @@
         1774
       ],
       "prompt": "Use case: illustration-story. Produce a new original 8-head full-body standing character sprite for a Korean animated visual novel. Genuinely transparent RGBA, no ground shadow or lingering alpha haze, entire head to boots centered with modest clear margin around the subject, slightly three-quarter silhouette, crisp fine contours and subtle brushed cel shading, steel-blue ambient light suitable for dark and light backgrounds. Hand-painted texture. The supplied portrait is an example of style only; this character has their own anatomy and identity. No text, watermark, design sheets, frames, logos or game asset recreation.\nA lone anonymous A-series pursuer known as Ghost, tall adult humanoid robot, originally designed heavy matte graphite racing armor with slightly streamlined angular shoulders, faceted fully enclosed black helmet and one slim horizontal blood-red luminous line, crisp metal neck collar and narrow red running lights, charcoal reinforced trousers and integrated technical boots. Straight alert pose, hands with articulated glove segments and no weapons, silhouette effortless to recognize."
+    },
+    {
+      "path": "Characters_Standing/aki_casual.png",
+      "key": "aki_casual",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New standing sprite pose for this adult character from the Beyond Destiny game. Keep the referenced design's identity through the same face proportions, eye color, hair shape, body proportions, and hand-painted Korean animation style. Draw an entire 8-head figure with several pixels of transparent margin above hair and below both shoes, genuine transparent RGBA, no fog or shadows on alpha, no text, scene elements or frame. New pose and costume variant.\nModest everyday adult street clothing: soft slate jacket, ivory knit top with simple crew neck, narrow wine-red scarf and dark straight trousers, muted oxblood ankle boots. Her asymmetric winered bob and dark rose amber eyes remain immediately recognizable. Unmasked. Quietly hopeful neutral smile, hands relaxed."
+    },
+    {
+      "path": "Characters_Standing/aki_riding.png",
+      "key": "aki_riding",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New standing sprite pose for this adult character from the Beyond Destiny game. Keep the referenced design's identity through the same face proportions, eye color, hair shape, body proportions, and hand-painted Korean animation style. Draw an entire 8-head figure with several pixels of transparent margin above hair and below both shoes, genuine transparent RGBA, no fog or shadows on alpha, no text, scene elements or frame. New pose and costume variant.\nAki wears her original fitted high-collared oxblood motorcycle protection jacket, black adaptive inserts over shoulders, unobtrusive waist hardware, black riding trousers, oxblood boots, navy red gauntlet gloves. Helmet off and held under one arm, face exposed, expression confidently intent, no blush."
+    },
+    {
+      "path": "Characters_Standing/sherry_fallen.png",
+      "key": "sherry_fallen",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New standing sprite pose for this adult character from the Beyond Destiny game. Keep the referenced design's identity through the same face proportions, eye color, hair shape, body proportions, and hand-painted Korean animation style. Draw an entire 8-head figure with several pixels of transparent margin above hair and below both shoes, genuine transparent RGBA, no fog or shadows on alpha, no text, scene elements or frame. New pose and costume variant.\nSherry in a darker shrouded original riding coat, midnight violet high-collar over navy with torn ivory asymmetrical shoulder panel, muted thin gold hems, dark riding trousers and tall boots. Wind brushes her neat blond layers across one eye; icy blue gaze and controlled exhausted expression. No injury, supernatural signs or shadow around feet."
+    },
+    {
+      "path": "Characters_Standing/hero_scar.png",
+      "key": "hero_scar",
+      "source": "ImageGen built-in",
+      "resolution": [
+        887,
+        1774
+      ],
+      "prompt": "Use case: illustration-story. New standing sprite pose for this adult character from the Beyond Destiny game. Keep the referenced design's identity through the same face proportions, eye color, hair shape, body proportions, and hand-painted Korean animation style. Draw an entire 8-head figure with several pixels of transparent margin above hair and below both shoes, genuine transparent RGBA, no fog or shadows on alpha, no text, scene elements or frame. New pose and costume variant.\nYun's same charcoal coat open a little over the gray stand-collar shirt at top. Let a small pale barcode-like healed burn scar be visible just below his left collarbone (no letters or actual barcode numbers; thin parallel healed marks, non-graphic), black fingerless gloves. His head turns a little toward camera-left, right hand raising the coat collar unconsciously. Hair short and unchanged. Tired but composed eyes."
+    },
+    {
+      "path": "Characters_SD/aki.png",
+      "key": "aki_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "prompt": "Use case: illustration-story. New 2.5D exploration animated SD sprite sheet for Beyond Destiny, genuine transparent RGBA. Use the supplied adult standing character as exact reference for eyes, hair, colors, jacket and boots, and adapt into proportional 3.2-head compact stylized 2.5D field art with robust leg silhouette. Precisely THREE columns and FOUR rows with consistent cell occupancy, feet close to bottom of each cell but separated by a clear transparent gutter on all sides. Row 1 front facing idle, walk left foot forward, walk right foot forward. Row 2 left-facing exact side profile idle, walk left foot forward, walk right foot forward. Row 3 right-facing exact side profile idle, walk left foot forward, walk right foot forward. Row 4 back facing idle, walk left foot forward, walk right foot forward. Distinct footfalls, same costume throughout, no outlines of cells, no lettering, no floor shadow, no background, each character within their cell and all feet visible.\nAki's wine-red bob, silver clasp oxblood high-collar coat, black pants and oxblood boots; unmasked with reserved face.",
+      "actor": "aki",
+      "grid": [
+        3,
+        4
+      ]
+    },
+    {
+      "path": "Characters_SD/sherry.png",
+      "key": "sherry_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "prompt": "Use case: illustration-story. New 2.5D exploration animated SD sprite sheet for Beyond Destiny, genuine transparent RGBA. Use the supplied adult standing character as exact reference for eyes, hair, colors, jacket and boots, and adapt into proportional 3.2-head compact stylized 2.5D field art with robust leg silhouette. Precisely THREE columns and FOUR rows with consistent cell occupancy, feet close to bottom of each cell but separated by a clear transparent gutter on all sides. Row 1 front facing idle, walk left foot forward, walk right foot forward. Row 2 left-facing exact side profile idle, walk left foot forward, walk right foot forward. Row 3 right-facing exact side profile idle, walk left foot forward, walk right foot forward. Row 4 back facing idle, walk left foot forward, walk right foot forward. Distinct footfalls, same costume throughout, no outlines of cells, no lettering, no floor shadow, no background, each character within their cell and all feet visible.\nSherry's gold layered bob, ivory asymmetric long coat and ultramarine shoulder flap with fine gold trim, navy trousers and pale boots.",
+      "actor": "sherry",
+      "grid": [
+        3,
+        4
+      ]
+    },
+    {
+      "path": "Characters_SD/yusei.png",
+      "key": "yusei_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "prompt": "Use case: illustration-story. New 2.5D exploration animated SD sprite sheet for Beyond Destiny, genuine transparent RGBA. Use the supplied adult standing character as exact reference for eyes, hair, colors, jacket and boots, and adapt into proportional 3.2-head compact stylized 2.5D field art with robust leg silhouette. Precisely THREE columns and FOUR rows with consistent cell occupancy, feet close to bottom of each cell but separated by a clear transparent gutter on all sides. Row 1 front facing idle, walk left foot forward, walk right foot forward. Row 2 left-facing exact side profile idle, walk left foot forward, walk right foot forward. Row 3 right-facing exact side profile idle, walk left foot forward, walk right foot forward. Row 4 back facing idle, walk left foot forward, walk right foot forward. Distinct footfalls, same costume throughout, no outlines of cells, no lettering, no floor shadow, no background, each character within their cell and all feet visible.\nYusei's black compact pointed locks with a couple gold streaks, petrol blue mechanic jacket with muted orange tabs, dark trousers and riding boots.",
+      "actor": "yusei",
+      "grid": [
+        3,
+        4
+      ]
+    },
+    {
+      "path": "Characters_SD/devine.png",
+      "actor": "devine",
+      "key": "devine_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite.",
+      "normalization": "Row 2 mirrored by cell so leftward movement faces left. Transparent row gutters aligned."
+    },
+    {
+      "path": "Characters_SD/jack.png",
+      "actor": "jack",
+      "key": "jack_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
+    },
+    {
+      "path": "Characters_SD/crow.png",
+      "actor": "crow",
+      "key": "crow_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
+    },
+    {
+      "path": "Characters_SD/mizoguchi.png",
+      "actor": "mizoguchi",
+      "key": "mizoguchi_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
+    },
+    {
+      "path": "Characters_SD/misty.png",
+      "actor": "misty",
+      "key": "misty_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
+    },
+    {
+      "path": "Characters_SD/rex.png",
+      "actor": "rex",
+      "key": "rex_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
+    },
+    {
+      "path": "Characters_SD/zone.png",
+      "actor": "zone",
+      "key": "zone_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
+    },
+    {
+      "path": "Characters_SD/ghost_a.png",
+      "actor": "ghost_a",
+      "key": "ghost_a_sd",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1086,
+        1448
+      ],
+      "grid": [
+        3,
+        4
+      ],
+      "prompt": "Use case: illustration-story. Produce a new genuinely transparent RGBA sprite atlas for Beyond Destiny 2.5D field exploration. Use the supplied standing character as your exact subject for face, hair, clothing and color, adapting into a clean compact 3.2-head-tall SD field character. Precisely THREE columns by FOUR rows, even pitch in both directions and very clearly EMPTY transparent gutters between every row and cell, reserve 8 pixels margin each side of each subject. Row ONE FRONT standing idle, front left step, front right step. Row TWO exact LEFT SIDE PROFILE idle, leftward left step, leftward right step. Row THREE exact RIGHT SIDE PROFILE idle, rightward left step, rightward right step. Row FOUR BACK facing idle, back left step, back right step. Keep each full character within the rectangle of its slot even while feet step, feet line consistent across each row, minimize silhouette shift to avoid jitter. Each poses has identical features and same clothing. No floor shadows, borders, separators, letters, steam, scene, text, logos, watermarks or extra objects. Clean slightly textured cel-shaded original Korean animation sprite."
     }
   ],
   "cutscenes": [
