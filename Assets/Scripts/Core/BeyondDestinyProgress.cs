@@ -40,9 +40,9 @@ namespace YGOPortable.Core
             return !completed;
         }
 
-        internal static BeyondDestinyProgress Load(string persistentDataPath, BeyondDestinyCampaign campaign)
+        internal static BeyondDestinyProgress Load(string persistentDataPath, BeyondDestinyCampaign campaign, bool replay = false)
         {
-            string path = SavePath(persistentDataPath);
+            string path = SavePath(persistentDataPath, replay);
             if (!File.Exists(path)) return new BeyondDestinyProgress();
             var progress = JsonUtility.FromJson<BeyondDestinyProgress>(File.ReadAllText(path));
             if (progress == null) throw new InvalidDataException("The Beyond Destiny save could not be read.");
@@ -50,10 +50,10 @@ namespace YGOPortable.Core
             return progress;
         }
 
-        internal void Save(string persistentDataPath, BeyondDestinyCampaign campaign)
+        internal void Save(string persistentDataPath, BeyondDestinyCampaign campaign, bool replay = false)
         {
             Validate(campaign);
-            string path = SavePath(persistentDataPath);
+            string path = SavePath(persistentDataPath, replay);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string pending = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
@@ -82,6 +82,9 @@ namespace YGOPortable.Core
                 throw new InvalidDataException("The final Beyond Destiny checkpoint is missing.");
         }
 
-        private static string SavePath(string root) => Path.Combine(root, "campaigns", "beyond_destiny.json");
+        internal static bool HasReplay(string root) => File.Exists(SavePath(root, replay: true));
+
+        private static string SavePath(string root, bool replay) =>
+            Path.Combine(root, "campaigns", replay ? "beyond_destiny_replay.json" : "beyond_destiny.json");
     }
 }

@@ -1277,7 +1277,8 @@
               "text": "이곳은 시티의 화려한 불빛이 닿지 않는 외곽의 폐공장 지대.\n썩은 빗물과 녹슨 철 냄새가 진동하는 진창 바닥에, 검은 정장을 입은 사내 하나가 개처럼 쓰러져 거친 숨을 몰아쉬고 있었다.",
               "line": 20,
               "source": "[내레이션]\n이곳은 시티의 화려한 불빛이 닿지 않는 외곽의 폐공장 지대.\n썩은 빗물과 녹슨 철 냄새가 진동하는 진창 바닥에, 검은 정장을 입은 사내 하나가 개처럼 쓰러져 거친 숨을 몰아쉬고 있었다.\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "시티의 화려한 불빛은 외곽의 폐공장까지 닿지 않았다.\n썩은 빗물과 녹슨 쇠 냄새가 진동하는 진창에 검은 정장을 입은 사내가 쓰러져 있었다. 사내는 가쁜 숨을 몰아쉬었다."
             },
             {
               "kind": "sound",
@@ -2687,7 +2688,8 @@
               "source": "아키 (혼란):\n\"그 사람의 눈... 어째서 나랑 똑같은 어둠을 품고 있었던 거지...?\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
               "guestPortrait": "Characters_Standing/aki_masked",
-              "speakerSide": 2
+              "speakerSide": 2,
+              "displayText": "\"그 사람의 눈은… 왜 나랑 똑같았던 거지?\""
             },
             {
               "kind": "narration",
@@ -2800,14 +2802,16 @@
               "text": "\"신사 숙녀 여러분! 드디어 대망의 듀얼 대회, 포츈 컵이 막을 올렸습니다!! 영광의 킹, 잭 아틀라스에게 도전할 최강의 듀얼리스트는 과연 누가 될 것인가!!\"",
               "line": 15,
               "source": "MC (스피커 에코):\n\"신사 숙녀 여러분! 드디어 대망의 듀얼 대회, 포츈 컵이 막을 올렸습니다!! 영광의 킹, 잭 아틀라스에게 도전할 최강의 듀얼리스트는 과연 누가 될 것인가!!\"\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "\"신사 숙녀 여러분, 포츈 컵의 막이 올랐습니다! 과연 누가 최강의 자리에 올라 킹, 잭 아틀라스에게 도전하게 될까요?\""
             },
             {
               "kind": "narration",
               "text": "며칠 전의 비 내리던 뒷골목과는 완전히 다른 세상이었다.\n눈이 시릴 정도로 눈부신 햇살과 귀청을 찢을 듯한 관중들의 환호성.\n하지만 이 화려한 무대 뒤편에 얼마나 역겨운 음모가 도사리고 있는지, 저 들뜬 관중들은 아무도 알지 못한다.",
               "line": 18,
               "source": "[내레이션]\n며칠 전의 비 내리던 뒷골목과는 완전히 다른 세상이었다.\n눈이 시릴 정도로 눈부신 햇살과 귀청을 찢을 듯한 관중들의 환호성.\n하지만 이 화려한 무대 뒤편에 얼마나 역겨운 음모가 도사리고 있는지, 저 들뜬 관중들은 아무도 알지 못한다.\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "며칠 전, 비가 쏟아지던 골목과는 딴판이었다.\n햇살에 눈이 시렸고, 관중의 환호에 귀가 먹먹했다.\n이 화려한 무대 뒤에서 무슨 일이 벌어지고 있는지 아는 사람은 저 관중석에 없었다."
             },
             {
               "kind": "background",
@@ -3528,7 +3532,8 @@
               "line": 197,
               "source": "[내레이션]\n정적이 흐르는 대기실.\n홀로 남겨진 아키는 한참 동안 문 쪽을 바라보다가, 천천히 자신의 무릎 위에 놓인 서류 뭉치로 시선을 내렸다.\n그리고 붕대가 감긴 오른손으로, 떨리는 손끝을 뻗어 첫 장을 넘겼다.\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "guestPortrait": "Characters_Standing/aki"
+              "guestPortrait": "Characters_Standing/aki",
+              "displayText": "대기실이 조용해졌다.\n아키는 한참 동안 문만 바라보다 무릎 위의 서류로 눈을 내렸다.\n붕대 감긴 오른손이 떨렸다. 그녀는 조심스럽게 첫 장을 넘겼다."
             },
             {
               "kind": "sound",
@@ -4692,7 +4697,8 @@
               "source": "아르카디아 공작원 A (낮은 목소리):\n\"제어반 해킹 완료했습니다. 다음 아키 님의 경기 때, 아레나 솔리드 비전의 출력 리미터를 300%까지 강제 해제하도록 예약해 두었습니다.\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
               "guestPortrait": "Characters_Standing/arcadia_operative_a",
-              "speakerSide": 2
+              "speakerSide": 2,
+              "displayText": "\"제어반을 장악했습니다. 아키 님의 다음 경기 때 솔리드 비전 출력 제한을 풀어 300%까지 올리도록 해뒀습니다.\""
             },
             {
               "kind": "dialogue",
@@ -5970,7 +5976,8 @@
               "text": "그녀가 버리지 못한 건 붕대만이 아니다.\n어젯밤 그녀가 찢지 못한 그 서류 한 장이, 지금 그녀 안에서 디바인의 거짓말을 서서히 갉아먹고 있었다.",
               "line": 328,
               "source": "[내레이션]\n그녀가 버리지 못한 건 붕대만이 아니다.\n어젯밤 그녀가 찢지 못한 그 서류 한 장이, 지금 그녀 안에서 디바인의 거짓말을 서서히 갉아먹고 있었다.\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "그녀가 버리지 못한 건 붕대만이 아니었다.\n어젯밤 끝내 찢지 못한 서류 한 장. 그걸 본 뒤로는 디바인의 말을 예전처럼 믿을 수 없었을 것이다."
             },
             {
               "kind": "thought",
@@ -9320,7 +9327,8 @@
               "text": "하지만 안도하기엔 이르다.\n내 시선이 곧바로 VIP석을 향했다.\n아니나 다를까. VIP석에 앉아 있던 디바인이 굳은 표정으로 자리에서 벌떡 일어나, 경호원들을 대동하고 급히 지하 통로 쪽으로 이동하고 있었다.",
               "line": 191,
               "source": "[내레이션]\n하지만 안도하기엔 이르다.\n내 시선이 곧바로 VIP석을 향했다.\n아니나 다를까. VIP석에 앉아 있던 디바인이 굳은 표정으로 자리에서 벌떡 일어나, 경호원들을 대동하고 급히 지하 통로 쪽으로 이동하고 있었다.\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "아직 안도하긴 일렀다.\n나는 곧바로 VIP석을 바라봤다.\n예상대로였다. 디바인은 굳은 얼굴로 자리에서 일어나 경호원들과 함께 지하 통로로 향했다."
             },
             {
               "kind": "dialogue",
@@ -14817,7 +14825,8 @@
               "cutsceneKey": "ep13_ashes",
               "heroPortrait": "Characters_Standing/hero",
               "speakerSide": 1,
-              "guestPortrait": "Characters_Standing/aki_distress"
+              "guestPortrait": "Characters_Standing/aki_distress",
+              "displayText": "(울어도 돼. 적어도 지금은 내가 여기 있으니까.)"
             },
             {
               "kind": "direction",
@@ -14919,7 +14928,8 @@
               "text": "아르카디아 무브먼트 본부가 무너진 다음 날 아침.\n잿더미 속에서 한참을 울다가 결국 탈진해 의식을 잃은 아키를, 나는 그대로 안아 들고 시티 중앙 병원으로 옮겼다.\n치안유지국의 눈을 피해 응급실에 그녀를 맡기고, 유세이에게 짧은 익명 메시지를 남겨 아키의 부모님과 연락이 닿도록 해두었다.",
               "line": 15,
               "source": "[내레이션]\n아르카디아 무브먼트 본부가 무너진 다음 날 아침.\n잿더미 속에서 한참을 울다가 결국 탈진해 의식을 잃은 아키를, 나는 그대로 안아 들고 시티 중앙 병원으로 옮겼다.\n치안유지국의 눈을 피해 응급실에 그녀를 맡기고, 유세이에게 짧은 익명 메시지를 남겨 아키의 부모님과 연락이 닿도록 해두었다.\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "아르카디아 무브먼트 본부가 무너진 다음 날 아침.\n잿더미 속에서 울다 지쳐 의식을 잃은 아키를 안고 시티 중앙 병원으로 갔다.\n치안유지국의 눈을 피해 그녀를 응급실에 맡겼다. 유세이에게는 아키의 부모님께 연락해 달라는 익명 메시지를 남겼다."
             },
             {
               "kind": "narration",
@@ -14937,7 +14947,8 @@
               "line": 25,
               "source": "[주인공] (속마음):\n(참으로 우스운 꼴이군. 복수가 끝나면 모든 게 후련해질 줄 알았는데. 정작 남은 건 이 텅 빈 공허감뿐인가.)\n\n",
               "heroPortrait": "Characters_Standing/hero_haunted",
-              "speakerSide": 1
+              "speakerSide": 1,
+              "displayText": "(우스운 꼴이군. 복수만 끝나면 속이 후련할 줄 알았는데. 남은 게 이렇게 허전할 줄은 몰랐어.)"
             },
             {
               "kind": "narration",
@@ -17878,7 +17889,8 @@
               "source": "[주인공] (단단하게):\n\"알았어. 안 죽어. 네가 돌아올 때까지 결계 바깥에서 버티고 있을 테니까... 너도 반드시 이기고 돌아와, 아키.\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
               "speakerSide": 1,
-              "guestPortrait": "Characters_Standing/aki_casual_hope"
+              "guestPortrait": "Characters_Standing/aki_casual_hope",
+              "displayText": "\"알았어. 안 죽어. 네가 돌아올 때까지 결계 밖에서 버틸게. 그러니까 너도 꼭 이기고 돌아와, 아키.\""
             },
             {
               "kind": "dialogue",
@@ -17890,7 +17902,8 @@
               "source": "아키 (눈물을 닦으며 환하게 웃음):\n\"응! 약속할게! 반드시 이기고 네 옆으로 돌아올게!\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
               "guestPortrait": "Characters_Standing/aki_casual_hope",
-              "speakerSide": 2
+              "speakerSide": 2,
+              "displayText": "\"응. 꼭 이기고 네 옆으로 돌아올게. 약속해.\""
             },
             {
               "kind": "narration",
@@ -19787,7 +19800,8 @@
               "line": 15,
               "source": "[내레이션]\n네 개의 제어탑이 모두 해방되었음에도, 어둠은 끝나지 않았다.\n오히려 그 모든 사건의 진짜 배후—치안유지국 장관 렉스 고드윈이 스스로 시그너와 다크 시그너의 힘을 모두 손에 넣고, 명계의 왕을 강림시키려 하고 있었다.\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "guestPortrait": "Characters_Standing/rex_fervor"
+              "guestPortrait": "Characters_Standing/rex_fervor",
+              "displayText": "네 개의 제어탑을 모두 해방했어도 싸움은 끝나지 않았다.\n모든 사건의 배후였던 치안유지국 장관 렉스 고드윈은 시그너와 다크 시그너의 힘을 손에 넣고 명계의 왕을 불러내려 하고 있었다."
             },
             {
               "kind": "narration",
@@ -20460,7 +20474,8 @@
               "source": "[주인공] (낮고, 따뜻한 미소를 띠며):\n\"그래. 어디 안 가. ...돌아가자, 아키.\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
               "speakerSide": 1,
-              "guestPortrait": "Characters_Standing/aki_casual_hope"
+              "guestPortrait": "Characters_Standing/aki_casual_hope",
+              "displayText": "\"그래. 안 가. 이제 돌아가자, 아키.\""
             },
             {
               "kind": "dialogue",
@@ -21422,7 +21437,8 @@
               "line": 242,
               "source": "[내레이션]\n환하게 웃는 아키의 얼굴을 바라보며, 나는 쇄골의 흉터가 조금 전보다 덜 아픈 것 같은 기묘한 착각에 빠졌다.\n어쩌면, 정말로 '내일'이라는 시간을 살아가도 괜찮을지도 모른다.\n적어도 이 순간만큼은, 그렇게 믿고 싶었다.\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "guestPortrait": "Characters_Standing/aki_casual_hope"
+              "guestPortrait": "Characters_Standing/aki_casual_hope",
+              "displayText": "아키가 환하게 웃었다. 그 얼굴을 보고 있으니 쇄골의 흉터가 조금 덜 아픈 것만 같았다.\n내일을 기다려도 괜찮을지 모른다는 생각이 들었다.\n적어도 그 순간엔 그러고 싶었다."
             },
             {
               "kind": "direction",
@@ -22469,7 +22485,8 @@
               "line": 23,
               "source": "[주인공] (무전기 너머 / 무뚝뚝하지만 부드럽게):\n\"직선 가속은 완벽해. 차선 변경할 때 시야만 조금 더 넓게 봐라. ...이제 슬슬 갓길 전망대에서 멈추지.\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "speakerSide": 1
+              "speakerSide": 1,
+              "displayText": "\"직선 가속은 좋아. 차선을 바꿀 땐 시야를 조금 더 넓혀. 슬슬 갓길 전망대에 세우자.\""
             },
             {
               "kind": "narration",
@@ -23014,7 +23031,8 @@
               "line": 173,
               "source": "[내레이션]\n태어나서 처음으로, 내일이 오는 것이 두렵지 않았다.\n이 온기를, 이 여자를 지키기 위해서라면 무엇이든 할 수 있을 것 같았다.\n\n",
               "cutsceneKey": "ep23_scar",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "처음으로 내일이 오는 게 두렵지 않았다.\n이 온기와 내 곁에 있는 사람을 지킬 수 있다면 뭐든 할 수 있을 것 같았다."
             },
             {
               "kind": "direction",
@@ -23178,7 +23196,8 @@
               "line": 22,
               "source": "[주인공] (무전기 너머 / 입꼬리를 살짝 올리며):\n\"들떠서 시선 놓치지 마라. 시속 100 이상은 아직 무리니까 내 옆 라인 유지해.\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "speakerSide": 1
+              "speakerSide": 1,
+              "displayText": "\"들떠도 앞은 봐. 아직 시속 100은 무리야. 내 옆 차선에서 따라와.\""
             },
             {
               "kind": "dialogue",
@@ -24089,7 +24108,8 @@
               "line": 263,
               "source": "[주인공] (떨리는 목소리 / 이를 악물며):\n\"조금만 버텨, 아키... 지금 당장 병원으로 데려갈 테니까. 제발... 눈 뜨고 있어...\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "speakerSide": 1
+              "speakerSide": 1,
+              "displayText": "\"아키, 조금만 버텨. 바로 병원에 갈 거야. 제발 눈 감지 마.\""
             },
             {
               "kind": "narration",
@@ -28698,7 +28718,8 @@
               "text": "\"준결승 제1경기!! 팀 5D's 대 팀 셰리!! 1번 주자 대결에서 잭 아틀라스 선수가 미조구치 선수를 꺾었지만, 남은 라이프는 겨우 1100! 뒤이어 출격한 팀 셰리의 2번 주자가 엄청난 기세로 잭 선수를 추격하고 있습니다!!\"",
               "line": 15,
               "source": "MC (흥분 / 외침):\n\"준결승 제1경기!! 팀 5D's 대 팀 셰리!! 1번 주자 대결에서 잭 아틀라스 선수가 미조구치 선수를 꺾었지만, 남은 라이프는 겨우 1100! 뒤이어 출격한 팀 셰리의 2번 주자가 엄청난 기세로 잭 선수를 추격하고 있습니다!!\"\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "\"준결승 첫 경기, 팀 5D’s 대 팀 셰리! 잭 아틀라스가 미조구치를 꺾었지만 남은 라이프는 1100! 팀 셰리의 두 번째 주자가 잭을 빠르게 따라붙습니다!\""
             },
             {
               "kind": "narration",
@@ -30543,7 +30564,8 @@
               "line": 250,
               "source": "[내레이션]\n하지만 트랙 위에서 서로를 애틋하게 바라보는 두 사람의 모습이, 대형 중계 카메라를 통해 피트 모니터에 그대로 송출되고 있었다.\n모니터 앞에 홀로 서 있던 셰리 르블랑의 손에서, 헬멧이 툭— 바닥으로 떨어졌다.\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "guestPortrait": "Characters_Standing/sherry_stern"
+              "guestPortrait": "Characters_Standing/sherry_stern",
+              "displayText": "두 사람이 트랙 위에서 마주 보는 모습은 대형 중계 카메라를 통해 피트 모니터에 그대로 비쳤다.\n화면을 바라보던 셰리의 손에서 헬멧이 툭 떨어졌다."
             },
             {
               "kind": "dialogue",
@@ -31584,7 +31606,8 @@
               "source": "미조구치 (떨리는 목소리 / 무릎을 꿇으며):\n\"...죄송합니다. 제가 곁에 있었으면서도, 아가씨의 마음이 그토록 곪아 가고 있다는 걸 눈치채지 못했습니다.\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
               "guestPortrait": "Characters_Standing/mizoguchi",
-              "speakerSide": 2
+              "speakerSide": 2,
+              "displayText": "\"죄송합니다. 곁에 있으면서도 아가씨가 그토록 힘들어하시는 줄 몰랐습니다.\""
             },
             {
               "kind": "dialogue",
@@ -32705,7 +32728,8 @@
               "line": 20,
               "source": "[내레이션]\n필드가 전개되자마자 회랑의 공기가 무겁게 가라앉았다.\nZ-ONE이 부여한 차원의 힘 때문인지, 셰리의 주변에는 솔리드 비전을 넘어선 실제 물리적인 압력이 서늘하게 감돌고 있었다.\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "guestPortrait": "Characters_Standing/aki_riding_resolve"
+              "guestPortrait": "Characters_Standing/aki_riding_resolve",
+              "displayText": "필드가 펼쳐지자 회랑의 공기가 무겁게 가라앉았다.\n셰리의 곁에서는 솔리드 비전만으로는 설명할 수 없는 서늘한 압력이 느껴졌다. Z-ONE이 준 힘 때문일까."
             },
             {
               "kind": "dialogue",
@@ -35103,7 +35127,8 @@
               "text": "셰리는 소매로 눈물을 훔치더니, 내 오른손과 아키의 왼손을 잠깐 내려다보았다.\n그녀의 눈동자에서는 더 이상 Z-ONE의 검은 빛이 보이지 않았다.\n오직 맑고 단단한, 원래의 셰리 르블랑의 푸른 빛만이 반짝이고 있었다.",
               "line": 261,
               "source": "[내레이션]\n셰리는 소매로 눈물을 훔치더니, 내 오른손과 아키의 왼손을 잠깐 내려다보았다.\n그녀의 눈동자에서는 더 이상 Z-ONE의 검은 빛이 보이지 않았다.\n오직 맑고 단단한, 원래의 셰리 르블랑의 푸른 빛만이 반짝이고 있었다.\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "셰리는 소매로 눈물을 닦고 내 오른손과 아키의 왼손을 잠시 내려다봤다.\nZ-ONE의 검은 빛은 더 이상 그녀의 눈에 없었다.\n셰리의 맑고 단단한 푸른 눈이 다시 우리를 바라봤다."
             },
             {
               "kind": "direction",
@@ -35236,7 +35261,8 @@
               "source": "셰리 (팔짱을 끼며 / 살짝 떨리는 목소리):\n\"...저기, 이자요이 아키. 아까 그 절벽에서 했던 말... 진짜 진심으로 한 소리야?\"\n\n",
               "heroPortrait": "Characters_Standing/hero",
               "guestPortrait": "Characters_Standing/sherry",
-              "speakerSide": 2
+              "speakerSide": 2,
+              "displayText": "\"저기, 이자요이 아키. 아까 절벽에서 한 말… 진심이었어?\""
             },
             {
               "kind": "dialogue",
@@ -36220,7 +36246,8 @@
               "line": 245,
               "source": "[내레이션]\n붉은 용의 빛이 우리 세 사람을 감싸 안고, 눈부신 새벽하늘을 향해 날아올랐다.\n길고 지독했던 어둠의 밤이, 마침내 완전히 막을 내리고 있었다.\n\n",
               "heroPortrait": "Characters_Standing/hero",
-              "guestPortrait": "Characters_Standing/sherry"
+              "guestPortrait": "Characters_Standing/sherry",
+              "displayText": "붉은 용의 빛이 우리 셋을 감쌌다. 우리는 그 빛과 함께 눈부신 새벽하늘로 날아올랐다.\n길고 지독했던 밤이 끝났다."
             },
             {
               "kind": "direction",
@@ -36322,7 +36349,8 @@
               "text": "아크 크래들의 결전이 끝난 지, 어느덧 몇 년이라는 시간이 흘렀다.\n모멘트의 폭주는 완전히 멈췄고, 하늘을 뒤덮던 검은 그림자도 이제는 먼 옛날의 악몽처럼 희미해졌다.\n각자의 길을 향해 흩어진 동료들도 모두 제자리에서 눈부시게 살아가고 있었다.",
               "line": 15,
               "source": "[내레이션]\n아크 크래들의 결전이 끝난 지, 어느덧 몇 년이라는 시간이 흘렀다.\n모멘트의 폭주는 완전히 멈췄고, 하늘을 뒤덮던 검은 그림자도 이제는 먼 옛날의 악몽처럼 희미해졌다.\n각자의 길을 향해 흩어진 동료들도 모두 제자리에서 눈부시게 살아가고 있었다.\n\n",
-              "heroPortrait": "Characters_Standing/hero"
+              "heroPortrait": "Characters_Standing/hero",
+              "displayText": "아크 크래들의 결전이 끝나고 몇 년이 흘렀다.\n모멘트는 더 이상 폭주하지 않았고, 하늘을 덮었던 검은 그림자도 이제는 오래된 악몽처럼 희미했다.\n동료들은 각자의 길을 찾아 제자리를 잡았다."
             },
             {
               "kind": "narration",
@@ -37020,7 +37048,8 @@
               "source": "[주인공] (부드럽고 따뜻한 미소로):\n\"알았어. 지금 가지.\"\n\n",
               "cutsceneKey": "ep37_home",
               "heroPortrait": "Characters_Standing/hero",
-              "speakerSide": 1
+              "speakerSide": 1,
+              "displayText": "\"알았어. 지금 갈게.\""
             },
             {
               "kind": "direction",

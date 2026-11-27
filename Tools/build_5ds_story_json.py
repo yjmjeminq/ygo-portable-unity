@@ -526,6 +526,17 @@ def build(source, *, require_all_maps=False):
             raise ValueError(f"Unexpected racing background resolution: {path}")
     audio = bind_audio(episodes, catalog, json.loads(AUDIO_MANIFEST.read_text(encoding="utf-8")))
     portraits, expressions = bind_portraits(episodes, manifest)
+    editorial = json.loads((ASSET_MANIFEST.parent / "editorial.json").read_text(encoding="utf-8"))
+    cues = {(episode["number"], cue["line"]): cue for episode in episodes
+            for scene in episode["scenes"] for cue in scene["events"]}
+    for entry in editorial:
+        key = (entry["episode"], entry["line"])
+        cue = cues.get(key)
+        if (cue is None or cue["kind"] not in {"dialogue", "narration", "thought"} or
+                "displayText" in cue or not entry["text"].strip() or
+                hashlib.sha256(cue["text"].encode("utf-8")).hexdigest() != entry["sourceDigest"]):
+            raise ValueError(f"Editorial line no longer matches the manuscript: {key}")
+        cue["displayText"] = entry["text"]
     return {"schemaVersion": 1, "id": "beyond_destiny", "title": "5D's: Beyond Destiny",
             "linear": True, "sourceBibleSha256": hashes["5d_s_story_bible.md"],
             "speakers": SPEAKERS, "cueCatalog": catalog, "mappedBackgrounds": mapped_count,

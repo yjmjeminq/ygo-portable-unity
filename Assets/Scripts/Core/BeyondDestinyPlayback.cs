@@ -60,16 +60,26 @@ namespace YGOPortable.Core
 
         private readonly BeyondDestinyCampaign _campaign;
         private readonly string _saveDirectory;
+        private readonly bool _replay;
         internal BeyondDestinyProgress Progress { get; }
         internal BeyondDestinyCampaign.Episode Episode => _campaign.Episodes[Progress.episodeIndex];
         internal BeyondDestinyCampaign.Scene Scene => Progress.Scene(_campaign);
         internal BeyondDestinyCampaign.Deck Deck(int id) => _campaign.DeckById(id);
 
-        internal BeyondDestinyPlayback(BeyondDestinyCampaign campaign, string saveDirectory)
+        internal BeyondDestinyPlayback(BeyondDestinyCampaign campaign, string saveDirectory, bool replay = false)
         {
             _campaign = campaign;
             _saveDirectory = saveDirectory;
-            Progress = BeyondDestinyProgress.Load(saveDirectory, campaign);
+            _replay = replay;
+            Progress = BeyondDestinyProgress.Load(saveDirectory, campaign, replay);
+        }
+
+        internal bool ChangesLocationOrChapter(Segment segment)
+        {
+            if (segment.Duel != null) return false;
+            int next = Progress.sceneIndex + 1;
+            return next >= Episode.scenes.Length || !string.Equals(Scene.backgroundPath,
+                Episode.scenes[next].backgroundPath, StringComparison.Ordinal);
         }
 
         internal string FieldGuest()
@@ -186,7 +196,7 @@ namespace YGOPortable.Core
         internal static bool CanContinue(string resolution, bool won, bool validResult, bool reachedObjective) =>
             reachedObjective || validResult && (won || resolution is "interrupted" or "sparring" or "canonicalOpponentWin");
 
-        private void Save() => Progress.Save(_saveDirectory, _campaign);
+        private void Save() => Progress.Save(_saveDirectory, _campaign, _replay);
 
         private static string EpisodeReward(int index) => $"episode_{index + 1:00}_clear";
 

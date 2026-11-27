@@ -277,7 +277,7 @@ namespace YGOPortable.Editor
                     if (!BeyondDestinyProgress.Load(Application.persistentDataPath, _campaign).completed)
                         throw new InvalidOperationException("The final episode did not persist completion.");
                     Debug.Log("[Beyond Destiny Play Mode] Nine additional event CGs, expression portraits, rooftop POV, duet and finale save passed.");
-                    Finish(0);
+                    VerifyReplayControls();
                     return;
                 }
 
@@ -303,6 +303,36 @@ namespace YGOPortable.Editor
                 Debug.LogException(exception);
                 Finish(1);
             }
+        }
+
+        private static void VerifyReplayControls()
+        {
+            string path = Path.Combine(Application.persistentDataPath, "campaigns", "beyond_destiny.json");
+            byte[] main = File.ReadAllBytes(path);
+            Click("캠페인 선택");
+            Click("5D’s 처음부터 다시보기");
+            if (Playback().Episode.number != 1 || FindButton("이야기 시작") == null)
+                throw new InvalidOperationException("The replay menu did not enter the original opening.");
+            var replay = Playback();
+            replay.RememberPage(replay.Read().Pages[1].Index);
+            _app.ShowScreen(AppScreen.Campaigns);
+            Click("5D’s 처음부터 다시보기");
+            if (FindButton("다시보기 이어하기") == null)
+                throw new InvalidOperationException("The replay save did not persist.");
+            Click("처음부터 다시보기");
+            Click("취소");
+            Click("다시보기 이어하기");
+            if (Playback().Progress.cueIndex <= 0)
+                throw new InvalidOperationException("Cancelling a replay restart lost the saved place.");
+            _app.ShowScreen(AppScreen.Campaigns);
+            Click("5D’s 처음부터 다시보기");
+            Click("처음부터 다시보기");
+            Click("1화부터 시작");
+            if (Playback().Episode.number != 1 || Playback().Progress.cueIndex != 0 ||
+                FindButton("이야기 시작") == null || !File.ReadAllBytes(path).SequenceEqual(main))
+                throw new InvalidOperationException("Confirming a replay restart did not preserve the finished main route.");
+            Debug.Log("[Beyond Destiny Play Mode] Replay menu, restart confirmation, cancel, resume, and main save isolation passed.");
+            Finish(0);
         }
 
         private static void VerifySoundscape(string music, string ambience)
@@ -373,7 +403,7 @@ namespace YGOPortable.Editor
                 var panel = Get<Image>(view, "_dialoguePanel").rectTransform;
                 var next = FindButton("계속");
                 Canvas.ForceUpdateCanvases();
-                if (text.text != _campaign.Episodes[20].scenes[1].events.Single(cue => cue.line == 91).text ||
+                if (text.text != BeyondDestinyReading.Typeset(_campaign.Episodes[20].scenes[1].events.Single(cue => cue.line == 91).text) ||
                     next == null || !IsInside(panel, text.rectTransform) || !IsInside(panel, (RectTransform)next.transform))
                     throw new InvalidOperationException("The complete narration or continue control was outside its dialogue panel.");
                 var settings = text.GetGenerationSettings(text.rectTransform.rect.size);

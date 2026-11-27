@@ -17,16 +17,17 @@ namespace YGOPortable.UI
         private readonly Image _background, _curtain;
         private readonly CanvasGroup _input;
         private readonly Text _heading, _description;
-        private readonly Button _primary, _secondary, _back;
+        private readonly Button _primary, _secondary, _tertiary, _back;
         private readonly StoryModeUI.StoryDialogueView _dialogue;
         private readonly BeyondDestinyField _field;
         private readonly TagForceWorldImages _art = new();
         private BeyondDestinyCampaign _campaign;
         private BeyondDestinyPlayback _playback;
         private BeyondDestinyCampaign.Encounter _pending;
-        private Action _primaryAction, _secondaryAction, _afterCurtain;
+        private Action _primaryAction, _secondaryAction, _tertiaryAction, _afterCurtain;
+        private bool _replay, _chooseReplay;
         private float _curtainTime;
-        private const float CurtainDuration = .80f;
+        private const float CurtainDuration = .96f;
         private bool CurtainActive => _curtain.gameObject.activeSelf;
 
         internal GameObject Root => _root.gameObject;
@@ -47,7 +48,8 @@ namespace YGOPortable.UI
             _description = Label("Description", .47f, .71f, 26, FontStyle.Normal);
             _primary = Button("Primary", .21f, .30f, .79f, .44f, () => _primaryAction?.Invoke(), gold: true);
             _secondary = Button("Secondary", .21f, .15f, .79f, .28f, () => _secondaryAction?.Invoke());
-            _back = Button("Back", .70f, .030f, .95f, .12f, Back);
+            _tertiary = Button("Tertiary", .21f, .021f, .79f, .130f, () => _tertiaryAction?.Invoke());
+            _back = Button("Back", .82f, .030f, .97f, .12f, Back);
             SetLabel(_back, "뒤로");
             _field = new BeyondDestinyField(_root);
             _dialogue = new StoryModeUI.StoryDialogueView(_root);
@@ -61,9 +63,14 @@ namespace YGOPortable.UI
                 new Vector2(.925f, top), Vector2.zero, Vector2.zero), "Text", "", size, 17,
                 TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, style);
 
-        private Button Button(string name, float left, float bottom, float right, float top, Action click, bool gold = false) =>
-            DuelUiKit.CreateButton(DuelUiKit.CreateRect(name, _panel, new Vector2(left, bottom),
+        private Button Button(string name, float left, float bottom, float right, float top, Action click, bool gold = false)
+        {
+            var button = DuelUiKit.CreateButton(DuelUiKit.CreateRect(name, _panel, new Vector2(left, bottom),
                 new Vector2(right, top), Vector2.zero, Vector2.zero), name + "Button", "", click, 26, gold);
+            RpgUiStyle.Control(button, primary: gold);
+            if (button.TryGetComponent<MenuButtonMotion>(out var motion)) motion.HandlesFocusFrame = true;
+            return button;
+        }
 
         private static void SetLabel(Button button, string title) => button.GetComponentInChildren<Text>().text = title;
 
@@ -71,8 +78,14 @@ namespace YGOPortable.UI
         {
             Root.SetActive(true);
             _pending = null;
+            _replay = _chooseReplay = false;
             ShowPanel("스토리 RPG", "캠페인을 선택하세요.", "GX: 듀얼 아카데미아", _app.OpenGxRpgField,
-                "5D’s: Beyond Destiny", () => _app.ShowScreen(AppScreen.BeyondDestiny));
+                "5D’s: Beyond Destiny", () => _app.ShowScreen(AppScreen.BeyondDestiny),
+                third: "5D’s 처음부터 다시보기", extra: () =>
+                {
+                    _replay = _chooseReplay = true;
+                    _app.ShowScreen(AppScreen.BeyondDestiny);
+                });
         }
 
         internal void OpenCampaign()
@@ -81,7 +94,15 @@ namespace YGOPortable.UI
             try
             {
                 _campaign ??= BeyondDestinyCampaign.Load(Application.streamingAssetsPath);
-                _playback = new BeyondDestinyPlayback(_campaign, Application.persistentDataPath);
+                if (_chooseReplay)
+                {
+                    if (BeyondDestinyProgress.HasReplay(Application.persistentDataPath))
+                        ShowPanel("5D’s 다시보기", "다시보기 진행은 본편과 별도로 저장됩니다.",
+                            "다시보기 이어하기", ResumeReplay, "처음부터 다시보기", ConfirmReplayRestart);
+                    else StartReplay();
+                    return;
+                }
+                _playback = new BeyondDestinyPlayback(_campaign, Application.persistentDataPath, replay: _replay);
                 Resume();
             }
             catch (Exception error) when (error is IOException || error is InvalidDataException ||
@@ -91,6 +112,24 @@ namespace YGOPortable.UI
                 ShowPanel("5D’s: Beyond Destiny", "캠페인 데이터 또는 저장 파일을 읽을 수 없습니다.",
                     "다시 읽기", OpenCampaign);
             }
+        }
+
+        private void ResumeReplay()
+        {
+            _chooseReplay = false;
+            OpenCampaign();
+        }
+
+        private void ConfirmReplayRestart()
+        {
+            ShowPanel("다시보기를 처음부터 시작할까요?", "본편 저장은 그대로 두고, 현재 다시보기 진행을 1화부터 새로 시작합니다.",
+                "1화부터 시작", StartReplay, "취소", OpenCampaign);
+        }
+
+        private void StartReplay()
+        {
+            if (!Save(() => new BeyondDestinyProgress().Save(Application.persistentDataPath, _campaign, replay: true))) return;
+            ResumeReplay();
         }
 
         internal void Close()
@@ -110,7 +149,7 @@ namespace YGOPortable.UI
         internal void Back()
         {
             if (CurtainActive || _dialogue.HandleDisplayInput(restore: true) || _dialogue.ClosePopup()) return;
-            _app.ShowScreen(_pending != null || _playback != null && _app.IsBeyondDestinyScreen
+            _app.ShowScreen(_app.IsBeyondDestinyScreen
                 ? AppScreen.Campaigns : AppScreen.MainMenu);
         }
 
@@ -149,7 +188,10 @@ namespace YGOPortable.UI
                 if (Save(() => _playback.Finish(segment))) Resume();
             }
 
-            if (!Application.isPlaying || segment.TailVisual.Curtain == BeyondDestinyLight.None)
+            var transition = segment.TailVisual.Curtain;
+            if (transition == BeyondDestinyLight.None && _playback.ChangesLocationOrChapter(segment))
+                transition = BeyondDestinyLight.Dark;
+            if (!Application.isPlaying || transition == BeyondDestinyLight.None)
             {
                 ContinueScene();
                 return;
@@ -157,7 +199,7 @@ namespace YGOPortable.UI
             _dialogue.PlayEndingDirection(segment.TailVisual);
             _afterCurtain = ContinueScene;
             _curtainTime = 0f;
-            var color = LightColor(segment.TailVisual.Curtain);
+            var color = LightColor(transition);
             color.a = 0f;
             _curtain.color = color;
             _input.interactable = false;
@@ -225,7 +267,7 @@ namespace YGOPortable.UI
             var lines = segment.Pages.Select((page, index) => new StoryDialogueLine
             {
                 speaker = page.Text.kind == "system" ? "시스템" : page.Text.speaker ?? "내레이션",
-                text = page.Text.text,
+                text = BeyondDestinyReading.Typeset(page.Text.displayText ?? page.Text.text),
                 sceneMap = page.Map == null ? null : Path.GetFileNameWithoutExtension(page.Map),
                 sceneTime = index == 0 ? scene.title : null,
                 cutscene = page.Cutscene,
@@ -342,7 +384,7 @@ namespace YGOPortable.UI
         }
 
         private void ShowPanel(string heading, string description, string primary, Action submit,
-            string secondary = null, Action alternate = null, string map = null)
+            string secondary = null, Action alternate = null, string map = null, string third = null, Action extra = null)
         {
             _dialogue.Close();
             _field.Close();
@@ -353,6 +395,9 @@ namespace YGOPortable.UI
             _background.enabled = _background.sprite != null;
             _primaryAction = submit;
             _secondaryAction = alternate;
+            _tertiaryAction = extra;
+            SetLabel(_tertiary, third ?? "");
+            _tertiary.gameObject.SetActive(extra != null);
             SetLabel(_primary, primary);
             SetLabel(_secondary, secondary ?? "");
             _secondary.gameObject.SetActive(alternate != null);

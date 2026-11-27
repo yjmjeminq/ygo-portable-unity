@@ -11,6 +11,9 @@ namespace YGOPortable.UI
     {
         private const string ArtRoot = "TagForce/5DS/";
         private const string WalkerPath = ArtRoot + "Characters_SD/hero.png";
+        private const float WalkSpeed = .245f;
+        private const float Acceleration = 1.06f;
+        private const float Braking = 1.72f;
         private readonly TagForceWorldImages _images = new();
         private readonly RectTransform _root, _map, _walker, _guest, _marker;
         private readonly Image _picture, _character, _guestImage;
@@ -20,9 +23,9 @@ namespace YGOPortable.UI
         private RpgFieldTerrain _terrain;
         private Sprite[] _poses, _guestPoses;
         private Action _enter;
-        private Vector2 _position, _destination, _guestPosition;
+        private Vector2 _position, _destination, _guestPosition, _velocity;
         private int _step, _facing = 3;
-        private float _walkTime, _clock;
+        private float _stride, _clock, _arrivalPause;
         private bool _enterOnArrival;
 
         internal GameObject Root => _root.gameObject;
@@ -86,7 +89,8 @@ namespace YGOPortable.UI
             _guest.gameObject.SetActive(_guestPoses?.Length == 12);
             _step = 0;
             _facing = 3;
-            _walkTime = _clock = 0f;
+            _velocity = Vector2.zero;
+            _stride = _clock = _arrivalPause = 0f;
             _enterOnArrival = false;
             _path.Clear();
             _title.text = title;
@@ -112,33 +116,57 @@ namespace YGOPortable.UI
             if (!IsOpen) return;
             _clock += delta;
             Vector2 from = _position;
-            if (direction.sqrMagnitude > .01f)
+            float stepTime = Mathf.Min(delta, .065f);
+            Vector2 target = Vector2.zero;
+            bool manual = direction.sqrMagnitude > .01f;
+            if (manual)
             {
                 _path.Clear();
                 _enterOnArrival = false;
-                _position = _terrain.Slide(_position, _position + Vector2.ClampMagnitude(direction, 1f) * (.36f * delta));
+                _arrivalPause = 0f;
+                target = Vector2.ClampMagnitude(direction, 1f) * WalkSpeed;
             }
             else if (_step < _path.Count)
             {
-                _position = Vector2.MoveTowards(_position, _path[_step], delta * .36f);
-                if ((_position - _path[_step]).sqrMagnitude < .0000001f) ++_step;
+                Vector2 remaining = _path[_step] - _position;
+                float speed = _step == _path.Count - 1
+                    ? Mathf.Min(WalkSpeed, Mathf.Sqrt(2f * Braking * remaining.magnitude)) : WalkSpeed;
+                target = remaining.normalized * speed;
             }
+
+            _velocity = Vector2.MoveTowards(_velocity, target,
+                (target.sqrMagnitude < _velocity.sqrMagnitude ? Braking : Acceleration) * stepTime);
+            if (!manual && _step < _path.Count)
+            {
+                // Follow the terrain's waypoints exactly so smoothing cannot cut a corner through a wall.
+                _position = Vector2.MoveTowards(_position, _path[_step], _velocity.magnitude * stepTime);
+                if ((_position - _path[_step]).sqrMagnitude < .0000001f)
+                {
+                    ++_step;
+                    if (_step == _path.Count) _velocity = Vector2.zero;
+                }
+            }
+            else _position = _terrain.Slide(_position, _position + _velocity * stepTime);
             Vector2 travelled = _position - from;
             bool moving = travelled.sqrMagnitude > .00000001f;
             if (moving)
             {
                 _facing = Mathf.Abs(travelled.x) > Mathf.Abs(travelled.y)
                     ? travelled.x < 0f ? 1 : 2 : travelled.y < 0f ? 0 : 3;
-                _walkTime += delta;
+                _stride += travelled.magnitude;
             }
-            else _walkTime = 0f;
+            else _stride = 0f;
             Render(moving);
-            if (_enterOnArrival && NearStory()) Finish();
+            if (_enterOnArrival && _step >= _path.Count && NearStory())
+            {
+                _arrivalPause += stepTime;
+                if (_arrivalPause >= .18f) Finish();
+            }
         }
 
         private void Render(bool moving)
         {
-            int frame = moving ? 1 + Mathf.FloorToInt(_walkTime * 7f) % 2 : 0;
+            int frame = moving ? 1 + Mathf.FloorToInt(_stride / .042f) % 2 : 0;
             _character.sprite = _poses[_facing * 3 + frame];
             _walker.anchorMin = _walker.anchorMax = _position;
             _walker.localScale = Vector3.one * _terrain.ScaleAt(_position.y);
@@ -169,6 +197,7 @@ namespace YGOPortable.UI
         {
             _terrain.BuildPath(_position, _terrain.Ground(point), _path);
             _step = 0;
+            _arrivalPause = 0f;
             _enterOnArrival = enter;
         }
 

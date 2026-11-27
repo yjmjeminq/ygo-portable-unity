@@ -99,6 +99,7 @@ namespace YGOPortable.UI
             private Action<int> _confirmDeck;
             private Action _editDeck;
             private int[] _characters;
+            private float[] _storyRevealTimes;
             private Match[] _formatting = Array.Empty<Match>();
             private int _index;
             private int _opponentPortraitFirstLine;
@@ -479,15 +480,26 @@ namespace YGOPortable.UI
                     _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
-                    _typed += delta * CharactersPerSecond * Mathf.Max(1, _autoSpeed);
-                    Reveal(Mathf.Min(_characters.Length, (int)_typed));
+                    if (_storyRevealTimes == null)
+                    {
+                        _typed += delta * CharactersPerSecond * Mathf.Max(1, _autoSpeed);
+                        Reveal(Mathf.Min(_characters.Length, (int)_typed));
+                    }
+                    else
+                    {
+                        _typed += delta * Mathf.Max(1, _autoSpeed);
+                        int next = _visible;
+                        while (next < _storyRevealTimes.Length && _typed >= _storyRevealTimes[next]) ++next;
+                        Reveal(next);
+                    }
                 }
                 else if (_autoSpeed > 0)
                 {
                     _readTime += delta * _autoSpeed;
-                    float readDuration = IsGxDialogue ? Mathf.Max(1.65f, _characters.Length * .055f) :
-                        Mathf.Max(1.05f, _characters.Length * .037f);
-                    if (_sceneTimeBadge.gameObject.activeSelf) readDuration += 1.15f * _autoSpeed;
+                    bool sceneTimeVisible = _sceneTimeBadge.gameObject.activeSelf;
+                    float readDuration = IsBeyondDestinyDialogue ? BeyondDestinyReading.AutoHold(_characters.Length, sceneTimeVisible) :
+                        IsGxDialogue ? Mathf.Max(1.65f, _characters.Length * .055f) : Mathf.Max(1.05f, _characters.Length * .037f);
+                    if (sceneTimeVisible && !IsBeyondDestinyDialogue) readDuration += 1.15f * _autoSpeed;
                     if (_readTime >= readDuration) Advance();
                 }
             }
@@ -707,6 +719,7 @@ namespace YGOPortable.UI
                 if (_formatting.Length > 0)
                     _characters = _characters.Where(offset =>
                         !_formatting.Any(tag => offset >= tag.Index && offset < tag.Index + tag.Length)).ToArray();
+                _storyRevealTimes = IsBeyondDestinyDialogue ? BeyondDestinyReading.RevealTimes(line.text, _characters) : null;
                 _text.text = "";
                 _fx.ShowCaret(_caret, false);
                 _counter.text = $"{index + 1} / {_dialogue.Length}";
@@ -921,7 +934,7 @@ namespace YGOPortable.UI
                     (IsGxDialogue && _choiceRoot.activeSelf)) return;
                 if (frame >= 0)
                 {
-                    if (_advanceFrame == frame || (IsGxDialogue && now - _advanceTime < .12f)) return;
+                    if (_advanceFrame == frame || ((IsGxDialogue || IsBeyondDestinyDialogue) && now - _advanceTime < .12f)) return;
                     _advanceFrame = frame;
                     _advanceTime = now;
                 }

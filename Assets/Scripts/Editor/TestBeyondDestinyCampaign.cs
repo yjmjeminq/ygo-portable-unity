@@ -22,6 +22,7 @@ namespace YGOPortable.Editor
                 VerifyAudio(campaign);
                 VerifyPortraits(campaign);
                 VerifyIndependentProgress(campaign);
+                VerifyReplayAndEditorial(campaign);
                 VerifyPlayback(campaign);
                 VerifyNativeDuelOpenings(campaign);
                 VerifyWalkIn();
@@ -170,6 +171,46 @@ namespace YGOPortable.Editor
             if (!result) throw new InvalidOperationException(message);
         }
 
+        private static void VerifyReplayAndEditorial(BeyondDestinyCampaign campaign)
+        {
+            string root = Path.Combine(Path.GetTempPath(), "beyond-destiny-replay-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                var original = new BeyondDestinyProgress { episodeIndex = 13, sceneIndex = 1, cueIndex = 4 };
+                original.unlockedLocations.Add("spot_arcadia_atrium");
+                original.earnedRewards.Add("episode_13_clear");
+                original.Save(root, campaign);
+                string originalPath = Path.Combine(root, "campaigns", "beyond_destiny.json");
+                byte[] main = File.ReadAllBytes(originalPath);
+                Require(!BeyondDestinyProgress.HasReplay(root), "A fresh campaign had a replay save.");
+                new BeyondDestinyProgress().Save(root, campaign, replay: true);
+                var replay = new BeyondDestinyPlayback(campaign, root, replay: true);
+                Require(BeyondDestinyProgress.HasReplay(root) && replay.Episode.number == 1 &&
+                    replay.Progress.resolvedEncounters.Count == 0 && replay.Progress.earnedRewards.Count == 0,
+                    "The replay did not start at the first scene with its own history.");
+                var opener = replay.Read();
+                Require(opener.Pages.Length > 1 && opener.Pages[1].Text.displayText.StartsWith("시티의 화려한 불빛은") &&
+                    opener.Pages[1].Text.text.StartsWith("이곳은 시티의"),
+                    "The editorial pass discarded the original narration or failed to bind the revised reading.");
+                replay.RememberPage(opener.Pages[1].Index);
+                Require(new BeyondDestinyPlayback(campaign, root, replay: true).Progress.cueIndex == opener.Pages[1].Index &&
+                    File.ReadAllBytes(originalPath).SequenceEqual(main),
+                    "Playing or reopening the replay changed the main campaign.");
+                new BeyondDestinyProgress().Save(root, campaign, replay: true);
+                Require(new BeyondDestinyPlayback(campaign, root, replay: true).Progress.cueIndex == 0 &&
+                    File.ReadAllBytes(originalPath).SequenceEqual(main), "Restarting the replay changed the main campaign.");
+
+                string display = BeyondDestinyReading.Typeset("\"그래...! **블랙 가든**!!\"");
+                Require(display == "“그래…! <b>블랙 가든</b>!”", "The reading view exposed draft punctuation or markup.");
+                var beat = BeyondDestinyReading.RevealTimes("가,나", new[] { 0, 1, 2 });
+                Require(beat[0] > 1f / 34f && beat[2] - beat[1] > .1f &&
+                    BeyondDestinyReading.AutoHold(30, true) > BeyondDestinyReading.AutoHold(30, false),
+                    "Reading pace did not slow down or pause naturally at a break.");
+            }
+            finally { Directory.Delete(root, recursive: true); }
+        }
+
         private static void VerifyPlayback(BeyondDestinyCampaign campaign)
         {
             string root = Path.Combine(Path.GetTempPath(), "beyond-destiny-playback-" + Guid.NewGuid().ToString("N"));
@@ -281,8 +322,20 @@ namespace YGOPortable.Editor
                 bool entered = false;
                 Require(field.Open("Maps/spot_neodomino_rain_alley.png", "네오 도미노 시티", () => entered = true),
                     "The opening map and all twelve walk-cycle poses must load.");
+                var walker = (RectTransform)field.Root.transform.Find("FieldProjection/Protagonist");
+                float start = walker.anchorMin.x;
+                field.Update(.05f, Vector2.right);
+                Require(walker.anchorMin.x - start < .006f, "Manual walking started at full speed.");
+                for (int i = 0; i < 7; ++i) field.Update(.05f, Vector2.right);
+                float cruising = walker.anchorMin.x;
+                field.Update(.05f, Vector2.right);
+                Require(walker.anchorMin.x - cruising is > .009f and < .014f, "Manual walking did not reach a slower steady pace.");
+                for (int i = 0; i < 9; ++i) field.Update(.05f, Vector2.zero);
+                float stopped = walker.anchorMin.x;
+                field.Update(.05f, Vector2.zero);
+                Require(Mathf.Approximately(stopped, walker.anchorMin.x), "The character slid after releasing movement.");
                 field.MoveToStory();
-                for (int i = 0; i < 60 && !entered; ++i) field.Update(.05f, Vector2.zero);
+                for (int i = 0; i < 100 && !entered; ++i) field.Update(.05f, Vector2.zero);
                 Require(entered && !field.IsOpen, "The scene could not be reached on foot or left the field controls open.");
                 foreach (string location in new[] { "kaiba_dome_plaza", "kaiba_dome_corridor", "kaiba_dome_arena",
                     "arcadia_atrium", "arcadia_private_room", "arcadia_collapse", "team5ds_garage", "night_circuit",
