@@ -56,6 +56,7 @@ namespace YGOPortable.Editor
                 "Starter selection did not grant the deck and starting DP exactly once.");
 
             VerifyWindowsSaveRetry(save);
+            VerifySaveSyncCredential(save);
             VerifySaveSync(streamingPath, save, starter);
             var materials = LoadLegacyProfile(save, profile);
             VerifyCrafting(materials, starter, profile);
@@ -82,6 +83,32 @@ namespace YGOPortable.Editor
             finally { release.Join(); }
             Require(File.ReadAllText(path) == "after", "A transient Windows file lock lost the committed save.");
             Debug.Log("[VERIFY ATOMIC SAVE] Windows reader temporarily blocking replacement passed.");
+        }
+
+        private static void VerifySaveSyncCredential(string save)
+        {
+            if (Application.platform != RuntimePlatform.WindowsEditor) return;
+            const string Prefix = "github_pat_";
+            string dummy = Prefix + new string('X', 42);
+            string encryptedFile = Path.Combine(save, "cloud-save-token.dpapi");
+            var files = new SaveSyncFiles(save);
+            string localBefore = files.Capture().Hash;
+            SaveSyncCredential.Write(save, dummy);
+            try
+            {
+                using var restarted = new GitHubSaveSync(null, save, files, () => false, () => { });
+                Require(restarted.Connected && SaveSyncCredential.Read(save) == dummy &&
+                    !File.ReadAllText(encryptedFile).Contains(dummy, StringComparison.Ordinal),
+                    "The protected credential must reload automatically without plaintext.");
+                Require(!restarted.ResetRejectedCredential(403) && restarted.Connected &&
+                    !restarted.ResetRejectedCredential(0) && restarted.Connected,
+                    "Uncertain access or offline results must keep the credential.");
+                Require(restarted.ResetRejectedCredential(401) && !restarted.Connected &&
+                    !File.Exists(encryptedFile) && localBefore == files.Capture().Hash,
+                    "A rejected credential must require reconnection while keeping the local save.");
+            }
+            finally { SaveSyncCredential.Write(save, null); }
+            Debug.Log("[VERIFY CLOUD CREDENTIAL] Protected restart, offline and expired-token reconnection passed.");
         }
 
         private static void VerifyOpponentAccess()

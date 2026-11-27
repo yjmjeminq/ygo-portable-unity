@@ -14,7 +14,7 @@ namespace YGOPortable.UI
         private readonly GameObject _setup;
         private readonly GameObject _connected;
         private readonly GameObject _conflict;
-        private readonly Button _connect;
+        private readonly Button _connect, _pasteConnect;
         private readonly Button _refresh;
         private readonly Button _disconnect;
         private readonly Button _local;
@@ -42,21 +42,17 @@ namespace YGOPortable.UI
             _setup = setup.gameObject;
             var instructions = Row(setup, "Instructions", .055f, .40f, .945f, .58f);
             DuelUiKit.AddFittedText(instructions, "Text",
-                "토큰은 " + GitHubSaveSync.Repository + " 전용으로 만드세요.\nRepository permissions에서 Contents를 Read and write로 설정하세요.",
+                "토큰은 " + GitHubSaveSync.Repository + " 전용으로 만들고 Contents 쓰기 권한을 주세요.\n복사한 토큰으로 한 번 연결하면 이 기기에 저장됩니다.",
                 18, 13, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             var entry = Row(setup, "Entry", .055f, .255f, .945f, .385f);
             _token = DuelUiKit.CreateInputField(entry, "GitHubToken", "fine-grained 토큰 붙여넣기", 18);
             _token.contentType = InputField.ContentType.Password;
             _token.characterLimit = 512;
-            AddButton(setup, "TokenPage", "GitHub 토큰 만들기", .055f, .49f,
+            AddButton(setup, "TokenPage", "토큰 만들기", .055f, .32f,
                 () => Application.OpenURL("https://github.com/settings/personal-access-tokens/new"));
-            _connect = AddButton(setup, "Connect", "연결", .51f, .945f, () =>
-            {
-                string value = _token.text;
-                _token.SetTextWithoutNotify("");
-                _token.DeactivateInputField();
-                _sync.Connect(value);
-            }, y: .10f);
+            _connect = AddButton(setup, "Connect", "입력한 토큰 연결", .34f, .620f, () => Connect(_token.text));
+            _pasteConnect = AddButton(setup, "PasteConnect", "복사한 토큰 연결", .64f, .945f,
+                () => Connect(GUIUtility.systemCopyBuffer));
 
             var connected = DuelUiKit.FillRect("Connected", win);
             _connected = connected.gameObject;
@@ -101,12 +97,20 @@ namespace YGOPortable.UI
             _setup.SetActive(!_sync.Connected);
             _connected.SetActive(_sync.Connected && !_sync.HasConflict);
             _conflict.SetActive(_sync.HasConflict);
-            _connect.interactable = !_sync.Busy && SaveSyncCredential.Supported;
+            _connect.interactable = _pasteConnect.interactable = !_sync.Busy && SaveSyncCredential.Supported;
             _token.interactable = !_sync.Busy && SaveSyncCredential.Supported;
             _refresh.interactable = !_sync.Busy;
             _disconnect.interactable = !_sync.Busy;
             _local.interactable = !_sync.Busy;
             _cloud.interactable = !_sync.Busy && _sync.CloudExists;
+        }
+
+        private void Connect(string value)
+        {
+            _token.SetTextWithoutNotify("");
+            _token.DeactivateInputField();
+            _sync.Connect(value);
+            Refresh();
         }
 
         private static RectTransform Row(Transform parent, string name, float left, float bottom, float right, float top) =>

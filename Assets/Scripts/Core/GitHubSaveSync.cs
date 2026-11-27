@@ -96,11 +96,16 @@ namespace YGOPortable.Core
         internal void Connect(string input)
         {
             if (_busy || !SaveSyncCredential.Supported) return;
-            string token = input.Trim();
+            string token = input?.Trim();
+            if (string.IsNullOrEmpty(token))
+            {
+                Status = "GitHub에서 새 토큰을 복사한 뒤 다시 누르세요.";
+                return;
+            }
             if (!token.StartsWith("github_pat_", StringComparison.Ordinal) || token.Length < 22 ||
                 Array.Exists(token.ToCharArray(), c => !(c is >= '0' and <= '9' or >= 'a' and <= 'z' or >= 'A' and <= 'Z' or '_')))
             {
-                Status = "GitHub에서 만든 fine-grained 토큰을 붙여 넣으세요.";
+                Status = "GitHub에서 만든 fine-grained 토큰을 복사해 주세요.";
                 return;
             }
             _busy = true;
@@ -162,6 +167,7 @@ namespace YGOPortable.Core
                 using (var repo = Get(Endpoint, _token))
                 {
                     yield return repo.SendWebRequest();
+                    if (ResetRejectedCredential(repo.responseCode)) yield break;
                     if (!IsPrivateRepository(repo))
                     {
                         Status = repo.result == UnityWebRequest.Result.ConnectionError
@@ -176,6 +182,7 @@ namespace YGOPortable.Core
                 using (var request = Get(SaveEndpoint, _token, "application/vnd.github.object+json"))
                 {
                     yield return request.SendWebRequest();
+                    if (ResetRejectedCredential(request.responseCode)) yield break;
                     if (request.result == UnityWebRequest.Result.Success)
                     {
                         if (!TryReadRemote(request.downloadHandler.text, out info, out serialized))
@@ -195,6 +202,7 @@ namespace YGOPortable.Core
                 {
                     using var raw = Get(SaveEndpoint, _token, "application/vnd.github.raw+json");
                     yield return raw.SendWebRequest();
+                    if (ResetRejectedCredential(raw.responseCode)) yield break;
                     if (raw.result != UnityWebRequest.Result.Success || !MatchesBlob(raw.downloadHandler.data, info.sha))
                     {
                         Status = "클라우드 파일이 바뀌었습니다. 다시 확인합니다.";
@@ -217,6 +225,7 @@ namespace YGOPortable.Core
                     : JsonUtility.ToJson(payload);
                 using var put = Request(SaveEndpoint, "PUT", _token, "application/vnd.github+json", body);
                 yield return put.SendWebRequest();
+                if (ResetRejectedCredential(put.responseCode)) yield break;
                 if (put.result == UnityWebRequest.Result.Success)
                 {
                     try { MarkSynced(SaveSyncSnapshot.Digest(localJson)); }
@@ -230,6 +239,21 @@ namespace YGOPortable.Core
                 else Status = "클라우드에 올리지 못했습니다. 기기 저장을 유지하고 다시 시도합니다.";
             }
             finally { _busy = false; }
+        }
+
+        internal bool ResetRejectedCredential(long responseCode)
+        {
+            if (responseCode != 401) return false;
+
+            _token = null;
+            _conflict = _resolve = null;
+            Status = "GitHub 인증이 만료됐습니다. 새 토큰을 복사해 연결해 주세요.";
+            try { SaveSyncCredential.Write(_directory, null); }
+            catch (Exception e) when (IsSaveError(e))
+            {
+                Status = "기존 인증 정보를 지우지 못했습니다. 새 토큰으로 다시 연결해 주세요.";
+            }
+            return true;
         }
 
         private string PrepareSync(string remoteSha, string serialized)
