@@ -10,6 +10,7 @@ namespace YGOPortable.AI
     {
         private const int Lethal = 100000;
         private const int BattleReplayBudgetMilliseconds = 80;
+        private const int EffectReplayBudgetMilliseconds = 200;
         private const uint UtopiaDragonar = 95134948;
         private const uint NightmarePain = 65261141;
         private const uint LovingDefender = 47172959;
@@ -101,7 +102,7 @@ namespace YGOPortable.AI
             bool allowBattle = false)
         {
             var clock = Stopwatch.StartNew();
-            bool Expired() => clock.ElapsedMilliseconds >= BattleReplayBudgetMilliseconds;
+            bool Expired() => clock.ElapsedMilliseconds >= EffectReplayBudgetMilliseconds;
             using var trial = duel.ReplayForPlanning(Expired);
             if (trial?.ActivePrompt is not { messageType: YgoConstants.MSG_SELECT_IDLECMD } start ||
                 start.playerId != prompt.playerId)
