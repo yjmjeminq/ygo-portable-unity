@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using YGOPortable.Core;
 
@@ -280,6 +281,148 @@ namespace YGOPortable.AI
             return score;
         }
 
+        private static readonly ConditionalWeakTable<CardInfo, BoardRoles> BoardRoleCache = new();
+
+        private sealed class BoardRoles
+        {
+            internal readonly bool Interacts, NeedsDiscard, SpendsOverlay, FairyCost, Recurs, OwnStatsChange;
+            internal readonly bool GraveTrigger, SelfSpecialFromHand;
+            internal readonly string RequiredFieldMonster;
+
+            internal BoardRoles(CardInfo card)
+            {
+                var text = card.desc ?? string.Empty;
+                bool quickWindow = Has("상대 턴에도", "자신 / 상대 턴", "자신 또는 상대 턴", "상대의 턴", "자신 / 상대의 턴",
+                    "퀵 이펙트", "Quick Effect", "during either player's turn");
+                bool responds = (Has("상대가", "발동했을 때", "발동하였을 때", "when your opponent") &&
+                    Has("발동을 무효", "효과를 무효", "소환을 무효", "효과는 「", "효과를 「", "효과가 된다",
+                        "negate the activation", "negate that effect", "becomes"));
+                bool restriction = Has("상대는 특수 소환할 수 없", "상대는 묘지", "대신 제외", "발동할 수 없", "지불해야",
+                    "your opponent cannot", "banished instead", "cannot activate", "must pay");
+                bool interferes = (card.DeckEffectCategories & Disruption) != 0 ||
+                    Has("효과를 무효", "발동을 무효", "카드를 파괴", "카드를 제외", "몬스터를 제외", "뒷면 수비 표시로",
+                        "패로 되돌", "덱으로 되돌", "묘지로 보", "컨트롤을 얻", "뒷면 표시로 제외",
+                        "링크 소환을 실행", "융합 소환한다", "싱크로 소환을 실행", "엑시즈 소환을 실행",
+                        "negate", "destroy", "banish", "return", "shuffle", "take control",
+                        "Link Summon", "Fusion Summon", "Synchro Summon");
+                bool trap = card.IsTrap || (card.type & YgoConstants.TYPE_QUICKPLAY) != 0;
+                Interacts = restriction || responds || interferes && (quickWindow || trap);
+                if ((card.type & YgoConstants.TYPE_COUNTER) != 0)
+                    RequiredFieldMonster = ReadNamedFieldRequirement(text, "자신 필드에 \"", "\" 몬스터가 존재하고,") ??
+                        ReadNamedFieldRequirement(text, "if you control a \"", "\" monster,");
+                NeedsDiscard = Has("패에서", "discard") && Has("버리고", "묘지로 보내고", "discard");
+                SpendsOverlay = card.IsXyz && Has("엑시즈 소재를", "엑시즈 소재 1개", "detach");
+                FairyCost = NeedsDiscard && Has("천사족 몬스터", "Fairy monster");
+                Recurs = Has("묘지의 이 카드", "이 카드가 묘지에", "이 카드가 묘지에 존재", "this card is in your GY",
+                    "this card from your GY") && Has("특수 소환", "패에 넣", "패로 되돌", "Special Summon", "add it to your hand");
+                GraveTrigger = Recurs || Has("이 카드가 묘지로 보내졌을 경우", "묘지로 보내졌을 경우", "묘지의 이 카드를 제외하고",
+                    "묘지에서 제외하고", "if this card is sent to the GY", "banish this card from your GY");
+                SelfSpecialFromHand = Has("패에서 특수 소환할 수 있다", "이 카드를 패에서 특수 소환한다",
+                    "Special Summon this card from your hand", "Special Summon this card (from your hand)");
+                OwnStatsChange = Has("이 카드의 공격력", "이 카드의 원래 공격력", "this card gains ATK", "this card's ATK") &&
+                    !Has("턴 종료시까지", "until the end of this turn");
+
+                bool Has(params string[] needles)
+                {
+                    foreach (string needle in needles)
+                        if (text.Contains(needle, StringComparison.OrdinalIgnoreCase)) return true;
+                    return false;
+                }
+            }
+
+            private static string ReadNamedFieldRequirement(string text, string startMarker, string endMarker)
+            {
+                int start = text.IndexOf(startMarker, StringComparison.OrdinalIgnoreCase);
+                if (start < 0) return null;
+                start += startMarker.Length;
+                int end = text.IndexOf('"', start);
+                if (end <= start || !text.AsSpan(end).StartsWith(endMarker.AsSpan(), StringComparison.OrdinalIgnoreCase)) return null;
+                return text.Substring(start, end - start);
+            }
+        }
+
+        internal static bool? BackrowFieldCondition(PlayerFieldSnapshot field, CardInfo card) =>
+            BoardRoleCache.GetValue(card, info => new BoardRoles(info)).RequiredFieldMonster is { } name
+                ? HasNamedFieldMonster(field, name) : null;
+
+        private static bool HasNamedFieldMonster(PlayerFieldSnapshot field, string name) => field.mzone.Any(monster =>
+            monster is { IsFaceUp: true } && CardDatabase.Get(monster.code)?.name?.Contains(name, StringComparison.OrdinalIgnoreCase) == true);
+
+        internal static int StableAttack(LiveCardState monster, CardInfo info, bool canBattle)
+        {
+            if (canBattle || monster.attack <= Math.Max(monster.baseAttack, info.atk)) return Math.Max(0, monster.attack);
+            return BoardRoleCache.GetValue(info, card => new BoardRoles(card)).OwnStatsChange
+                ? Math.Max(0, monster.attack) : Math.Max(0, Math.Max(monster.baseAttack, info.atk));
+        }
+
+        internal static int ReadyInteractionCount(DuelSession duel, byte player, bool inspectPrivateCards)
+        {
+            var field = duel.Players[player];
+            int count = 0;
+            foreach (var monster in field.mzone)
+            {
+                if (monster is not { IsFaceUp: true, effectsDisabled: false } ||
+                    CardDatabase.Get(monster.code) is not { } info || duel.HasSpentBaronneNegate(monster)) continue;
+                var roles = BoardRoleCache.GetValue(info, card => new BoardRoles(card));
+                if (!roles.Interacts || roles.SpendsOverlay && monster.overlayCodes.Count == 0 ||
+                    roles.NeedsDiscard && field.hand.Count == 0 ||
+                    roles.FairyCost && inspectPrivateCards && !field.hand.Any(card => (card.race & YgoConstants.RACE_FAIRY) != 0))
+                    continue;
+                count++;
+            }
+            foreach (var card in field.szone)
+            {
+                if (card == null || card.effectsDisabled || !inspectPrivateCards && !card.IsFaceUp ||
+                    CardDatabase.Get(card.code) is not { } info) continue;
+                var roles = BoardRoleCache.GetValue(info, data => new BoardRoles(data));
+                if (!roles.Interacts || roles.RequiredFieldMonster is { } name && !HasNamedFieldMonster(field, name))
+                    continue;
+                if (info.IsTrap || (info.type & YgoConstants.TYPE_QUICKPLAY) != 0) count++;
+            }
+            return count;
+        }
+
+        internal static int ReadyHandInterruptions(PlayerFieldSnapshot player)
+        {
+            int distinct = 0;
+            bool emptyField = !player.mzone.Any(card => card != null) && !player.szone.Any(card => card != null);
+            for (int index = 0; index < player.hand.Count; index++)
+            {
+                var card = player.hand[index];
+                if (!ComboSearch.IsHandDisruption(card.code) || card.code == DuelTactics.MaxxC && player.deckCount <= 2)
+                    continue;
+                if (card.code == DuelTactics.CalledBy ||
+                    card.code == DuelTactics.InfiniteImpermanence && !emptyField) continue;
+                bool duplicate = false;
+                for (int previous = 0; previous < index; previous++)
+                    if (player.hand[previous].code == card.code)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                if (!duplicate) distinct++;
+            }
+            return distinct;
+        }
+
+        internal static bool HasGraveyardValue(CardInfo card) => card != null &&
+            BoardRoleCache.GetValue(card, info => new BoardRoles(info)).GraveTrigger;
+
+        internal static bool CanSelfSpecialFromHand(CardInfo card) => card != null &&
+            BoardRoleCache.GetValue(card, info => new BoardRoles(info)).SelfSpecialFromHand;
+
+        internal static int GraveyardFollowUps(PlayerFieldSnapshot field)
+        {
+            int count = 0;
+            foreach (var card in field.grave)
+            {
+                if (CardDatabase.Get(card.code) is not { } info ||
+                    !BoardRoleCache.GetValue(info, item => new BoardRoles(item)).Recurs) continue;
+                if (++count >= 3) break;
+            }
+            return count;
+        }
+
         internal static bool IsRitualSpell(uint code) => IsMachineAngelRitual(code) || code is MeteonisDrytron or MeteoroaDrytron;
 
         internal static bool IsMachineAngelRitual(uint code) => code is MachineAngelRitual or MachineAngelAbsoluteRitual;
@@ -296,6 +439,32 @@ namespace YGOPortable.AI
             HeraldOfUltimateness or HeraldOfPerfection or DrytronDad or DrytronDra or DrytronQua;
 
         internal static bool IsEstablishedRitualAce(LiveCardState card) => card != null && IsRitualAce(card.code);
+
+        internal static bool SpentEstablishedFieldAce(CardMoveEvent move, ChainLinkInfo effect) =>
+            move.fromLoc == YgoConstants.LOCATION_MZONE && (move.fromPos & YgoConstants.POS_FACEUP) != 0 &&
+            (move.toCon != move.fromCon || move.toLoc != YgoConstants.LOCATION_MZONE) &&
+            (effect == null || effect.triggerPlayer == move.fromCon && !effect.negated) &&
+            DuelTactics.IsEstablishedFieldAce(move.SourceReadout) &&
+            ((move.reason & (YgoConstants.REASON_RELEASE | YgoConstants.REASON_MATERIAL | YgoConstants.REASON_COST)) != 0 ||
+                effect != null && (move.reason & YgoConstants.REASON_DESTROY) != 0);
+
+        internal static bool NeedsAceMaterialProjection(PlayerFieldSnapshot own, SelectableCardItem summon) =>
+            summon.location == YgoConstants.LOCATION_EXTRA && CardDatabase.Get(summon.code)?.IsExtra == true &&
+            // A spare monster might not have the level, Type or name required by the offered summon.
+            own.mzone.Any(card => card?.IsFaceUp == true && DuelTactics.IsEstablishedFieldAce(card));
+
+        internal static bool NeedsAceFusionProjection(PlayerFieldSnapshot own, SelectableCardItem effect)
+        {
+            if (!own.mzone.Any(card => card?.IsFaceUp == true && DuelTactics.IsEstablishedFieldAce(card)) ||
+                CardDatabase.Get(effect.code) is not { desc: { } rules } ||
+                !rules.Contains("융합 소재", StringComparison.Ordinal) ||
+                !own.extra.Any(card => CardDatabase.Get(card.code)?.IsFusion == true)) return false;
+            string text = CardDatabase.GetDescriptionCardCode(effect.description) == effect.code
+                ? CardDatabase.ExtractIndexedEffectDescription(effect.code, (int)(effect.description & 0xfffff)) ?? rules : rules;
+            int material = text.IndexOf("융합 소재", StringComparison.Ordinal);
+            return material >= 0 && text.Contains("융합 소환", StringComparison.Ordinal) &&
+                text[..material].Contains("필드", StringComparison.Ordinal);
+        }
 
         internal static bool SpentOwnRitualAce(CardMoveEvent move, ChainLinkInfo effect) =>
             move.fromLoc == YgoConstants.LOCATION_MZONE && move.toLoc != YgoConstants.LOCATION_MZONE &&

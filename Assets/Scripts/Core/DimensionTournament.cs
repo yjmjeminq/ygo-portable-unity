@@ -94,13 +94,22 @@ namespace YGOPortable.Core
             if (slots == 2)
             {
                 var signature = CardDatabase.Get(deck.sigCard);
-                uint ace = signature?.IsMonster == true && (signature.type & YgoConstants.TYPE_TOKEN) == 0
+                uint ace = IsOpeningAce(signature)
                     ? signature.code : (deck.extra ?? Array.Empty<uint>()).Concat(deck.main).Select(CardDatabase.Get)
-                        .Where(card => card?.IsMonster == true && (card.type & YgoConstants.TYPE_TOKEN) == 0)
+                        .Where(IsOpeningAce)
                         .OrderByDescending(card => card.atk).FirstOrDefault()?.code ?? 0;
                 return new DuelOpening(20000, 7, ace);
             }
             return slots == 4 ? new DuelOpening(12000, 6, 0) : new DuelOpening(8000, 5, 0);
+        }
+
+        private static bool IsOpeningAce(CardInfo card)
+        {
+            if (card?.IsMonster != true || (card.type & YgoConstants.TYPE_TOKEN) != 0) return false;
+            string text = card.desc ?? string.Empty;
+            return !text.Contains("필드 마법 카드가 앞면 표시로 존재하지 않을 경우에 이 카드는 파괴된다", StringComparison.Ordinal) &&
+                !text.Contains("필드 마법 카드가 존재하지 않을 경우 이 카드를 파괴한다", StringComparison.Ordinal) &&
+                !text.Contains("필드 마법 카드가 존재하지 않을 경우, 이 카드를 파괴한다", StringComparison.Ordinal);
         }
     }
 }

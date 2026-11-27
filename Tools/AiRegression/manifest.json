@@ -14,7 +14,10 @@
     {
       "path": "Assets/Plugins/x86_64/ygoengine.dll",
       "sha256": "93936408a0edad5d952045d4f7d1362e5fe7353a1a6c6acf989321f7a1f84dbe",
-      "alternateSha256": "0bf991d90c56478a9ffd5bc9063bb64c1142ece23e76704c515cd8b4eb53b8d3"
+      "compatibleSha256": [
+        "0bf991d90c56478a9ffd5bc9063bb64c1142ece23e76704c515cd8b4eb53b8d3",
+        "416120e5c795eb6dbe05d1246ff38a8d802fa5a3d140c01425e377366bf4928f"
+      ]
     },
     {
       "path": "Assets/StreamingAssets/cards_prop.bin",

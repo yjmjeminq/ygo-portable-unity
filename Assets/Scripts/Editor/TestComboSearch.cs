@@ -205,7 +205,10 @@ namespace YGOPortable.Editor
             var opening = Array.Empty<uint>();
             var steps = new List<uint>();
             double slowest = 0;
-            int planningStepLimit = difficulty == AIDifficulty.Master ? 128 : 24;
+            int planningBudget = difficulty == AIDifficulty.Master ? ComboSearch.MasterPlanningMilliseconds :
+                ComboSearch.LinkOpeningPlanningMilliseconds;
+            int planningStepLimit = (planningBudget + ComboSearch.PlanningSliceMilliseconds - 1) /
+                ComboSearch.PlanningSliceMilliseconds;
             bool canBattle = false;
             for (int i = 0; !duel.IsFinished && duel.RetryCount == 0 && i < 180; i++)
             {
@@ -230,7 +233,9 @@ namespace YGOPortable.Editor
                 while (!adaptive.AdvanceComboPlanning(duel, prompt))
                 {
                     slowest = Math.Max(slowest, watch.Elapsed.TotalMilliseconds);
-                    if (++planningSteps > planningStepLimit) throw new InvalidOperationException("Combo planning did not finish.");
+                    if (++planningSteps > planningStepLimit)
+                        throw new InvalidOperationException($"{difficulty} combo planning did not finish within {planningStepLimit} slices " +
+                            $"for deck {deck.id}, seed {seed}, board {board}, turn {duel.TurnNumber}.");
                     watch.Restart();
                 }
                 var response = adaptive.ComputeResponse(duel, prompt);

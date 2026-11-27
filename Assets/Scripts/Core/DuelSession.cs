@@ -181,6 +181,7 @@ namespace YGOPortable.Core
         internal LiveCardState ActivationReadout;
         internal LiveCardState ResolutionReadout;
         internal (byte Controller, uint Location, uint Sequence)? PublicFieldSource;
+        internal IReadOnlyList<(byte Controller, uint Location, uint Sequence)> PublicTargets;
     }
 
     [Serializable]
@@ -309,6 +310,7 @@ namespace YGOPortable.Core
         private PlanningReplay _planningReplay;
         private bool _loadingPlanningReplay;
         private int _speculatingPlayer = -1;
+        private (byte Player, uint Code, uint Location, uint Sequence, ulong Description)? _expectedPlanningReaction;
         private readonly List<uint> _selectedFromDeck = new List<uint>();
         private ChainLinkInfo _deckSelectionEffect;
         private ulong _deckSelectionHint;
@@ -327,8 +329,9 @@ namespace YGOPortable.Core
             internal string storyGimmick;
             internal UserDeck destinyDeck;
             internal uint[] opponentDestiny;
-            internal readonly List<(byte message, byte player, byte[] bytes)> responses = new();
         }
+
+        private readonly List<(byte Message, byte Player, byte[] Bytes)> _planningResponses = new();
 
         public DuelSession() { }
         internal DuelSession(bool recordPlanningReplay, LocalDuelReplayRecorder playerReplay = null)
@@ -336,6 +339,17 @@ namespace YGOPortable.Core
             _recordPlanningReplay = recordPlanningReplay;
             _playerReplay = playerReplay;
         }
+
+#if UNITY_EDITOR
+        [ThreadStatic] internal static Action<string, long> ObservePlanningOperation;
+
+        private static long PlanningOperationStart() => ObservePlanningOperation == null ? 0 : System.Diagnostics.Stopwatch.GetTimestamp();
+
+        private static void RecordPlanningOperation(string operation, long started)
+        {
+            if (started != 0) ObservePlanningOperation?.Invoke(operation, System.Diagnostics.Stopwatch.GetTimestamp() - started);
+        }
+#endif
 
         public IntPtr NativePtr { get; private set; }
         public int TurnNumber { get; private set; }
@@ -460,6 +474,17 @@ namespace YGOPortable.Core
             DuelOpening? opponentOpening = null, IReadOnlyList<uint> opponentDestiny = null, DuelOpening? playerOpening = null,
             string storyGimmick = null)
         {
+            foreach (bool? result in StartDuelInSlices(p0Main, p0Extra, p1Main, p1Extra, p0GoesFirst, startingLp, seed,
+                playerDeckAppearance, opponentOpening, opponentDestiny, playerOpening, storyGimmick, null))
+                return result == true;
+            return false;
+        }
+
+        private IEnumerable<bool?> StartDuelInSlices(
+            IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra, IReadOnlyList<uint> p1Main, IReadOnlyList<uint> p1Extra,
+            bool p0GoesFirst, int startingLp, ulong[] seed, UserDeck playerDeckAppearance, DuelOpening? opponentOpening,
+            IReadOnlyList<uint> opponentDestiny, DuelOpening? playerOpening, string storyGimmick, Func<bool> sliceDue)
+        {
             Dispose();
             _storyRuntime = storyGimmick == null ? null : new StoryGimmickRuntime(storyGimmick);
             UsesDeckAppearances = playerDeckAppearance != null && !_loadingPlanningReplay;
@@ -512,16 +537,31 @@ namespace YGOPortable.Core
             int playerHand = playerOpening?.Hand ?? 5;
             int firstLife = p0GoesFirst ? playerLife : bossLife;
             int secondLife = p0GoesFirst ? bossLife : playerLife;
+            if (sliceDue?.Invoke() == true) yield return null;
+#if UNITY_EDITOR
+            long creationStarted = PlanningOperationStart();
+#endif
             NativePtr = YgoNativeBridge.CreateDuel(seed, YgoConstants.DUEL_MODE_MR5,
                 firstLife, p0GoesFirst ? playerHand : bossHand, 1,
                 secondLife, p0GoesFirst ? bossHand : playerHand, 1);
+#if UNITY_EDITOR
+            RecordPlanningOperation("duel allocation", creationStarted);
+#endif
 
-            if (NativePtr == IntPtr.Zero) return false;
-            if (YgoNativeBridge.YGO_LoadBaseScripts(NativePtr) == 0)
+            if (NativePtr == IntPtr.Zero) yield break;
+            if (sliceDue?.Invoke() == true) yield return null;
+#if UNITY_EDITOR
+            long scriptsStarted = PlanningOperationStart();
+#endif
+            int scriptsLoaded = YgoNativeBridge.YGO_LoadBaseScripts(NativePtr);
+#if UNITY_EDITOR
+            RecordPlanningOperation("base scripts", scriptsStarted);
+#endif
+            if (scriptsLoaded == 0)
             {
                 Debug.LogError("[DuelSession] Failed to load base scripts.");
                 Dispose();
-                return false;
+                yield break;
             }
 
             Players[0].lp = firstLife;
@@ -550,12 +590,15 @@ namespace YGOPortable.Core
             uint deckMonster = opponentOpening?.DeckMonster ?? 0;
             var mainWithoutMonster = RemoveOpeningCard(p0GoesFirst ? secondMain : firstMain, deckMonster);
             var extraWithoutMonster = mainWithoutMonster == null ? RemoveOpeningCard(p1Extra, deckMonster) : null;
-            LoadDeckForPlayer(0, p0GoesFirst ? firstMain : mainWithoutMonster ?? firstMain,
+            foreach (bool paused in LoadDeckForPlayer(0, p0GoesFirst ? firstMain : mainWithoutMonster ?? firstMain,
                 p0GoesFirst ? turn0Extra : extraWithoutMonster ?? turn0Extra, shuffle,
-                p0GoesFirst ? playerDeckAppearance : null, p0GoesFirst ? null : opponentDestiny);
-            LoadDeckForPlayer(1, p0GoesFirst ? mainWithoutMonster ?? secondMain : secondMain,
+                p0GoesFirst ? playerDeckAppearance : null, p0GoesFirst ? null : opponentDestiny, sliceDue))
+                yield return null;
+            foreach (bool paused in LoadDeckForPlayer(1, p0GoesFirst ? mainWithoutMonster ?? secondMain : secondMain,
                 p0GoesFirst ? extraWithoutMonster ?? turn1Extra : turn1Extra, shuffle,
-                p0GoesFirst ? null : playerDeckAppearance, p0GoesFirst ? opponentDestiny : null);
+                p0GoesFirst ? null : playerDeckAppearance, p0GoesFirst ? opponentDestiny : null, sliceDue))
+                yield return null;
+            if (sliceDue?.Invoke() == true) yield return null;
             if (opponentOpening is { FieldCard: > 0 } opening)
                 PlaceOpeningCard((byte)AiPlayerIndex, opening.FieldCard,
                     StoryGimmickRuntime.OpeningMonsterSequence(storyGimmick, opening.FieldCard) ?? 2u);
@@ -564,21 +607,22 @@ namespace YGOPortable.Core
             if (!PlaceStoryOpeningCards((byte)AiPlayerIndex, storyGimmick))
             {
                 Dispose();
-                return false;
+                yield break;
             }
             if (StoryGimmickRuntime.IsRidingDuel(storyGimmick) && !SetupRidingDuel())
             {
                 Dispose();
-                return false;
+                yield break;
             }
             if (!string.IsNullOrEmpty(storyGimmick) &&
                 YgoNativeBridge.YGO_ConfigureStoryGimmick(NativePtr, storyGimmick, (byte)HumanPlayerIndex) < 0)
             {
                 Debug.LogError($"Could not configure story rule: {storyGimmick}");
                 Dispose();
-                return false;
+                yield break;
             }
 
+            if (sliceDue?.Invoke() == true) yield return null;
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
             {
@@ -598,8 +642,8 @@ namespace YGOPortable.Core
             }
             _playerReplay?.Begin(seed, p0Main, p0Extra, p1Main, p1Extra, p0GoesFirst, startingLp);
             AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")}) — 덱 무작위 셔플 완료");
-            StepUntilPrompt();
-            return true;
+            foreach (bool paused in StepUntilPromptInSlices(sliceDue)) yield return null;
+            yield return true;
         }
 
         private static uint[] CopyDeck(IReadOnlyList<uint> cards)
@@ -612,31 +656,89 @@ namespace YGOPortable.Core
 
         internal DuelSession ReplayForPlanning(Func<bool> expired)
         {
+            foreach (var copy in ReplayForPlanning(expired, () => false))
+                return copy;
+            return null;
+        }
+
+        internal IEnumerable<DuelSession> ReplayForPlanning(Func<bool> expired, Func<bool> sliceDue)
+        {
+            if (_planningReplay == null || RetryCount != 0) yield break;
+            foreach (var result in RestorePlanningReplay(_planningReplay, _planningResponses,
+                TurnNumber, CurrentPhase, expired, sliceDue))
+                yield return result;
+        }
+
+        internal Func<Func<bool>, DuelSession> CapturePlanningReplay()
+        {
+            if (_planningReplay == null || RetryCount != 0 || ActivePrompt == null || IsFinished) return null;
+            // Deck metadata is owned by the replay from start-up. Recorded buffers are copied on submission.
+            // Only the history container changes as the live duel progresses.
             var replay = _planningReplay;
-            if (replay == null || RetryCount != 0 || expired()) return null;
+            var responses = _planningResponses.ToArray();
+            int turn = TurnNumber, phase = CurrentPhase;
+            return expired =>
+            {
+                foreach (var copy in RestorePlanningReplay(replay, responses, turn, phase, expired, expired, retainReplay: true))
+                {
+                    if (copy != null) return copy;
+                    if (expired()) break;
+                }
+                return null;
+            };
+        }
+
+        private static IEnumerable<DuelSession> RestorePlanningReplay(PlanningReplay replay,
+            IReadOnlyList<(byte Message, byte Player, byte[] Bytes)> responses, int turn, int phase,
+            Func<bool> expired, Func<bool> sliceDue, bool retainReplay = false)
+        {
+            if (expired()) yield break;
             var copy = new DuelSession { _loadingPlanningReplay = true };
             bool ready = false;
             try
             {
-                if (!copy.StartNewDuel(replay.firstDeck, replay.firstExtra, replay.secondDeck, replay.secondExtra,
+                if (sliceDue()) yield return null;
+                if (expired()) yield break;
+                bool started = false;
+                foreach (bool? progress in copy.StartDuelInSlices(replay.firstDeck, replay.firstExtra, replay.secondDeck, replay.secondExtra,
                     replay.first, replay.startingLp, replay.seed, replay.destinyDeck,
-                    replay.opponentOpening, replay.opponentDestiny, replay.playerOpening, replay.storyGimmick)) return null;
-                foreach (var response in replay.responses)
+                    replay.opponentOpening, replay.opponentDestiny, replay.playerOpening, replay.storyGimmick, sliceDue))
                 {
-                    if (expired() || copy.IsFinished) return null;
-                    if (copy.ActivePrompt == null) copy.StepUntilPrompt();
-                    var prompt = copy.ActivePrompt;
-                    if (prompt == null || prompt.messageType != response.message || prompt.playerId != response.player) return null;
-                    copy.SubmitResponse(response.bytes);
-                    if (copy.RetryCount != 0) return null;
+                    if (progress.HasValue) { started = progress.Value; break; }
+                    yield return null;
+                    if (expired()) yield break;
                 }
-                if (copy.ActivePrompt == null) copy.StepUntilPrompt();
+                if (!started) yield break;
+                foreach (var response in responses)
+                {
+                    if (sliceDue()) yield return null;
+                    if (expired() || copy.IsFinished) yield break;
+                    if (copy.ActivePrompt == null)
+                        foreach (bool paused in copy.StepUntilPromptInSlices(sliceDue))
+                            yield return null;
+                    var prompt = copy.ActivePrompt;
+                    if (prompt == null || prompt.messageType != response.Message || prompt.playerId != response.Player) yield break;
+                    foreach (bool paused in copy.SubmitPlanningResponse(response.Bytes, sliceDue, preserveDeckSelection: false))
+                        yield return null;
+                    if (copy.RetryCount != 0) yield break;
+                }
+                if (sliceDue()) yield return null;
+                if (expired()) yield break;
+                if (copy.ActivePrompt == null)
+                    foreach (bool paused in copy.StepUntilPromptInSlices(sliceDue))
+                        yield return null;
                 copy._loadingPlanningReplay = false;
-                if (copy.IsFinished || copy.ActivePrompt == null || copy.TurnNumber != TurnNumber || copy.CurrentPhase != CurrentPhase)
-                    return null;
-                copy.RefreshZonesFromCore();
+                if (copy.IsFinished || copy.ActivePrompt == null || copy.TurnNumber != turn || copy.CurrentPhase != phase)
+                    yield break;
+                foreach (bool paused in copy.RefreshZonesInSlices(sliceDue))
+                    yield return null;
+                if (retainReplay)
+                {
+                    copy._planningReplay = replay;
+                    copy._planningResponses.AddRange(responses);
+                }
                 ready = true;
-                return copy;
+                yield return copy;
             }
             finally
             {
@@ -649,11 +751,32 @@ namespace YGOPortable.Core
             _speculatingPlayer = player;
             _planningTurnLimit = stopAfterTurn ? TurnNumber : -1;
             SpeculationUncertain = false;
+            _expectedPlanningReaction = null;
             ClearDeckSelection();
         }
 
-        private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra,
-            System.Random shuffle, UserDeck appearanceDeck, IReadOnlyList<uint> opponentDestiny)
+        internal IEnumerable<bool> SubmitVisiblePlanningReaction(int index, Func<bool> sliceDue)
+        {
+            if (ActivePrompt is not { messageType: YgoConstants.MSG_SELECT_CHAIN } prompt || _speculatingPlayer < 0 ||
+                prompt.playerId == _speculatingPlayer || (uint)index >= prompt.candidates.Count)
+                yield break;
+            var effect = prompt.candidates[index];
+            var monsters = Players[prompt.playerId].mzone;
+            if (effect.controller != prompt.playerId || effect.location != YgoConstants.LOCATION_MZONE ||
+                effect.sequence >= monsters.Length || monsters[effect.sequence] is not { IsFaceUp: true, effectsDisabled: false } card ||
+                card.code != effect.code) yield break;
+
+            _expectedPlanningReaction = (prompt.playerId, effect.code, effect.location, effect.sequence, effect.description);
+            try
+            {
+                foreach (bool paused in SubmitPlanningResponse(BitConverter.GetBytes(index), sliceDue, preserveDeckSelection: false))
+                    yield return paused;
+            }
+            finally { _expectedPlanningReaction = null; }
+        }
+
+        private IEnumerable<bool> LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra,
+            System.Random shuffle, UserDeck appearanceDeck, IReadOnlyList<uint> opponentDestiny, Func<bool> sliceDue)
         {
             if (main != null && main.Count > 0)
             {
@@ -664,14 +787,20 @@ namespace YGOPortable.Core
                     (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
                 }
                 for (int i = shuffled.Length - 1; i >= 0; i--)
+                {
+                    if (sliceDue?.Invoke() == true) yield return true;
                     AddDeckCard(main[shuffled[i]], YgoConstants.LOCATION_DECK,
                         appearanceDeck?.GetAppearance(appearanceDeck.main, shuffled[i]) ?? default);
+                }
             }
             if (extra != null)
             {
                 for (int i = 0; i < extra.Count; i++)
+                {
+                    if (sliceDue?.Invoke() == true) yield return true;
                     AddDeckCard(extra[i], YgoConstants.LOCATION_EXTRA,
                         appearanceDeck?.GetAppearance(appearanceDeck.extra, i) ?? default);
+                }
             }
 
             void AddDeckCard(uint code, uint location, DeckCardAppearance appearance)
@@ -680,7 +809,13 @@ namespace YGOPortable.Core
                     (appearance.destinyDraw || opponentDestiny?.Contains(code) == true);
                 bool styled = UsesDeckAppearances && !appearance.IsDefault;
                 uint before = marked || styled ? YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location) : 0;
+#if UNITY_EDITOR
+                long addingStarted = PlanningOperationStart();
+#endif
                 YgoNativeBridge.YGO_AddCard(NativePtr, playerId, 0, code, playerId, location, 0, YgoConstants.POS_FACEDOWN_DEFENSE);
+#if UNITY_EDITOR
+                RecordPlanningOperation("add deck card", addingStarted);
+#endif
                 if ((!marked && !styled) || YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location) != before + 1) return;
                 uint identity = YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, playerId, location, before);
                 if (identity == 0) return;
@@ -763,12 +898,20 @@ namespace YGOPortable.Core
 
         internal void SubmitPlanningResponse(byte[] buffer) => SubmitResponse(buffer, preserveDeckSelection: true);
 
+        internal IEnumerable<bool> SubmitPlanningResponse(byte[] buffer, Func<bool> sliceDue, bool preserveDeckSelection = true) =>
+            SubmitResponseInSlices(buffer, preserveDeckSelection, sliceDue, origin: null);
+
         internal void SubmitAutomaticResponseInt(int value, string origin) =>
             SubmitResponse(BitConverter.GetBytes(value), preserveDeckSelection: false, origin: origin);
 
         private void SubmitResponse(byte[] buffer, bool preserveDeckSelection, string origin = null)
         {
-            if (NativePtr == IntPtr.Zero || IsFinished) return;
+            foreach (bool paused in SubmitResponseInSlices(buffer, preserveDeckSelection, sliceDue: null, origin)) { }
+        }
+
+        private IEnumerable<bool> SubmitResponseInSlices(byte[] buffer, bool preserveDeckSelection, Func<bool> sliceDue, string origin)
+        {
+            if (NativePtr == IntPtr.Zero || IsFinished) yield break;
             var prevPrompt = ActivePrompt;
             int prevRetry = RetryCount;
             int recorded = _playerReplay?.Submitted(prevPrompt, buffer, TurnNumber, CurrentPhase, HumanPlayerIndex, origin) ?? 0;
@@ -777,9 +920,12 @@ namespace YGOPortable.Core
             {
                 if (_planningReplay != null)
                 {
-                    if (prevPrompt == null || buffer == null || buffer.Length == 0 || _planningReplay.responses.Count >= MaxReplayResponses)
+                    if (prevPrompt == null || buffer == null || buffer.Length == 0 || _planningResponses.Count >= MaxReplayResponses)
+                    {
                         _planningReplay = null;
-                    else _planningReplay.responses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
+                        _planningResponses.Clear();
+                    }
+                    else _planningResponses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
                 }
                 if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer, preserveDeckSelection);
                 if (prevPrompt?.messageType == YgoConstants.MSG_SORT_CARD) TrackSortedDeckTop(prevPrompt, buffer);
@@ -796,7 +942,8 @@ namespace YGOPortable.Core
                 else if (prevPrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW)
                     ResolveDestinyDraw(prevPrompt.playerId, buffer?.Length >= sizeof(int) && BitConverter.ToInt32(buffer, 0) == 1);
                 else YgoNativeBridge.SetResponse(NativePtr, buffer);
-                StepUntilPrompt();
+                foreach (bool paused in StepUntilPromptInSlices(sliceDue))
+                    yield return paused;
                 if (_observedTopSort.Remaining > 0) ForgetObservedDeckTop(_observedTopSort.Player);
                 if (!IsFinished && ActivePrompt == null && RetryCount > prevRetry && prevPrompt != null)
                 {
@@ -949,20 +1096,36 @@ namespace YGOPortable.Core
 
         public void StepUntilPrompt()
         {
-            if (NativePtr == IntPtr.Zero || IsFinished || IsManagedDrawPrompt(ActivePrompt)) return;
+            foreach (bool paused in StepUntilPromptInSlices(null)) { }
+        }
+
+        internal IEnumerable<bool> StepUntilPromptInSlices(Func<bool> sliceDue)
+        {
+            if (NativePtr == IntPtr.Zero || IsFinished || IsManagedDrawPrompt(ActivePrompt)) yield break;
             if (!TracksFieldReadouts) _fieldReadoutBaseline = null;
             else _fieldReadoutBaseline ??= CaptureFieldReadouts(fromNative: true);
 
             int guard = 0;
             while (!IsFinished && guard < 256)
             {
+                if (sliceDue?.Invoke() == true) yield return true;
                 guard++;
+#if UNITY_EDITOR
+                long processingStarted = PlanningOperationStart();
+#endif
                 int status = YgoNativeBridge.YGO_Process(NativePtr);
+#if UNITY_EDITOR
+                RecordPlanningOperation("native process", processingStarted);
+                long messagesStarted = PlanningOperationStart();
+#endif
                 byte[] msgBytes = YgoNativeBridge.GetMessageBuffer(NativePtr);
                 if (msgBytes.Length > 0)
                 {
                     ParseMessages(msgBytes);
                 }
+#if UNITY_EDITOR
+                RecordPlanningOperation("message readout", messagesStarted);
+#endif
                 if (_automaticReplayResponse != 0)
                 {
                     _playerReplay?.Acknowledge(_automaticReplayResponse, RetryCount == _automaticReplayRetry,
@@ -993,7 +1156,9 @@ namespace YGOPortable.Core
                 }
             }
 
-            if (!_loadingPlanningReplay) RefreshZonesFromCore();
+            if (!_loadingPlanningReplay)
+                foreach (bool paused in RefreshZonesInSlices(sliceDue))
+                    yield return paused;
             // A group can need several zone and position selections before its cards arrive.
             // Other prompts, including a summon-negation response, see the cards already arriving.
             if (IsFinished || ActivePrompt != null &&
@@ -1301,10 +1466,21 @@ namespace YGOPortable.Core
 
         private void CaptureMoveSource(CardMoveEvent move)
         {
-            if (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE &&
-                _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
+            if (move.fromLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE)) return;
+            if (_fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
                 source.code == move.code && source.position == move.fromPos)
+            {
                 move.SourceReadout = source;
+                return;
+            }
+            // Speculative and headless duels do not attach the presentation readout listeners.
+            // Use the last prompt's field when the native move identifies the same card and position.
+            if (OnCardMoved == null || TracksFieldReadouts || move.fromCon >= Players.Length) return;
+            var player = Players[move.fromCon];
+            var zone = move.fromLoc == YgoConstants.LOCATION_MZONE ? player.mzone : player.szone;
+            if (move.fromSeq < zone.Length && zone[move.fromSeq] is { } fromPrompt &&
+                fromPrompt.code == move.code && fromPrompt.position == move.fromPos)
+                move.SourceReadout = fromPrompt;
         }
 
         private void PublishCardMove(CardMoveEvent move)
@@ -1805,7 +1981,12 @@ namespace YGOPortable.Core
                     // The bundled engine appends flags to the length-delimited MSG_CHAINING.
                     byte activationFlags = br.BaseStream.Position < msgEnd ? br.ReadByte() : (byte)0;
                     uint identity = msgEnd - br.BaseStream.Position >= sizeof(uint) ? br.ReadUInt32() : 0;
-                    if (_speculatingPlayer >= 0 && tCon != _speculatingPlayer) SpeculationUncertain = true;
+                    if (_speculatingPlayer >= 0 && tCon != _speculatingPlayer)
+                    {
+                        if (_expectedPlanningReaction == (tCon, code, (uint)tLoc, tSeq, desc))
+                            _expectedPlanningReaction = null;
+                        else SpeculationUncertain = true;
+                    }
                     var activation = CaptureChainFieldCard(source);
                     var link = new ChainLinkInfo
                     {
@@ -1836,7 +2017,8 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_BECOME_TARGET:
                 {
-                    if (OnCardsTargeted == null || msgEnd - br.BaseStream.Position < sizeof(uint)) break;
+                    var link = _resolvingChainLink ?? CurrentChain.LastOrDefault(item => !item.Resolved);
+                    if (link == null && OnCardsTargeted == null || msgEnd - br.BaseStream.Position < sizeof(uint)) break;
                     uint count = br.ReadUInt32();
                     const int locationSize = 2 * sizeof(byte) + 2 * sizeof(uint);
                     if (count != (msgEnd - br.BaseStream.Position) / locationSize ||
@@ -1854,8 +2036,9 @@ namespace YGOPortable.Core
                     }
                     if (targets.Count == 0) break;
 
-                    var link = _resolvingChainLink ?? CurrentChain.LastOrDefault(item => !item.Resolved);
-                    OnCardsTargeted.Invoke(link?.PublicFieldSource ?? link?.ActivationSource, targets);
+                    if (link != null)
+                        link.PublicTargets = link.PublicTargets == null ? targets : link.PublicTargets.Concat(targets).ToArray();
+                    OnCardsTargeted?.Invoke(link?.PublicFieldSource ?? link?.ActivationSource, targets);
                     break;
                 }
 
@@ -2479,7 +2662,13 @@ namespace YGOPortable.Core
 
         public void RefreshZonesFromCore()
         {
-            if (NativePtr == IntPtr.Zero) return;
+            foreach (bool paused in RefreshZonesInSlices(null)) { }
+        }
+
+        private IEnumerable<bool> RefreshZonesInSlices(Func<bool> sliceDue)
+        {
+            if (NativePtr == IntPtr.Zero) yield break;
+            if (sliceDue?.Invoke() == true) yield return true;
 
             byte[] fb = YgoNativeBridge.QueryFieldBytes(NativePtr);
             if (fb.Length >= 12)
@@ -2505,17 +2694,23 @@ namespace YGOPortable.Core
 
             for (byte p = 0; p < 2; p++)
             {
+                if (sliceDue?.Invoke() == true) yield return true;
                 Array.Clear(Players[p].mzone, 0, Players[p].mzone.Length);
                 var mList = QueryLocationCards(p, YgoConstants.LOCATION_MZONE);
                 for (int i = 0; i < mList.Count && i < 7; i++) Players[p].mzone[i] = mList[i];
 
+                if (sliceDue?.Invoke() == true) yield return true;
                 Array.Clear(Players[p].szone, 0, Players[p].szone.Length);
                 var sList = QueryLocationCards(p, YgoConstants.LOCATION_SZONE);
                 for (int i = 0; i < sList.Count && i < 8; i++) Players[p].szone[i] = sList[i];
 
+                if (sliceDue?.Invoke() == true) yield return true;
                 Players[p].hand = QueryLocationCards(p, YgoConstants.LOCATION_HAND, keepNulls: false);
+                if (sliceDue?.Invoke() == true) yield return true;
                 Players[p].grave = QueryLocationCards(p, YgoConstants.LOCATION_GRAVE, keepNulls: false);
+                if (sliceDue?.Invoke() == true) yield return true;
                 Players[p].banished = QueryLocationCards(p, YgoConstants.LOCATION_REMOVED, keepNulls: false);
+                if (sliceDue?.Invoke() == true) yield return true;
                 Players[p].extra = QueryLocationCards(p, YgoConstants.LOCATION_EXTRA, keepNulls: false);
             }
         }
@@ -2551,7 +2746,13 @@ namespace YGOPortable.Core
         {
             var result = new List<LiveCardState>();
             if (loc == YgoConstants.LOCATION_SZONE && TracksFieldReadouts) flags |= YgoConstants.QUERY_EQUIP_CARD;
+#if UNITY_EDITOR
+            long started = PlanningOperationStart();
+#endif
             byte[] raw = YgoNativeBridge.QueryLocationBytes(NativePtr, flags, playerId, loc);
+#if UNITY_EDITOR
+            RecordPlanningOperation("location query", started);
+#endif
             if (raw.Length < 4) return result;
 
             int pos = 4; // uint32 total payload bytes
@@ -2674,7 +2875,9 @@ namespace YGOPortable.Core
             FinishPlayerReplay(IsFinished && Winner >= 0 ? "finished" : "interrupted", force: true);
             _playerReplay?.Dispose();
             _planningReplay = null;
+            _planningResponses.Clear();
             _speculatingPlayer = -1;
+            _expectedPlanningReaction = null;
             _fieldReadoutBaseline = null;
             _awaitingFieldArrivalCompletion = false;
             _movementGroups.Clear();

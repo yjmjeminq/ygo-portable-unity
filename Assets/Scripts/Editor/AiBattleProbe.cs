@@ -45,6 +45,50 @@ namespace YGOPortable.Editor
                     $"prompt {prompt.messageType}, recorded {BitConverter.ToString(answer)}, winning line {evidence}");
         }
 
+        internal static bool ConfirmsSearchedReplacement(CardMoveEvent move, ChainLinkInfo effect, byte owner, uint searchedCard) =>
+            move.code == searchedCard && move.fromCon == owner && move.toCon == owner &&
+            move.fromLoc == YgoConstants.LOCATION_HAND && move.toLoc == YgoConstants.LOCATION_MZONE &&
+            (move.toPos & YgoConstants.POS_FACEUP) != 0 && (move.reason & YgoConstants.REASON_SPSUMMON) != 0 &&
+            effect is { negated: false, triggerLoc: YgoConstants.LOCATION_HAND } &&
+            effect.triggerPlayer == owner && effect.code == searchedCard;
+
+        internal static bool TryFindDecisionBlunder(DuelSession duel, DuelPrompt prompt, byte[] answer,
+            out string kind, out uint code)
+        {
+            kind = null;
+            code = 0;
+            if (answer == null || answer.Length < sizeof(int)) return false;
+            int response = BitConverter.ToInt32(answer, 0);
+            var activation = ChosenActivation(prompt, response);
+            if (activation == null) return false;
+            code = activation.code;
+            if (DuelTactics.TryGetTemporaryBattleTrick(code, activation.description, out _) &&
+                !DuelTactics.CanSpendBattleTrick(duel, prompt, activation))
+                kind = "temporary_combat_waste";
+            else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced && !prompt.IsTriggerChain &&
+                !activation.isTriggeredEffect && DuelTactics.IsResponseNegate(code) &&
+                duel.CurrentChain.LastOrDefault() is { } source &&
+                (source.triggerPlayer == prompt.playerId || source.negated))
+                kind = "wasted_handtrap";
+            return kind != null;
+        }
+
+        private static SelectableCardItem ChosenActivation(DuelPrompt prompt, int response)
+        {
+            if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && response == 1 && !prompt.IsDirectAttackChoice)
+                return new SelectableCardItem
+                {
+                    code = prompt.promptCardCode, controller = prompt.playerId, location = prompt.promptLoc,
+                    sequence = prompt.promptSeq, description = prompt.promptEffectDesc != 0 ? prompt.promptEffectDesc : prompt.promptDesc,
+                };
+            if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                return response >= 0 && response < prompt.candidates.Count ? prompt.candidates[response] : null;
+            int command = response & 0xffff, index = response >> 16;
+            return (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && command == 5 ||
+                    prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && command == 0) &&
+                index >= 0 && index < prompt.activatable.Count ? prompt.activatable[index] : null;
+        }
+
         internal static bool TryProveMissedLethal(DuelSession live, DuelPrompt prompt, byte[] actual, out string evidence)
         {
             evidence = null;

@@ -31,6 +31,7 @@ namespace YGOPortable.UI
     public class GameAppController : MonoBehaviour
     {
         public float AiStepDelay { get; set; } = 0.25f;
+        private const double MasterMainPhaseMinimumSeconds = 0.6;
         public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Master;
         internal ChainConfirmationMode ChainConfirmation { get; private set; } = ChainConfirmationMode.Auto;
         private const string AiDifficultyPreference = "ygo.ai-difficulty.v1";
@@ -64,6 +65,8 @@ namespace YGOPortable.UI
 
         private DuelSession _session;
         private TacticalAI _ai;
+        private DetachedAiPlanning _detachedAiPlanning;
+        private bool _detachedAiReady;
         private DuelPrompt _shownHumanPrompt;
         private float _aiTimer;
         private DuelPrompt _timedAiPrompt;
@@ -443,6 +446,7 @@ namespace YGOPortable.UI
                 {
                     _duelField.UnbindSession();
                     CardDragManager.Instance?.CancelDrag();
+                    CancelAiPlanning();
                     _session.Dispose();
                     _session = null;
                     _shownHumanPrompt = null;
@@ -657,6 +661,7 @@ namespace YGOPortable.UI
             _activeMyDeck = myDeck;
             _activePlayerFirst = playerGoesFirst;
 
+            CancelAiPlanning();
             _session?.Dispose();
             _personalReplay = null;
             if (PersonalReplayEnabled && !Application.isBatchMode)
@@ -850,6 +855,7 @@ namespace YGOPortable.UI
                 if (!_resultShown)
                 {
                     _resultShown = true;
+                    CancelAiPlanning();
                     _modals.HideAll();
                     _duelField.Refresh();
                     bool won = _session.Winner == _session.HumanPlayerIndex;
@@ -957,7 +963,8 @@ namespace YGOPortable.UI
                 if (AdvanceAiDecision(prompt, Time.deltaTime * DuelFieldUI.PlaybackRate, Time.realtimeSinceStartupAsDouble))
                 {
                     _timedAiPrompt = null;
-                    byte[] aiResp = _ai.ComputeResponse(_session, prompt);
+                    byte[] aiResp = _ai.UsesDetachedPlanning(prompt) ? _ai.ComputeWithoutSpeculation(_session, prompt) :
+                        _ai.ComputeResponse(_session, prompt);
                     _session.SubmitResponse(aiResp);
                     _duelField.Refresh();
                 }
@@ -1170,16 +1177,37 @@ namespace YGOPortable.UI
         {
             if (!ReferenceEquals(_timedAiPrompt, prompt))
             {
+                CancelAiPlanning();
                 _timedAiPrompt = prompt;
                 _aiPromptStartedAt = now;
                 _aiTimer = 0f;
+                if (_ai.UsesDetachedPlanning(prompt)) _detachedAiPlanning = new DetachedAiPlanning(_ai, _session, prompt);
             }
 
             _aiTimer += playbackDelta;
             bool masterMainPhase = _ai.Difficulty == AIDifficulty.Master &&
                 prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
-            return _ai.AdvanceComboPlanning(_session, prompt) && _aiTimer >= AiStepDelay &&
-                (!masterMainPhase || now - _aiPromptStartedAt >= ComboSearch.MasterPlanningMilliseconds / 1000d);
+            bool ready = _detachedAiPlanning == null ? _ai.AdvanceComboPlanning(_session, prompt) : PollDetachedPlanning(prompt);
+            return ready && _aiTimer >= AiStepDelay &&
+                (!masterMainPhase || now - _aiPromptStartedAt >= MasterMainPhaseMinimumSeconds);
+        }
+
+        private bool PollDetachedPlanning(DuelPrompt prompt)
+        {
+            if (_detachedAiReady) return true;
+            if (!_detachedAiPlanning.TryTake(prompt, out var advisor, out string error)) return false;
+            _detachedAiReady = true;
+            if (advisor != null) _ai = advisor;
+            if (error != null) Debug.LogWarning($"[Duel AI planning] {error}");
+            return true;
+        }
+
+        private void CancelAiPlanning()
+        {
+            _detachedAiPlanning?.Cancel();
+            _detachedAiPlanning = null;
+            _detachedAiReady = false;
+            _ai?.CancelComboPlanning();
         }
 
         internal void SetPersonalReplayEnabled(bool enabled)
@@ -1280,6 +1308,7 @@ namespace YGOPortable.UI
             _secretPackToast?.Dispose();
             _saveSync?.Dispose();
             Debug.Log($"[GameApp] OnDestroy called! Stack:\n{Environment.StackTrace}");
+            CancelAiPlanning();
             _session?.Dispose();
             _personalReplay?.Dispose();
             _personalReplay?.PollWarning();
@@ -1289,6 +1318,7 @@ namespace YGOPortable.UI
         private void OnApplicationQuit()
         {
             Debug.Log($"[GameApp] OnApplicationQuit called! Stack:\n{Environment.StackTrace}");
+            CancelAiPlanning();
             _session?.Dispose();
             _personalReplay?.Dispose();
             _personalReplay?.PollWarning();

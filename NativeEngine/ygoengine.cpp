@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <stack>
 #include <string>
@@ -25,6 +26,7 @@
 #include "field.h"
 #include "interpreter.h"
 #include <lua.h>
+#include <lauxlib.h>
 
 namespace {
 
@@ -62,6 +64,7 @@ struct EngineState {
     std::vector<PackedCard> cards;
     std::vector<uint8_t> script_blob;
     std::unordered_map<std::string, std::pair<uint32_t, uint32_t>> scripts;
+    std::unordered_map<std::string, std::vector<char>> compiled_shared_scripts;
     std::filesystem::path fallback_script_dir;
     YGO_LogFn log_cb = nullptr;
 };
@@ -169,9 +172,43 @@ void read_card_cb(void* /*payload*/, uint32_t code, OCG_CardData* data) {
 void read_card_done_cb(void* /*payload*/, OCG_CardData* /*data*/) {
 }
 
+void compile_shared_scripts() {
+    g_state.compiled_shared_scripts.clear();
+    std::unique_ptr<lua_State, decltype(&lua_close)> compiler(luaL_newstate(), lua_close);
+    if (!compiler) return;
+
+    for (const auto& [key, entry] : g_state.scripts) {
+        // Every speculative duel starts a fresh Lua state and loads these same helpers.
+        // Only cache code compiled from the current pack, with no shared Lua globals.
+        const bool shared = key == "constant.lua" || key == "utility.lua" || key == "chain.lua" ||
+            key == "archetype_setcode_constants.lua" || key == "card_counter_constants.lua" ||
+            key == "cards_specific_functions.lua" || key == "debug_utility.lua" || key == "deprecated_functions.lua" ||
+            key.rfind("proc_", 0) == 0;
+        if (!shared) continue;
+        const char* source = reinterpret_cast<const char*>(g_state.script_blob.data() + entry.first);
+        if (luaL_loadbufferx(compiler.get(), source, entry.second, key.c_str(), "t") == LUA_OK) {
+            std::vector<char> chunk;
+            const int dumped = lua_dump(compiler.get(), [](lua_State*, const void* data, size_t size, void* context) {
+                auto& bytes = *static_cast<std::vector<char>*>(context);
+                const auto* first = static_cast<const char*>(data);
+                try { bytes.insert(bytes.end(), first, first + size); }
+                catch (...) { return 1; }
+                return 0;
+            }, &chunk, 0);
+            if (dumped == 0 && !chunk.empty()) g_state.compiled_shared_scripts.emplace(key, std::move(chunk));
+        }
+        lua_pop(compiler.get(), 1);
+    }
+}
+
 int read_script_cb(void* /*payload*/, OCG_Duel duel, const char* name) {
     if (!name || !*name) return 0;
     std::string key = to_lower_ascii(name);
+    auto cached = g_state.compiled_shared_scripts.find(key);
+    if (cached != g_state.compiled_shared_scripts.end()) {
+        const auto& chunk = cached->second;
+        return OCG_LoadScript(duel, chunk.data(), static_cast<uint32_t>(chunk.size()), name) ? 1 : 0;
+    }
     auto it = g_state.scripts.find(key);
     if (it != g_state.scripts.end()) {
         const uint32_t off = it->second.first;
@@ -202,6 +239,7 @@ void log_cb(void* /*payload*/, const char* string, int type) {
 
 YGO_API int32_t YGO_Init(const char* cardPropPath, const char* scriptPackPath) {
     std::lock_guard<std::mutex> lock(g_state.mu);
+    g_state.compiled_shared_scripts.clear();
     std::vector<uint8_t> cbuf;
     if (!read_all_bytes(cardPropPath, cbuf) || cbuf.size() < 12) {
         return -1;
@@ -249,6 +287,7 @@ YGO_API int32_t YGO_Init(const char* cardPropPath, const char* scriptPackPath) {
         }
         g_state.scripts[key] = { e.data_off, e.data_len };
     }
+    compile_shared_scripts();
     g_state.fallback_script_dir = std::filesystem::u8path(scriptPackPath).parent_path() / "StoryRules";
     return 0;
 }
@@ -257,6 +296,7 @@ YGO_API void YGO_Shutdown() {
     std::lock_guard<std::mutex> lock(g_state.mu);
     g_state.cards.clear();
     g_state.scripts.clear();
+    g_state.compiled_shared_scripts.clear();
     g_state.script_blob.clear();
     g_state.fallback_script_dir.clear();
     g_state.log_cb = nullptr;

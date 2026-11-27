@@ -18,12 +18,14 @@ PROJECT = Path(__file__).resolve().parents[1]
 BENCHMARK_STORE = PROJECT / 'Logs/AiBenchmark'
 BASELINE_V1 = '1da3213389f06a2689d9e0120d6aad8e673cf74d'
 POLICIES = ('DuelAiPolicy', 'LinkComboPolicy')
+NATIVE_LIBRARY = 'Assets/Plugins/x86_64/ygoengine.dll'
 STREAMING = (
     'cards_kr.json', 'cards_prop.bin', 'cardscripts.pack', 'deck_effect_categories.bin',
     'duel_effect_labels_ko.tsv', 'opponents_db.json', 'opponent_deck_levels.json',
 )
 GX_DECK_INPUTS = ('opponents_db.json', 'opponent_deck_levels.json', 'story_gx_rpg_decks.json')
-BLUNDERS = ('exposedAttackers', 'selfDestruction', 'lethalMisses', 'wastedHandtraps', 'retries')
+BLUNDERS = ('exposedAttackers', 'selfDestruction', 'lethalMisses', 'wastedHandtraps', 'retries',
+            'temporaryCombatWaste', 'reflectedBattleDefeats')
 BLUNDER_RATE_KINDS = ('ownEffectDefeats', 'missedLethal', 'exposureDamageWithoutPayoff',
                       'wastedDisruption', 'resourcesLeftOnDefeat', 'downgradeSummons')
 FIRST_TURN_DRAW_HANDTRAP_ACTIONS = frozenset(
@@ -47,7 +49,7 @@ def read_replay_report(path):
 
 def inputs():
     return [*(f'Assets/StreamingAssets/{name}' for name in STREAMING),
-            'Assets/Plugins/x86_64/ygoengine.dll', 'ProjectSettings/ProjectVersion.txt']
+            NATIVE_LIBRARY, 'ProjectSettings/ProjectVersion.txt']
 
 
 def pin_revision(revision):
@@ -136,8 +138,26 @@ namespace YGOPortable.Editor
     }
 }
 '''
-    if 'int opponentLevel' not in (frozen / 'Assets/Scripts/AI/TacticalAI.cs').read_text(encoding='utf-8-sig'):
+    baseline_source = (frozen / 'Assets/Scripts/AI/TacticalAI.cs').read_text(encoding='utf-8-sig')
+    if 'int opponentLevel' not in baseline_source:
         factory = factory.replace(', opponentLevel: level', '')
+    if all(marker in baseline_source for marker in ('AdvanceComboPlanning', 'AIDifficulty.Master', 'responseLimit')):
+        factory = factory.replace('        public static AiMatchBenchmark.Pilot Create(int level)', '''        public static AiMatchBenchmark.Pilot CreateMaster(int tier)
+        {
+            var difficulty = System.Environment.GetEnvironmentVariable("YGO_BENCH_BASELINE_DIFFICULTY") switch
+            {
+                "smart" => AIDifficulty.Smart,
+                "normal" => AIDifficulty.Normal,
+                _ => AIDifficulty.Master,
+            };
+            var ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
+                searchCombos: difficulty != AIDifficulty.Normal, planningScale: YGOPortable.UI.GameAppController.GxStoryPlanningScale(tier),
+                responseLimit: ComboSearch.RpgResponseLimit) { Difficulty = difficulty };
+            return AiMatchBenchmark.TimedPilot(ai.ComputeResponse, ai.AdvanceComboPlanning,
+                () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives);
+        }
+
+        public static AiMatchBenchmark.Pilot Create(int level)''')
     write(worker / 'Assets/Scripts/Editor/AiBenchmarkBaselineFactory.cs', factory.encode())
     if previous_snapshot is not None:
         for path in (previous_snapshot / 'Assets/Scripts/AI').glob('*.cs'):
@@ -233,9 +253,10 @@ def worker_path(workspace, frozen, index, candidate_snapshot=None, previous_snap
 def run_worker(index, arguments, editor, frozen, output):
     worker = worker_path(arguments.workspace, frozen, index, arguments.candidate_snapshot, arguments.previous_snapshot)
     prepare(worker, frozen, arguments.candidate_policies, arguments.candidate_snapshot, arguments.previous_snapshot)
-    if arguments.gx_suite or arguments.gx_field_audit:
-        for name, contents in arguments.gx_deck_inputs.items():
-            write(worker / 'Assets/StreamingAssets' / name, contents)
+    if arguments.engine_library_bytes is not None:
+        write(worker / NATIVE_LIBRARY, arguments.engine_library_bytes)
+    for name, contents in arguments.gx_deck_inputs.items():
+        write(worker / 'Assets/StreamingAssets' / name, contents)
     write(output / f'candidate-source-{index}.json', source_manifest(worker))
     previous_report = None
     if arguments.previous_snapshot is not None:
@@ -246,11 +267,15 @@ def run_worker(index, arguments, editor, frozen, output):
     log = output / f'unity-{index}.log'
     env = dict(os.environ, YGO_BENCH_REPORT=str(report), YGO_BENCH_SEEDS=str(arguments.seeds),
                YGO_BENCH_START=str(index), YGO_BENCH_STRIDE=str(arguments.jobs),
+               YGO_BENCH_FRAME_RATE=str(arguments.frame_rate or 0),
+               YGO_BENCH_DETACHED_PLANNING='1' if arguments.detached_planning else '0',
                YGO_BENCH_STYLE_SUITE='1' if arguments.style_suite else '0',
                YGO_BENCH_FULL_SUITE='1' if arguments.full_suite else '0',
                YGO_BENCH_GX_SUITE='1' if arguments.gx_suite else '0',
                YGO_BENCH_GX_FIELD_AUDIT='1' if arguments.gx_field_audit else '0',
                YGO_BENCH_GX_SELF_PLAY='1' if arguments.gx_self_play else '0',
+               YGO_BENCH_GX_MASTER_COMPARE='1' if arguments.gx_master_compare else '0',
+               YGO_BENCH_BASELINE_DIFFICULTY=arguments.master_opponent,
                YGO_BENCH_ROSTER_LEVELS='1' if arguments.roster_levels else '0',
                YGO_BENCH_OPENINGS_ONLY='1' if arguments.openings_only else '0',
                YGO_BENCH_REFERENCE_ONLY='1' if arguments.reference_only else '0',
@@ -345,7 +370,7 @@ def summarize(matches):
         for seat, side in enumerate(match['sides']):
             role = 'candidate' if seat == candidate else 'baseline'
             for name in BLUNDERS:
-                blunders[role][name] += side[name]
+                blunders[role][name] += side.get(name, 0)
             if winner == 1 - seat and side.get('selfDefeatEffect', 0):
                 self_effect_defeats[role] += 1
                 rate_counts[role]['ownEffectDefeats'] += 1
@@ -358,7 +383,7 @@ def summarize(matches):
             first_turn_draw_handtraps[role] += sum(
                 action in FIRST_TURN_DRAW_HANDTRAP_ACTIONS for action in side['earlyActions']
             )
-            for name in ('equipRuleLosses', 'selfDestructionWithoutEquipRuleLoss'):
+            for name in ('equipRuleLosses', 'selfDestructionWithoutEquipRuleLoss', 'sameTurnSelfDestructionReplacements'):
                 if name in side:
                     destruction_breakdown[role][name] += side[name]
             for trace in side.get('exposureTraces', ()):
@@ -383,6 +408,12 @@ def summarize(matches):
             totals[role]['chosenAlternatives'] += side.get('chosenAlternatives', 0)
             totals[role]['slowestMs'] = max(totals[role]['slowestMs'], side['slowestMs'])
             totals[role]['maxPlanMs'] = max(totals[role]['maxPlanMs'], side.get('maxPlanMs', 0))
+            if side.get('maxPlanningSliceMs', 0) > totals[role]['maxPlanningSliceMs']:
+                totals[role]['maxPlanningSliceMs'] = side['maxPlanningSliceMs']
+                totals[role]['maxPlanningSliceAt'] = {
+                    'matchup': match['matchup'], 'seed': match['seed'], 'seat': seat,
+                    'decision': side.get('maxPlanningSliceAt', ''),
+                }
             totals[role]['ordinaryDecisionMs'] += side.get('ordinaryDecisionMs', side['decisionMs'])
             totals[role]['slowestOrdinaryMs'] = max(totals[role]['slowestOrdinaryMs'],
                                                    side.get('slowestOrdinaryMs', side['slowestMs']))
@@ -420,7 +451,8 @@ def summarize(matches):
         style_report[name][turn_order] = policies
     gx_fields = ('signatureMonsterReached', 'completedTurns', 'emptyFieldEndTurns', 'emptyMonsterEndTurns',
                  'battleFinishes', 'provenMissedBattleWins', 'lethalMisses', 'threatsSpent', 'wastedHandtraps',
-                 'trackedResponses', 'selfDestruction', 'decisionMs', 'retries')
+                 'trackedResponses', 'selfDestruction', 'decisionMs', 'retries',
+                 'temporaryCombatWaste', 'openingReadyInteractions')
     gx_metrics = {role: Counter() for role in blunders}
     field_audit = {role: Counter() for role in blunders}
     for match in matches:
@@ -430,7 +462,9 @@ def summarize(matches):
             role = 'candidate' if seat == match['candidate'] else 'baseline'
             gx_metrics[role]['games'] += 1
             for field in gx_fields:
-                gx_metrics[role][field] += side[field]
+                gx_metrics[role][field] += side.get(field, 0)
+            if seat == 0 and side['completedTurns'] > 0:
+                gx_metrics[role]['firstSeatGames'] += 1
             if match['era'].startswith('GX/Audit/'):
                 moves = [trace for trace in side['fieldCosts'] if trace['actor'] == seat]
                 field_audit[role]['games'] += 1
@@ -656,8 +690,12 @@ def main():
     parser.add_argument('label', help='Unique name for this benchmark run in the workspace.')
     parser.add_argument('--workspace', type=Path, default=PROJECT / 'Logs/AiBenchmark')
     parser.add_argument('--unity', type=Path)
+    parser.add_argument('--engine-library', type=Path,
+                        help='Use this native DLL for both seats in a GX Master comparison or for an exact replay.')
     parser.add_argument('--jobs', type=int, default=2)
     parser.add_argument('--seeds', type=int, default=8, help='Shuffle seeds per matchup, with two policy assignments each.')
+    parser.add_argument('--frame-rate', type=int, help='Pace yielded planning slices at this rate for a frame-budget benchmark.')
+    parser.add_argument('--detached-planning', action='store_true', help='Measure the candidate Master using the gameplay worker path.')
     parser.add_argument('--fixture', help='Run a single MATCHUP:SEED pair or select the pair to replay.')
     parser.add_argument('--capture-replays', action='store_true', help='Keep exact engine responses for every match in the run.')
     parser.add_argument('--replay', type=Path, action='append', help='Replay recorded matches from a JSON or JSONL report. Repeat for additional files.')
@@ -674,6 +712,10 @@ def main():
     suite.add_argument('--gx-field-audit', action='store_true', help='Audit field costs for all 37 GX story decks.')
     parser.add_argument('--gx-self-play', action='store_true',
                         help='Use the live GX Master settings and candidate AI for both seats of a GX suite.')
+    parser.add_argument('--gx-master-compare', action='store_true',
+                        help='Compare both Master policies on the GX suite against a pinned shipped revision.')
+    parser.add_argument('--master-opponent', choices=('master', 'smart', 'normal'), default='master',
+                        help='Difficulty of the pinned opponent in the GX Master comparison.')
     suite.add_argument('--fixed-regressions', action='store_true', help='Replay every fixed scenario with the current native AI.')
     suite.add_argument('--roster-levels', action='store_true', help='Check every available deck in both seats with the candidate AI through turn two.')
     parser.add_argument('--openings-only', action='store_true', help='Measure the first two duel turns without scoring match winners.')
@@ -693,7 +735,13 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r'[\w-]+', args.label) or not 1 <= args.jobs <= 4 or args.seeds < 1:
         parser.error('Use a simple run label and positive job/seed counts.')
-    matchups = 37 if args.gx_field_audit else 10 if args.gx_suite else 22 if args.full_suite else 8 if args.style_suite else 14
+    if args.frame_rate is not None and (args.frame_rate <= 0 or not args.gx_master_compare):
+        parser.error('--frame-rate requires a positive rate and --gx-master-compare.')
+    if args.detached_planning and not (args.gx_master_compare or args.gx_self_play):
+        parser.error('--detached-planning requires a Master AI comparison or self-play.')
+    if args.master_opponent != 'master' and not args.gx_master_compare:
+        parser.error('--master-opponent requires --gx-master-compare.')
+    matchups = 37 if args.gx_field_audit else (14 if args.gx_master_compare else 10) if args.gx_suite else 22 if args.full_suite else 8 if args.style_suite else 14
     if args.jobs < 2 and not (args.fixture or args.replay or args.fixed_regressions):
         parser.error('Full benchmarks require two to four workers.')
     if args.fixture:
@@ -732,6 +780,13 @@ def main():
     if args.gx_self_play and (not (args.gx_suite or args.gx_field_audit) or args.reference_only or args.random_opponent or
                               args.previous_run or args.paired_previous_revision or args.stage or args.require_gates or args.replay):
         parser.error('--gx-self-play requires a GX suite and cannot be combined with comparison or replay options.')
+    if args.gx_master_compare and (not (args.gx_suite or args.gx_field_audit) or args.gx_self_play or
+                                   args.baseline_revision == BASELINE_V1 or args.reference_only or args.random_opponent or
+                                   args.replay or args.stage or args.previous_run or args.paired_previous_revision):
+        parser.error('--gx-master-compare requires a GX suite and an explicit shipped Master baseline revision.')
+    if args.engine_library is not None and (not (args.gx_master_compare or args.replay) or not args.engine_library.is_file()):
+        parser.error('--engine-library requires a native DLL and --gx-master-compare or --replay.')
+    args.engine_library_bytes = args.engine_library.read_bytes() if args.engine_library is not None else None
     if args.fixture and not args.replay:
         args.jobs = 1
     if args.replay:
@@ -787,12 +842,16 @@ def main():
             parser.error('Confirmation requires the same source and policies to pass the random opponent floor.')
     output = args.workspace / args.label
     output.mkdir(parents=True, exist_ok=False)
-    if args.gx_suite or args.gx_field_audit:
+    args.gx_deck_inputs = {}
+    replays_gx = args.replay and any(match.get('era', '').startswith('GX/') for match in selected)
+    if args.gx_suite or args.gx_field_audit or replays_gx:
         args.gx_deck_inputs = {name: (PROJECT / 'Assets/StreamingAssets' / name).read_bytes() for name in GX_DECK_INPUTS}
         hashes = {name: hashlib.sha256(contents).hexdigest() for name, contents in args.gx_deck_inputs.items()}
         write(output / 'gx-decks-sha256.json', json.dumps(hashes, indent=2).encode())
     if args.replay:
         write(output / 'replay-input.jsonl', ''.join(json.dumps(match, ensure_ascii=False) + '\n' for match in selected).encode())
+        if args.engine_library_bytes is not None:
+            write(output / 'native-library-sha256.txt', (hashlib.sha256(args.engine_library_bytes).hexdigest() + '\n').encode())
     version = (frozen / 'ProjectSettings/ProjectVersion.txt').read_text().splitlines()[0].split()[-1]
     editor = args.unity or Path(f'C:/Program Files/Unity/Hub/Editor/{version}/Editor/Unity.exe')
     if not editor.is_file():
@@ -830,7 +889,40 @@ def main():
         raise RuntimeError('Benchmark workers used different candidate policies.')
     summary = summary_identity(summarize(matches), frozen, source_manifests[0],
                                worker_policies[0],
-                               'GX Master self-play' if args.gx_self_play else 'RandomLegal-v1' if args.random_opponent else None)
+                               'GX Master self-play' if args.gx_self_play else f'Pinned {args.master_opponent.title()}' if args.gx_master_compare
+                               else 'RandomLegal-v1' if args.random_opponent else None)
+    native_bytes = args.engine_library_bytes if args.engine_library_bytes is not None else (frozen / NATIVE_LIBRARY).read_bytes()
+    summary['nativeLibrarySha256'] = hashlib.sha256(native_bytes).hexdigest()
+    if args.frame_rate is not None:
+        summary['planningFrameRate'] = args.frame_rate
+    if args.detached_planning:
+        candidate_sides = [match['sides'][match['candidate']] for match in matches]
+        summary['detachedPlanning'] = {
+            'requested': sum(side['detachedRequested'] for side in candidate_sides),
+            'accepted': sum(side['detachedAccepted'] for side in candidate_sides),
+        }
+    if args.gx_master_compare:
+        candidate_rows = [match['sides'][match['candidate']] for match in matches]
+        critical = {name: summary['blunders']['candidate'][name] for name in BLUNDERS
+                    if name not in ('exposedAttackers', 'selfDestruction')}
+        critical['uncompensatedSelfDestruction'] = sum(side['selfDestructionWithoutEquipRuleLoss'] -
+                                                       side.get('sameTurnSelfDestructionReplacements', 0)
+                                                       for side in candidate_rows)
+        critical['provenMissedBattleWins'] = sum(side['provenMissedBattleWins'] for side in candidate_rows)
+        critical['ownEffectDefeats'] = summary['selfEffectDefeats']['candidate']
+        critical['uncompensatedAceTrades'] = sum(side['uncompensatedAceTrades'] for side in candidate_rows)
+        timings = summary['decisionAndBoard']['candidate']
+        required_win_rate = .50 if args.master_opponent == 'master' else .70
+        master_targets = {
+            'winsAtLeastRequiredRate': (summary['winRate'] or 0) >= required_win_rate,
+            'noUnfinishedGamesOrNativeErrors': not any(summary['outcomes'].get(key, 0)
+                                                      for key in ('unfinished', 'nativeErrors')),
+            'noDetectedCriticalBlunders': not any(critical.values()),
+            'headlessPlanningSlicesUnderOne60HzFrame': 0 < timings['maxPlanningSliceMs'] <= 1000 / 60,
+            'headlessDecisionUnder1000Ms': timings['slowestMs'] <= 1000,
+        }
+        summary['masterTargets'] = {**master_targets, 'accepted': all(master_targets.values()),
+                                    'requiredWinRate': required_win_rate, 'criticalBlunders': critical}
     previous_output = args.previous_run
     if args.previous_snapshot is not None:
         previous_output = output / 'previous'
@@ -888,10 +980,11 @@ def main():
             summary['acceptance'] = acceptance(before, summary)
     write(output / 'summary.json', (json.dumps(summary, ensure_ascii=False, indent=2) + '\n').encode())
     print(json.dumps({key: summary[key] for key in ('games', 'outcomes', 'gainPercentagePoints', 'pairedOneSidedP',
-                                                   'opening', 'blundersPer100', 'decisionAndBoard', 'stageAudit', 'randomFloor')
+                                                   'opening', 'blundersPer100', 'decisionAndBoard', 'stageAudit', 'randomFloor', 'masterTargets')
                       if key in summary}, indent=2))
     print(f'Report: {output / "summary.json"}')
-    if args.require_gates and not summary.get('stageAudit' if args.stage else 'acceptance', {}).get('accepted', False):
+    gate = 'masterTargets' if args.gx_master_compare else 'stageAudit' if args.stage else 'acceptance'
+    if args.require_gates and not summary.get(gate, {}).get('accepted', False):
         raise SystemExit(2)
     if args.stage and not summary['stageAudit']['accepted']:
         raise SystemExit(2)

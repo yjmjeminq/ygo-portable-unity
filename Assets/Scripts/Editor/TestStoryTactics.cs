@@ -366,6 +366,11 @@ namespace YGOPortable.Editor
 
         private static void VerifyTournament(string save)
         {
+            var fieldDependentFinalist = DimensionTournament.HighestDeck(3203);
+            var replacement = DimensionTournament.Opening(2, fieldDependentFinalist);
+            Require(replacement.FieldCard != 0 && replacement.FieldCard != fieldDependentFinalist.sigCard,
+                "The final chose a signature monster that destroys itself before the first action.");
+            VerifyFinalOpening(fieldDependentFinalist, replacement);
             Require(!CollectionProgress.TryStartTournament(8, out _), "The tournament was open before completion.");
             Require(CollectionProgress.TryAwardStoryDuel("dm_ep_50", true, null, null, out _, out _, out string error), error);
             foreach (int size in new[] { 8, 16 })
@@ -399,17 +404,7 @@ namespace YGOPortable.Editor
                         4 => opening.Life == 12000 && opening.Hand == 6,
                         _ => opening.Life == 8000 && opening.Hand == 5
                     }, "Incorrect round difficulty.");
-                    if (run.PlayerNode == 2)
-                    {
-                        using var duel = new DuelSession();
-                        var player = Enumerable.Repeat(20721928u, 40).ToArray();
-                        Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival.main, rival.extra,
-                            opponentOpening: opening, seed: new ulong[] { 19, 131, 89, 291 }), "The tournament final could not start.");
-                        var boss = duel.Players[duel.AiPlayerIndex];
-                        Require(boss.lp == 20000 && boss.hand.Count == 7 &&
-                            boss.mzone.Any(card => card?.code == opening.FieldCard && card.IsFaceUp),
-                            "The final did not apply its boosted LP, hand or ace.");
-                    }
+                    if (run.PlayerNode == 2) VerifyFinalOpening(rival, opening);
                     Require(CollectionProgress.TryFinishTournamentRound(run.seed, run.round, run.Opponent, true, out var reward, out error), error);
                     Require(reward.Champion == (run.PlayerNode == 2) &&
                         (reward.Champion ? reward.Dp == (size == 16 ? 5000 : 3000) && reward.Dust > 0 : reward.Dp == CollectionProgress.WinReward),
@@ -432,6 +427,18 @@ namespace YGOPortable.Editor
                 "A tournament ticket opened a general pack.");
             Require(CollectionProgress.TryBuyPackContents(secret.Id, 10, out var cards, out error, useFreeSecretBundle: true) &&
                 cards.Count == 10 && CollectionProgress.Balance == balance && CollectionProgress.FreeSecretBundles == 1, error);
+        }
+
+        private static void VerifyFinalOpening(PresetDeckInfo rival, DuelOpening opening)
+        {
+            using var duel = new DuelSession();
+            var player = Enumerable.Repeat(20721928u, 40).ToArray();
+            Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival.main, rival.extra,
+                opponentOpening: opening, seed: new ulong[] { 19, 131, 89, 291 }), "The tournament final could not start.");
+            var boss = duel.Players[duel.AiPlayerIndex];
+            Require(boss.lp == 20000 && boss.hand.Count == 7 &&
+                boss.mzone.Any(card => card?.code == opening.FieldCard && card.IsFaceUp),
+                $"Final deck {rival.id} did not apply LP, hand or ace {opening.FieldCard}: LP {boss.lp}, hand {boss.hand.Count}.");
         }
 
         private static void VerifyNewScreens()
