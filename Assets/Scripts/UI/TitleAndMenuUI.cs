@@ -22,7 +22,6 @@ namespace YGOPortable.UI
         private Button _freeDuelButton;
         private Button _rankedButton;
         private GameObject _championBadge;
-        private Button _storyButton;
         private Button _rpgWorldButton, _gxRpgWorldButton;
         private Button _deckEditorButton;
         private Button _shopButton;
@@ -85,8 +84,8 @@ namespace YGOPortable.UI
             {
                 AppScreen.CardShop => _shopButton,
                 AppScreen.DeckEditor => _deckEditorButton,
-                AppScreen.StoryMode => _storyButton,
-                AppScreen.TagForceWorld => _app.RpgField?.IsGxCampaign == true ? _gxRpgWorldButton : _rpgWorldButton,
+                AppScreen.StoryMode or AppScreen.TagForceWorld =>
+                    _app.RpgField?.IsGxCampaign == true ? _gxRpgWorldButton : _rpgWorldButton,
                 AppScreen.ArchetypeCodex => _codexButton,
                 AppScreen.Ranked => _rankedButton,
                 _ => _freeDuelButton,
@@ -127,8 +126,7 @@ namespace YGOPortable.UI
                 new Vector2(.538f, .643f));
             int row = 0;
             Button AddRow(string name, string label, Action action) =>
-                AddMenuEntry(menu, name, .840f - row++ * .101f, label, action);
-            _storyButton = AddRow("StoryMode", "스토리 모드", () => _app.OpenStoryCampaign(false));
+                AddMenuEntry(menu, name, .839f - row++ * .111f, label, action);
             _rpgWorldButton = AddRow("RpgWorld", "5D's RPG 월드", _app.OpenRpgField);
             _gxRpgWorldButton = AddRow("GxRpgWorld", "GX RPG · 여왕의 대관식", _app.OpenGxRpgField);
             _rankedButton = AddRow("Ranked", "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
@@ -203,7 +201,7 @@ namespace YGOPortable.UI
 
         private static Button AddMenuEntry(Transform parent, string name, float y, string label, Action action)
         {
-            var row = DuelUiKit.CreateRect(name, parent, new Vector2(0.097f, y), new Vector2(0.91f, y + .106f),
+            var row = DuelUiKit.CreateRect(name, parent, new Vector2(0.097f, y), new Vector2(0.91f, y + .10f),
                 Vector2.zero, Vector2.zero);
             return MenuButtonMotion.Attach(DuelUiKit.CreateButton(row, "Button", label, action, 23));
         }

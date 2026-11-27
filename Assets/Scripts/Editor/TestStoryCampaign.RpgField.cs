@@ -344,7 +344,8 @@ namespace YGOPortable.Editor
                     app.ShowScreen(AppScreen.MainMenu);
                     var gxMenu = menu.MenuRoot.GetComponentsInChildren<Button>()
                         .Single(button => button.transform.parent.name == "GxRpgWorld");
-                    Require(gxMenu.IsInteractable(), "The GX campaign entry was unavailable on the main menu.");
+                    Require(menu.MenuRoot.transform.Find("Menu/StoryMode") == null && gxMenu.IsInteractable(),
+                        "The main menu should offer the GX RPG without the standalone story entry.");
                     gxMenu.onClick.Invoke();
                     Require(world.Root.activeSelf && world.RpgCampaignId == gx && !world.CanWalk, "GX prologue did not start automatically.");
                     VerifyGxOpeningInterlude(gxScript.episodes[0]);
@@ -372,6 +373,8 @@ namespace YGOPortable.Editor
                                 story.Back();
                                 Require(menu.MenuRoot.activeSelf && !world.Root.activeSelf && !storyRoot.gameObject.activeInHierarchy &&
                                     world.RpgClears == 0, "Esc restarted or cleared the mandatory GX prologue instead of leaving it.");
+                                Require(EventSystem.current.currentSelectedGameObject == gxMenu.gameObject,
+                                    "Leaving a GX story should return the main menu focus to the GX RPG entry.");
                                 gxMenu.onClick.Invoke();
                                 for (int frame = 0; frame < 18 && !storyRoot.gameObject.activeInHierarchy; frame++)
                                     world.Update(.18f);

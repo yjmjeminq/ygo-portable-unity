@@ -346,12 +346,6 @@ namespace YGOPortable.UI
             return canvas;
         }
 
-        internal void OpenStoryCampaign(bool rpgWorld)
-        {
-            _storyMode.UseRpgCampaign(rpgWorld);
-            ShowScreen(AppScreen.StoryMode);
-        }
-
         internal void OpenRpgField() => OpenRpgField(StoryModeUI.RpgSeriesId);
 
         internal void OpenGxRpgField() => OpenRpgField(StoryModeUI.GxRpgSeriesId);
