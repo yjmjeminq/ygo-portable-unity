@@ -112,7 +112,8 @@ namespace YGOPortable.UI
                 return;
             }
 
-            if (_scope != scope || _focus != selected || _frame == null || !_frame.gameObject.activeSelf)
+            if (_scope != scope || _focus != selected ||
+                (!HandlesOwnFocus(selected) && (_frame == null || !_frame.gameObject.activeSelf)))
                 FocusInScope(scope, selected);
         }
 
@@ -348,6 +349,11 @@ namespace YGOPortable.UI
             _focus = control;
             if (events != null && events.currentSelectedGameObject != control.gameObject && !events.alreadySelecting)
                 events.SetSelectedGameObject(control.gameObject);
+            if (HandlesOwnFocus(control))
+            {
+                _frame?.Hide();
+                return;
+            }
             if (_frame == null) _frame = PadFocusIndicator.Create(_root, "PadFocus");
             var target = (RectTransform)control.transform;
             var host = _scope as RectTransform;
@@ -369,6 +375,9 @@ namespace YGOPortable.UI
             else _frame.SetColors();
             _frame.Show(target, host != null ? host : (RectTransform)_root);
         }
+
+        private static bool HandlesOwnFocus(Selectable item) =>
+            item.TryGetComponent<MenuButtonMotion>(out var motion) && motion.HandlesFocusFrame;
 
         internal static void ScrollTo(Selectable control)
         {

@@ -24,6 +24,7 @@ namespace YGOPortable.UI
         public StoryStageAction[] stage;
         internal string storyHeroPortrait, storyGuestPortrait;
         internal int storySpeakerSide;
+        internal BeyondDestinyVisual storyVisual;
 
         internal string SceneMapPath => !string.IsNullOrEmpty(sceneMap) &&
             sceneMap.All(c => char.IsLetterOrDigit(c) || c is '_' or '-') ? $"Maps/{sceneMap}.png" : null;

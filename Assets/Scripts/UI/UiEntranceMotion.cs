@@ -57,6 +57,8 @@ namespace YGOPortable.UI
     internal sealed class MenuButtonMotion : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
         IPointerDownHandler, IPointerUpHandler, ISelectHandler, IDeselectHandler
     {
+        internal bool HandlesFocusFrame { get; set; }
+
         private static Sprite _softUnderline;
         private Image _shine;
         private Button _button;

@@ -39,7 +39,7 @@ namespace YGOPortable.Editor
         private static int _storyFrame, _castFrame;
         private static double _deadline, _next;
         private static int _phase;
-        private static bool _openingDialogueCaptured, _backlashCaptured;
+        private static bool _openingDialogueCaptured, _backlashCaptured, _curtainCaptured;
         private static double _captureAt;
         private static string _captureName;
         private static Action _afterCapture;
@@ -191,8 +191,44 @@ namespace YGOPortable.Editor
                             throw new InvalidOperationException("Opening story or Backlash artwork did not render.");
                         Debug.Log("[Beyond Destiny Play Mode] Picker, field, opening, native duel, Backlash and episode-two resume passed.");
                         _campaign = BeyondDestinyCampaign.Load(Application.streamingAssetsPath);
-                        StartRidingCheck();
+                        StartRidingCheck(24, 4, 156, phase: 10);
                     });
+                    return;
+                }
+
+                if (_phase == 10 && Get<DuelSession>(_app, "_session") is { } night)
+                {
+                    var display = Get<DuelFieldUI>(_app, "_duelField");
+                    if (display.IsPresenting || night.ActivePrompt == null) return;
+                    VerifyTrack(display, "spot_riding_night");
+                    CaptureAfter("duel-24-night-circuit", .7, () => StartRidingCheck(31, 1, 22, phase: 7));
+                    return;
+                }
+
+                if (_phase == 9)
+                {
+                    var ui = Get<BeyondDestinyUI>(_app, "_beyondDestiny");
+                    var curtain = Get<Image>(ui, "_curtain");
+                    var input = Get<CanvasGroup>(ui, "_input");
+                    if (curtain.gameObject.activeInHierarchy)
+                    {
+                        if (input.interactable || FindAdvance() != null)
+                            throw new InvalidOperationException("A storyboard fade left a dialogue control active.");
+                        if (!_curtainCaptured && curtain.color.a > .83f && Playback().Episode.number == 13)
+                        {
+                            _curtainCaptured = true;
+                            Capture("scene-13-closing-curtain");
+                        }
+                        return;
+                    }
+                    if (Playback().Episode.number == 14)
+                    {
+                        if (!_curtainCaptured || !input.interactable || !FindAdvance())
+                            throw new InvalidOperationException("The chapter fade did not restore the dialogue and its input.");
+                        CapturePullback();
+                        return;
+                    }
+                    FindAdvance()?.onClick.Invoke();
                     return;
                 }
 
@@ -201,6 +237,7 @@ namespace YGOPortable.Editor
                     var display = Get<DuelFieldUI>(_app, "_duelField");
                     if (display.IsPresenting || riding.ActivePrompt == null) return;
                     VerifySoundscape("backlash", null);
+                    VerifyTrack(display, "spot_riding_wrgp");
                     var mine = Get<Text>(display, "_mySpeed");
                     var theirs = Get<Text>(display, "_oppSpeed");
                     if (!mine.isActiveAndEnabled || !theirs.isActiveAndEnabled ||
@@ -231,7 +268,7 @@ namespace YGOPortable.Editor
                     if (!Playback().Progress.resolvedEncounters.Contains("beyond_destiny_ep_31_scene_01_duel_22"))
                         throw new InvalidOperationException("Episode 31's native riding result did not unlock its story.");
                     Debug.Log("[Beyond Destiny Play Mode] Chapter 31 rode with live SPC through its saved story outcome.");
-                    CaptureCastFrame();
+                    CaptureCameraPush();
                     return;
                 }
 
@@ -281,13 +318,95 @@ namespace YGOPortable.Editor
                     $"{mixer?.MusicPath} / {mixer?.AmbiencePath}.");
         }
 
-        private static void StartRidingCheck()
+        private static void StartRidingCheck(int episode, int scene, int line, int phase)
         {
-            var scene = _campaign.Episodes[30].scenes[0];
-            int firstPrompt = Array.FindIndex(scene.events, cue => cue.line == 22);
-            OpenStoryCheckpoint(30, 0, firstPrompt);
+            OpenStoryAtLine(episode, scene, line);
             Click("듀얼 시작");
-            _phase = 7;
+            _phase = phase;
+        }
+
+        private static void VerifyTrack(DuelFieldUI field, string venue)
+        {
+            var track = field.Root.GetComponentInChildren<DuelArenaGround>();
+            if (track == null || !track.IsDriftingTrack || track.texture?.name != venue)
+                throw new InvalidOperationException($"The live riding arena did not load {venue} and its background motion.");
+        }
+
+        private static void CaptureCameraPush()
+        {
+            OpenStoryAtLine(13, 6, 335);
+            CaptureAfter("scene-13-close-push", 1.40, () =>
+            {
+                var art = FindCutscene("ep13_ashes");
+                if (art == null || art.rectTransform.localScale.x < 1.09f)
+                    throw new InvalidOperationException("The ashes CG did not follow its authored push-in.");
+                OpenStoryAtLine(13, 6, 346);
+                _phase = 9;
+            });
+        }
+
+        private static void CapturePullback()
+        {
+            OpenStoryAtLine(23, 4, 177);
+            var view = Get<StoryModeUI.StoryDialogueView>(Get<BeyondDestinyUI>(_app, "_beyondDestiny"), "_dialogue");
+            var stage = Get<Image>(view, "_stage").rectTransform;
+            if (stage.localScale.x < 1.15f)
+                throw new InvalidOperationException("The night-sky cutaway did not start on its closer framing.");
+            CaptureAfter("scene-23-night-sky", 1.52, () =>
+            {
+                if (Mathf.Abs(stage.localScale.x - 1f) > .025f)
+                    throw new InvalidOperationException("The night-sky camera did not pull back to its wide framing.");
+                Debug.Log("[Beyond Destiny Play Mode] Camera push, night-sky pullback, curtain and input recovery passed.");
+                CaptureLongDialogue();
+            });
+        }
+
+        private static void CaptureLongDialogue()
+        {
+            OpenStoryAtLine(21, 2, 91);
+            FindAdvance().onClick.Invoke(); // Reveal the entire six-line narration.
+            CaptureAfter("scene-21-full-dialogue", .36, () =>
+            {
+                var ui = Get<BeyondDestinyUI>(_app, "_beyondDestiny");
+                var view = Get<StoryModeUI.StoryDialogueView>(ui, "_dialogue");
+                var text = Get<Text>(view, "_text");
+                var panel = Get<Image>(view, "_dialoguePanel").rectTransform;
+                var next = FindButton("계속");
+                Canvas.ForceUpdateCanvases();
+                if (text.text != _campaign.Episodes[20].scenes[1].events.Single(cue => cue.line == 91).text ||
+                    next == null || !IsInside(panel, text.rectTransform) || !IsInside(panel, (RectTransform)next.transform))
+                    throw new InvalidOperationException("The complete narration or continue control was outside its dialogue panel.");
+                var settings = text.GetGenerationSettings(text.rectTransform.rect.size);
+                for (int width = 0; width < 2; ++width)
+                {
+                    var layout = settings;
+                    if (width == 1) layout.generationExtents *= .82f;
+                    var fitted = new TextGenerator();
+                    fitted.Populate(text.text, layout);
+                    layout.verticalOverflow = VerticalWrapMode.Overflow;
+                    var full = new TextGenerator();
+                    full.Populate(text.text, layout);
+                    if (fitted.characterCountVisible != full.characterCountVisible)
+                        throw new InvalidOperationException($"The longest multiline narration is clipped (viewport {width}, " +
+                            $"{fitted.characterCountVisible}/{full.characterCountVisible} characters, {layout.generationExtents}).");
+                }
+                Debug.Log("[Beyond Destiny Play Mode] Full manuscript page and continue button fit the dialogue panel.");
+                CaptureCastFrame();
+            });
+        }
+
+        private static bool IsInside(RectTransform panel, RectTransform item)
+        {
+            var corners = new Vector3[4];
+            item.GetWorldCorners(corners);
+            return corners.All(world => panel.rect.Contains(panel.InverseTransformPoint(world)));
+        }
+
+        private static void OpenStoryAtLine(int episode, int scene, int line)
+        {
+            int cue = Array.FindIndex(_campaign.Episodes[episode - 1].scenes[scene - 1].events, item => item.line == line);
+            if (cue < 0) throw new InvalidOperationException($"Missing manuscript line {episode}/{scene}/{line}.");
+            OpenStoryCheckpoint(episode - 1, scene - 1, cue);
         }
 
         private static void CaptureCastFrame()

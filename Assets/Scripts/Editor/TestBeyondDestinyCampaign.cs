@@ -189,14 +189,19 @@ namespace YGOPortable.Editor
                     afterReload.InitialAudio.Ambience == "Audio/Ambience/storm.wav" &&
                     afterReload.Pages[0].Audio.All(cue => cue.assetPath != "Audio/Ambience/storm.wav"),
                     "Saving on a later line must recover music and ambience without replaying earlier cues.");
-                int readable = 0, duels = 0;
+                int readable = 0, duels = 0, curtains = 0;
+                var cameras = new HashSet<BeyondDestinyCamera>();
+                var lights = new HashSet<BeyondDestinyLight>();
                 var wardrobe = new HashSet<string>();
                 while (!playback.Progress.completed)
                 {
                     var segment = playback.Read();
                     readable += segment.Pages.Length;
+                    if (segment.TailVisual.Curtain != BeyondDestinyLight.None) ++curtains;
                     foreach (var page in segment.Pages)
                     {
+                        cameras.Add(page.Visual.Camera);
+                        lights.Add(page.Visual.Light);
                         wardrobe.Add(page.Text.heroPortrait);
                         wardrobe.Add(page.Text.guestPortrait);
                     }
@@ -213,6 +218,9 @@ namespace YGOPortable.Editor
                 foreach (string variant in new[] { "hero_scar", "aki_masked", "aki_casual", "aki_riding", "sherry_fallen" })
                     Require(wardrobe.Contains($"Characters_Standing/{variant}"), $"No manuscript page selected costume {variant}.");
                 Require(readable == allCues.Count(cue => cue.IsReadable), "Playback dropped or repeated source dialogue.");
+                Require(cameras.Count == Enum.GetValues(typeof(BeyondDestinyCamera)).Length &&
+                    lights.Contains(BeyondDestinyLight.Violet) && lights.Contains(BeyondDestinyLight.Crimson) && curtains >= 20,
+                    $"The screenplay lost its framing, light cues or closing fades (camera {cameras.Count}, curtains {curtains}).");
                 Require(duels == 15 && playback.Progress.earnedRewards.Contains("episode_37_clear"),
                     $"Playback must reach every playable duel and its finale (actual duels: {duels}).");
                 Require(!BeyondDestinyPlayback.CanContinue("win", false, true, false) &&
@@ -276,6 +284,17 @@ namespace YGOPortable.Editor
                 field.MoveToStory();
                 for (int i = 0; i < 60 && !entered; ++i) field.Update(.05f, Vector2.zero);
                 Require(entered && !field.IsOpen, "The scene could not be reached on foot or left the field controls open.");
+                foreach (string location in new[] { "kaiba_dome_plaza", "kaiba_dome_corridor", "kaiba_dome_arena",
+                    "arcadia_atrium", "arcadia_private_room", "arcadia_collapse", "team5ds_garage", "night_circuit",
+                    "wrgp_stadium", "ark_cradle" })
+                {
+                    entered = false;
+                    Require(field.Open($"Maps/spot_{location}.png", location, () => entered = true),
+                        $"The 2.5D field could not load {location}.");
+                    field.MoveToStory();
+                    for (int i = 0; i < 100 && !entered; ++i) field.Update(.05f, Vector2.zero);
+                    Require(entered && !field.IsOpen, $"The actor could not reach the manuscript entrance in {location}.");
+                }
                 foreach (string actor in new[] { "aki", "sherry", "devine", "yusei", "jack", "crow", "mizoguchi",
                     "misty", "rex", "zone", "ghost_a" })
                 {

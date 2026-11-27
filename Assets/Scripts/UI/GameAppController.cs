@@ -736,6 +736,8 @@ namespace YGOPortable.UI
                 _duelField.SetStoryPlayer(_beyondDestinyDuelist, art.Player);
                 _duelField.SetStoryOpponent(oppChar.name, art.Opponent);
                 _duelField.SetRidingPresentation(ridingMachine != null, art.Map);
+                if (ridingMachine != null && art.Map != null)
+                    _duelField.Root.GetComponentInChildren<DuelArenaGround>(includeInactive: true)?.DriftTrack(art.Map.texture);
             }
             _duelField.RefreshChainConfirmation(ChainConfirmation);
             if (!_session.StartNewDuel(
@@ -860,7 +862,8 @@ namespace YGOPortable.UI
                     return;
                 }
                 if (_screen == AppScreen.StoryMode) _storyMode?.Update(Time.unscaledDeltaTime);
-                if (_screen == AppScreen.BeyondDestiny) _beyondDestiny?.Update(Time.unscaledDeltaTime, _menuPadInput.HeldDirection);
+                if (_screen == AppScreen.BeyondDestiny &&
+                    _beyondDestiny?.Update(Time.unscaledDeltaTime, _menuPadInput.HeldDirection) == true) return;
                 if (_screen == AppScreen.Tournament) _tournament?.Update(Time.unscaledDeltaTime);
                 if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
                 else if (_menuPad != null)

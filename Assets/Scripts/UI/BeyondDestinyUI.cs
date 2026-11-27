@@ -14,7 +14,8 @@ namespace YGOPortable.UI
         private const string OpeningArt = "Maps/spot_neodomino_rain_alley.png";
         private readonly GameAppController _app;
         private readonly RectTransform _root, _panel;
-        private readonly Image _background;
+        private readonly Image _background, _curtain;
+        private readonly CanvasGroup _input;
         private readonly Text _heading, _description;
         private readonly Button _primary, _secondary, _back;
         private readonly StoryModeUI.StoryDialogueView _dialogue;
@@ -23,7 +24,10 @@ namespace YGOPortable.UI
         private BeyondDestinyCampaign _campaign;
         private BeyondDestinyPlayback _playback;
         private BeyondDestinyCampaign.Encounter _pending;
-        private Action _primaryAction, _secondaryAction;
+        private Action _primaryAction, _secondaryAction, _afterCurtain;
+        private float _curtainTime;
+        private const float CurtainDuration = .80f;
+        private bool CurtainActive => _curtain.gameObject.activeSelf;
 
         internal GameObject Root => _root.gameObject;
         internal GameObject ActiveRoot => _dialogue.IsOpen ? _dialogue.ActiveRoot : _field.IsOpen ? _field.Root : _panel.gameObject;
@@ -33,6 +37,7 @@ namespace YGOPortable.UI
         {
             _app = app;
             _root = DuelUiKit.FillRect("Screen_Campaigns", parent);
+            _input = _root.gameObject.AddComponent<CanvasGroup>();
             _background = DuelUiKit.AddImage(_root.gameObject, null, Color.white, false, false);
             var content = Application.isMobilePlatform ? MobileSafeArea.Create(_root) : _root;
             _panel = DuelUiKit.CreateMenuPanel(content, "CampaignSelection",
@@ -46,6 +51,8 @@ namespace YGOPortable.UI
             SetLabel(_back, "뒤로");
             _field = new BeyondDestinyField(_root);
             _dialogue = new StoryModeUI.StoryDialogueView(_root);
+            _curtain = DuelUiKit.AddImage(DuelUiKit.FillRect("StoryCurtain", _root).gameObject,
+                DuelUiKit.WhiteSprite, Color.clear);
             Close();
         }
 
@@ -90,6 +97,9 @@ namespace YGOPortable.UI
         {
             _dialogue.Close();
             _field.Close();
+            _curtain.gameObject.SetActive(false);
+            _input.interactable = true;
+            _afterCurtain = null;
             _background.sprite = null;
             _art.BeginPage();
             _art.Trim();
@@ -99,16 +109,71 @@ namespace YGOPortable.UI
 
         internal void Back()
         {
-            if (_dialogue.HandleDisplayInput(restore: true) || _dialogue.ClosePopup()) return;
+            if (CurtainActive || _dialogue.HandleDisplayInput(restore: true) || _dialogue.ClosePopup()) return;
             _app.ShowScreen(_pending != null || _playback != null && _app.IsBeyondDestinyScreen
                 ? AppScreen.Campaigns : AppScreen.MainMenu);
         }
 
-        internal void Update(float delta, Vector2 direction)
+        internal bool Update(float delta, Vector2 direction)
         {
-            _dialogue.Update(delta);
-            _field.Update(delta, direction);
+            _dialogue.Update(delta, inputLocked: CurtainActive);
+            if (!CurtainActive)
+            {
+                _field.Update(delta, direction);
+                return false;
+            }
+
+            _curtainTime = Mathf.Min(CurtainDuration, _curtainTime + delta);
+            float halfway = CurtainDuration * .5f;
+            var color = _curtain.color;
+            color.a = Mathf.SmoothStep(0f, 1f, 1f - Mathf.Abs(_curtainTime - halfway) / halfway);
+            _curtain.color = color;
+            if (_curtainTime >= halfway && _afterCurtain is { } reveal)
+            {
+                _afterCurtain = null;
+                reveal();
+            }
+            if (_curtainTime >= CurtainDuration)
+            {
+                _curtain.gameObject.SetActive(false);
+                _input.interactable = true;
+            }
+            return true;
         }
+
+        private void FinishDialogue(BeyondDestinyPlayback.Segment segment)
+        {
+            void ContinueScene()
+            {
+                _app.PlayBeyondDestinyCues(segment.TailAudio);
+                if (Save(() => _playback.Finish(segment))) Resume();
+            }
+
+            if (!Application.isPlaying || segment.TailVisual.Curtain == BeyondDestinyLight.None)
+            {
+                ContinueScene();
+                return;
+            }
+            _dialogue.PlayEndingDirection(segment.TailVisual);
+            _afterCurtain = ContinueScene;
+            _curtainTime = 0f;
+            var color = LightColor(segment.TailVisual.Curtain);
+            color.a = 0f;
+            _curtain.color = color;
+            _input.interactable = false;
+            _curtain.transform.SetAsLastSibling();
+            _curtain.gameObject.SetActive(true);
+        }
+
+        internal static Color LightColor(BeyondDestinyLight light) => light switch
+        {
+            BeyondDestinyLight.Crimson => new Color(.87f, .08f, .27f),
+            BeyondDestinyLight.Violet => new Color(.52f, .29f, .89f),
+            BeyondDestinyLight.Blue => new Color(.16f, .62f, .97f),
+            BeyondDestinyLight.Warm => new Color(1f, .77f, .40f),
+            BeyondDestinyLight.Dark => new Color(.012f, .016f, .034f),
+            _ => Color.white,
+        };
 
         internal bool HandleFieldSubmit()
         {
@@ -152,8 +217,7 @@ namespace YGOPortable.UI
                     ShowEncounter(segment.Duel);
                     return;
                 }
-                _app.PlayBeyondDestinyCues(segment.TailAudio);
-                if (Save(() => _playback.Finish(segment))) Resume();
+                FinishDialogue(segment);
                 return;
             }
             if (!fromField) _app.RestoreBeyondDestinySoundscape(segment.InitialAudio);
@@ -165,16 +229,14 @@ namespace YGOPortable.UI
                 sceneMap = page.Map == null ? null : Path.GetFileNameWithoutExtension(page.Map),
                 sceneTime = index == 0 ? scene.title : null,
                 cutscene = page.Cutscene,
-                fx = page.Effect,
+                storyVisual = page.Visual,
                 storyHeroPortrait = page.Text.heroPortrait,
                 storyGuestPortrait = page.Text.guestPortrait,
                 storySpeakerSide = page.Text.speakerSide,
             }).ToArray();
-            _dialogue.Open($"제{chapter.number}화 · {chapter.title}", "주인공", (OpponentCharacter)null, lines, () =>
-            {
-                _app.PlayBeyondDestinyCues(segment.TailAudio);
-                if (Save(() => _playback.Finish(segment))) Resume();
-            }, rpg: true, rpgBackdrop: scene.backgroundPath ?? OpeningArt, rpgAssetFolder: BeyondDestinyCampaign.AssetFolder,
+            _dialogue.Open($"제{chapter.number}화 · {chapter.title}", "주인공", (OpponentCharacter)null, lines,
+                () => FinishDialogue(segment), rpg: true, rpgBackdrop: scene.backgroundPath ?? OpeningArt,
+                rpgAssetFolder: BeyondDestinyCampaign.AssetFolder,
                 onPage: index =>
                 {
                     var page = segment.Pages[index];
@@ -227,7 +289,7 @@ namespace YGOPortable.UI
         }
 
         internal string BattleMap(BeyondDestinyCampaign.Encounter encounter) => encounter.Riding
-            ? _playback.Episode.number is >= 29 and <= 31 ? "Maps/spot_wrgp_stadium.png" : "Maps/spot_night_circuit.png"
+            ? _playback.Episode.number is >= 29 and <= 31 ? "Maps/spot_riding_wrgp.png" : "Maps/spot_riding_night.png"
             : _playback.Scene.backgroundPath;
 
         internal Sprite Artwork(string path)
@@ -242,6 +304,7 @@ namespace YGOPortable.UI
         {
             _art.BeginPage();
             var backdrop = _art.Get(WorldArt + (map ?? OpeningArt));
+            if (backdrop != null) backdrop.texture.name = Path.GetFileNameWithoutExtension(map ?? OpeningArt);
             var hero = DuelPortrait(player);
             var rival = DuelPortrait(opponent);
             _art.Trim();

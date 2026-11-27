@@ -29,7 +29,7 @@ namespace YGOPortable.UI
             }
         }
 
-        internal sealed class StoryDialogueView
+        internal sealed partial class StoryDialogueView
         {
             private static readonly Color HeroColor = new Color32(0x78, 0xDC, 0xFF, 255);
             private static readonly Color NarrationColor = new(.92f, .93f, .96f);
@@ -197,6 +197,7 @@ namespace YGOPortable.UI
                 _heroReaction = Reaction(hero);
                 _opponentReaction = Reaction(opponent);
 
+                CreateStoryCamera(content);
                 var dialogue = DuelUiKit.CreateMenuPanel(content, "DialogueBox",
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
                 _dialoguePanel = dialogue.GetComponent<Image>();
@@ -323,8 +324,14 @@ namespace YGOPortable.UI
                 _rpg = rpg;
                 _rpgEpisode = rpgEpisode;
                 _rpgAssetFolder = rpgAssetFolder ?? field?.RpgAssetFolder ?? "5DS";
+                _onPage = onPage;
                 if (IsGxDialogue && Application.isPlaying) _advanceFrame = Time.frameCount;
                 _playAsCharacterId = playAsCharacterId;
+                if (IsBeyondDestinyDialogue)
+                {
+                    dialogueTop = .436f;
+                    _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, dialogueTop);
+                }
                 ApplyDialogueStyle(rpg);
                 _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, dialogueTop - .018f) : new Vector2(.07f, .26f);
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .859f) : new Vector2(.493f, .855f);
@@ -354,7 +361,6 @@ namespace YGOPortable.UI
                 _dialogue = lines;
                 _onEnd = onEnd;
                 _onSkip = onSkip;
-                _onPage = onPage;
                 _stage.color = IsBeyondDestinyDialogue ? new Color(.88f, .92f, .98f) : new Color(.60f, .67f, .77f);
                 _root.SetActive(true);
                 _readThrough = 0;
@@ -380,6 +386,7 @@ namespace YGOPortable.UI
                 _heroIdentity.transform.parent.gameObject.SetActive(true);
                 foreach (var chrome in _dialogueChrome) chrome.alpha = 1f;
                 _fx.ResetEffect();
+                ResetStoryCamera();
                 _sceneTimeBadge.gameObject.SetActive(false);
                 _showCutscene = false;
                 _field = null;
@@ -435,16 +442,17 @@ namespace YGOPortable.UI
                 _advanceSurface.interactable = true;
             }
 
-            internal void Update(float delta)
+            internal void Update(float delta, bool inputLocked = false)
             {
                 if (_dialogue == null || !_root.activeInHierarchy) return;
-                bool displayInput = HandleDisplayInput(
+                bool displayInput = !inputLocked && HandleDisplayInput(
                     toggle: Input.GetKeyDown(KeyCode.H) || Input.GetMouseButtonDown(1),
                     restore: Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter));
                 bool changingVisibility = UpdateDialogueVisibility(delta);
                 _field?.UpdateRpgDialogue(delta);
                 RefreshStageCaption();
                 _poseTime += delta;
+                if (IsBeyondDestinyDialogue) RenderStoryCamera(_poseTime);
                 if (_sceneTimeBadge.gameObject.activeSelf)
                     _sceneTimeBadge.alpha = Mathf.Clamp01(_poseTime / .24f) * _chromeVisibility;
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
@@ -467,7 +475,7 @@ namespace YGOPortable.UI
                     _opponentSpeaking ? _emotion : null, _poseTime, 1f, ref _opponentFade, ref _opponentSlide,
                     usePaintedExpression: _speakerUsesPaintedExpression);
                 RefreshCaret();
-                if (displayInput || changingVisibility || _dialogueHidden || _stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
+                if (inputLocked || displayInput || changingVisibility || _dialogueHidden || _stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
                     _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
@@ -690,6 +698,7 @@ namespace YGOPortable.UI
                     if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
                 }
                 BindCutscene(_rpg ? line.cutscene : null);
+                if (IsBeyondDestinyDialogue) BeginStoryCamera(line.storyVisual, playStageMotion);
                 _fx.Play(showSceneTime ? "time-skip" : _rpg ? line.fx : null);
                 if (Application.isPlaying && playStageMotion && !string.IsNullOrEmpty(line.sfx))
                     DuelAudio.PlayStorySfx(line.sfx);
@@ -774,9 +783,9 @@ namespace YGOPortable.UI
                         label.fontStyle = label == _logText ? FontStyle.Normal : FontStyle.Bold;
                     }
                 }
-                _text.resizeTextMinSize = rpg ? 23 : 13;
+                _text.resizeTextMinSize = IsBeyondDestinyDialogue ? 17 : rpg ? 23 : 13;
                 _text.resizeTextMaxSize = rpg ? 31 : 29;
-                _text.lineSpacing = rpg ? 1.28f : 1f;
+                _text.lineSpacing = IsBeyondDestinyDialogue ? 1.04f : rpg ? 1.28f : 1f;
                 _text.supportRichText = rpg;
                 foreach (var button in new[] { _previous, _logButton, _auto, _skip, _hide })
                     StyleButton(button);
@@ -801,7 +810,12 @@ namespace YGOPortable.UI
                 {
                     if (rpg)
                     {
-                        RpgUiStyle.Control(button, primary, animated: button != _next);
+                        RpgUiStyle.Control(button, primary, animated: button != _next || IsBeyondDestinyDialogue);
+                        if (button == _next && button.TryGetComponent<MenuButtonMotion>(out var nextMotion))
+                        {
+                            nextMotion.HandlesFocusFrame = IsBeyondDestinyDialogue;
+                            nextMotion.enabled = IsBeyondDestinyDialogue;
+                        }
                         return;
                     }
                     if (button.TryGetComponent<MenuButtonMotion>(out var motion)) motion.enabled = false;
@@ -819,6 +833,7 @@ namespace YGOPortable.UI
             private void LayoutDialogueControls(bool rpg)
             {
                 var panel = _dialoguePanel.rectTransform;
+                bool story = IsBeyondDestinyDialogue;
                 _rpgTools.gameObject.SetActive(rpg);
                 _counter.gameObject.SetActive(!rpg);
                 _speakerStripe.enabled = rpg;
@@ -828,8 +843,10 @@ namespace YGOPortable.UI
                 _heading.rectTransform.anchorMin = rpg ? new Vector2(.057f, .05f) : Vector2.zero;
                 _heading.rectTransform.anchorMax = rpg ? new Vector2(.957f, .95f) : Vector2.one;
                 Place(_speakerBadge.transform, panel, rpg ? new Rect(.032f, .897f, .235f, .221f) : new Rect(.038f, .703f, .312f, .247f));
-                Place(_text.rectTransform.parent, panel, rpg ? new Rect(.041f, .126f, .906f, .705f) : new Rect(.047f, .234f, .90f, .456f));
-                Place(_caret.rectTransform.parent, panel, rpg ? new Rect(.905f, .066f, .050f, .142f) : new Rect(.724f, .046f, .048f, .165f));
+                Place(_text.rectTransform.parent, panel, story ? new Rect(.049f, .200f, .902f, .690f) :
+                    rpg ? new Rect(.041f, .126f, .906f, .705f) : new Rect(.047f, .234f, .90f, .456f));
+                Place(_caret.rectTransform.parent, panel, story ? new Rect(.720f, .059f, .057f, .126f) :
+                    rpg ? new Rect(.905f, .066f, .050f, .142f) : new Rect(.724f, .046f, .048f, .165f));
                 if (rpg)
                 {
                     RpgUiStyle.Speaker(_speakerPlate.rectTransform);
@@ -851,12 +868,13 @@ namespace YGOPortable.UI
                     label.fontSize = label.resizeTextMaxSize = rpg ? 20 : 22;
                 }
 
-                Place(_next.transform.parent, panel, rpg ? new Rect(0f, 0f, 1f, 1f) : new Rect(.778f, .042f, .174f, .172f));
+                Place(_next.transform.parent, panel, story ? new Rect(.790f, .037f, .161f, .154f) :
+                    rpg ? new Rect(0f, 0f, 1f, 1f) : new Rect(.778f, .042f, .174f, .172f));
                 var hit = (Image)_next.targetGraphic;
                 if (rpg)
                 {
-                    hit.color = Color.clear;
-                    _next.transition = Selectable.Transition.None;
+                    hit.color = story ? Color.white : Color.clear;
+                    _next.transition = story ? Selectable.Transition.ColorTint : Selectable.Transition.None;
                     _next.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _logButton };
                     for (int index = 0; index < tools.Length; index++)
                     {
@@ -870,7 +888,7 @@ namespace YGOPortable.UI
                     _next.navigation = new Navigation { mode = Navigation.Mode.Automatic };
                     foreach (var tool in tools) tool.navigation = new Navigation { mode = Navigation.Mode.Automatic };
                 }
-                _next.GetComponentInChildren<Text>().text = rpg ? string.Empty : "다음 ▶";
+                _next.GetComponentInChildren<Text>().text = story ? "계속" : rpg ? string.Empty : "다음 ▶";
 
                 static void Place(Transform child, Transform parent, Rect area)
                 {

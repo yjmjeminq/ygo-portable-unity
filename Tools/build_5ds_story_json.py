@@ -511,6 +511,19 @@ def build(source, *, require_all_maps=False):
     cards = {item["code"]: item["path"] for item in manifest["duelCards"]}
     if cards != {511090001: "DuelCards/speed_world_2.png"} or not all((ASSET_ROOT / path).is_file() for path in cards.values()):
         raise ValueError("Speed World 2 must have original standalone card artwork")
+    tracks = {item["key"]: item for item in manifest["ridingBackdrops"]}
+    if set(tracks) != {"night", "wrgp"}:
+        raise ValueError("Both Beyond Destiny riding venues need dedicated track art")
+    for key, track in tracks.items():
+        path = f"Maps/spot_riding_{key}.png"
+        art = ASSET_ROOT / path
+        if track["path"] != path or not art.is_file():
+            raise ValueError(f"Missing Beyond Destiny riding venue: {path}")
+        with art.open("rb") as image:
+            header = image.read(24)
+        if (header[:8] != b"\x89PNG\r\n\x1a\n" or
+                [int.from_bytes(header[offset:offset + 4], "big") for offset in (16, 20)] != track["resolution"]):
+            raise ValueError(f"Unexpected racing background resolution: {path}")
     audio = bind_audio(episodes, catalog, json.loads(AUDIO_MANIFEST.read_text(encoding="utf-8")))
     portraits, expressions = bind_portraits(episodes, manifest)
     return {"schemaVersion": 1, "id": "beyond_destiny", "title": "5D's: Beyond Destiny",

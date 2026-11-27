@@ -21,17 +21,18 @@ namespace YGOPortable.Core
         {
             internal readonly int Index;
             internal readonly BeyondDestinyCampaign.Cue Text;
-            internal readonly string Map, Cutscene, Effect;
+            internal readonly string Map, Cutscene;
+            internal readonly BeyondDestinyVisual Visual;
             internal readonly BeyondDestinyCampaign.Cue[] Audio;
 
             internal Page(int index, BeyondDestinyCampaign.Cue text, string map,
-                string effect, BeyondDestinyCampaign.Cue[] audio)
+                BeyondDestinyVisual visual, BeyondDestinyCampaign.Cue[] audio)
             {
                 Index = index;
                 Text = text;
                 Map = map;
                 Cutscene = text.cutsceneKey;
-                Effect = effect;
+                Visual = visual;
                 Audio = audio;
             }
         }
@@ -43,15 +44,17 @@ namespace YGOPortable.Core
             internal readonly int EndIndex;
             internal readonly BeyondDestinyCampaign.Cue[] TailAudio;
             internal readonly BeyondDestinySoundscape InitialAudio;
+            internal readonly BeyondDestinyVisual TailVisual;
 
             internal Segment(Page[] pages, BeyondDestinyCampaign.Encounter duel, int endIndex,
-                BeyondDestinyCampaign.Cue[] tailAudio, BeyondDestinySoundscape initialAudio)
+                BeyondDestinyCampaign.Cue[] tailAudio, BeyondDestinySoundscape initialAudio, BeyondDestinyVisual tailVisual)
             {
                 InitialAudio = initialAudio;
                 Pages = pages;
                 Duel = duel;
                 EndIndex = endIndex;
                 TailAudio = tailAudio;
+                TailVisual = tailVisual;
             }
         }
 
@@ -98,7 +101,7 @@ namespace YGOPortable.Core
                         initialAudio = initialAudio.After(priorCue);
             }
             string map = scene.backgroundPath;
-            string effect = null;
+            BeyondDestinyVisual visual = default;
             int start = Progress.cueIndex;
             int checkpoint = start;
             for (int index = 0; index < scene.events.Length; ++index)
@@ -108,7 +111,7 @@ namespace YGOPortable.Core
                 var encounter = _campaign.EncounterAt(scene.id, index == 0 ? scene.line : cue.line) ??
                     _campaign.EncounterAt(scene.id, cue.line);
                 if (index >= start && encounter?.Playable == true && !Progress.resolvedEncounters.Contains(encounter.id))
-                    return new Segment(pages.ToArray(), encounter, index, audio.ToArray(), initialAudio);
+                    return new Segment(pages.ToArray(), encounter, index, audio.ToArray(), initialAudio, visual);
 
                 switch (cue.kind)
                 {
@@ -117,7 +120,8 @@ namespace YGOPortable.Core
                         if (index >= start) audio.Add(cue);
                         break;
                     case "direction":
-                        if (index >= start) effect = VisualEffect(cue.text) ?? effect;
+                    case "standing":
+                        if (index >= start) visual = visual.After(cue);
                         break;
                     case "music":
                     case "sound":
@@ -126,12 +130,12 @@ namespace YGOPortable.Core
                         break;
                 }
                 if (!cue.IsReadable || index < start) continue;
-                pages.Add(new Page(checkpoint, cue, map, effect, audio.ToArray()));
+                pages.Add(new Page(checkpoint, cue, map, visual, audio.ToArray()));
                 checkpoint = index + 1;
                 audio.Clear();
-                effect = null;
+                visual = default;
             }
-            return new Segment(pages.ToArray(), null, scene.events.Length, audio.ToArray(), initialAudio);
+            return new Segment(pages.ToArray(), null, scene.events.Length, audio.ToArray(), initialAudio, visual);
         }
 
         internal void RememberPage(int page)
@@ -192,9 +196,5 @@ namespace YGOPortable.Core
             values.Add(value);
             return true;
         }
-
-        private static string VisualEffect(string text) =>
-            text.Contains("흔들") || text.Contains("진동") ? "shake" :
-            text.Contains("섬광") ? "flash" : text.Contains("암전") ? "fade" : null;
     }
 }

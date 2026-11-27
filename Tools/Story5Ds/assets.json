@@ -1732,5 +1732,27 @@
       ],
       "prompt": "Use case: illustration-story. Square album-like card inset illustration for the original Beyond Destiny game, a compact 1:1 logo-free stylized science fiction racetrack design. Original dark futuristic orbital highway forms two luminous teal ribbons in an S curve leading into a low bronze midnight horizon with three faint brush streaks. Foreground lines of cold cyan racing infrastructure and wet asphalt; a long airy teal energy loop arches above the track at the center, subtle yellow accents at the base. No vehicles, words, lettering, logos, people, faces, card frame, reference game images, watermark, or HUD. Strong legible angular silhouette and medium contrast at postage stamp size. Painterly premium Korean game scene illustration with grounded geometry, moody cinematic soft edge. Keep the image center visually concentrated at square inset crop. Full bleed."
     }
+  ],
+  "ridingBackdrops": [
+    {
+      "key": "night",
+      "path": "Maps/spot_riding_night.png",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Rain-swept coastal night circuit with two original helmeted D-Wheel riders. Wet industrial architecture and blue/purple lights, dark center for the card board, racers framing the outer lanes."
+    },
+    {
+      "key": "wrgp",
+      "path": "Maps/spot_riding_wrgp.png",
+      "source": "ImageGen built-in",
+      "resolution": [
+        1672,
+        941
+      ],
+      "prompt": "Banked WRGP stadium at sunset with original red and blue D-Wheels, warm grandstand lighting and clear silhouettes outside the playable board."
+    }
   ]
 }

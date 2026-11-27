@@ -343,6 +343,25 @@ namespace YGOPortable.UI
 
     internal sealed class DuelArenaGround : RawImage
     {
+        private Texture _track;
+        private float _drift;
+
+        internal void DriftTrack(Texture artwork)
+        {
+            _track = artwork;
+            _drift = 0f;
+            SetVerticesDirty();
+        }
+
+        internal bool IsDriftingTrack => _track != null && texture == _track;
+
+        private void Update()
+        {
+            if (!IsDriftingTrack || CardAnimationManager.Instance?.Paused == true) return;
+            _drift += Time.unscaledDeltaTime;
+            SetVerticesDirty();
+        }
+
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear();
@@ -352,7 +371,10 @@ namespace YGOPortable.UI
             float textureAspect = (float)mainTexture.width / mainTexture.height;
             // Fill the screen without stretching the architecture on wider displays.
             var extent = new Vector2(Mathf.Min(1f, screenAspect / textureAspect), Mathf.Min(1f, textureAspect / screenAspect));
+            if (IsDriftingTrack) extent *= .977f;
             Vector2 cropMin = (Vector2.one - extent) * .5f;
+            if (IsDriftingTrack)
+                cropMin += new Vector2(Mathf.Sin(_drift * .89f) * .008f, Mathf.Sin(_drift * 1.36f) * .003f);
             DuelMat.AddQuad(mesh, rect.min, new Vector2(rect.xMin, rect.yMax), rect.max, new Vector2(rect.xMax, rect.yMin),
                 new Color(.72f, .79f, .87f), new Color(.86f, .92f, .98f), cropMin, cropMin + extent);
         }

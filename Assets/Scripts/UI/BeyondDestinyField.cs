@@ -196,6 +196,10 @@ namespace YGOPortable.UI
             {
                 "Maps/spot_neodomino_rain_alley.png" => new[] { (.14f,.08f), (.82f,.08f), (.86f,.52f), (.68f,.52f), (.29f,.31f) },
                 "Maps/spot_kaiba_dome_plaza.png" => new[] { (.17f,.09f), (.94f,.09f), (.94f,.43f), (.45f,.43f), (.22f,.31f) },
+                "Maps/spot_kaiba_dome_corridor.png" => new[] { (.14f,.07f), (.91f,.07f), (.83f,.31f), (.61f,.43f), (.46f,.43f) },
+                "Maps/spot_kaiba_dome_arena.png" => new[] { (.26f,.14f), (.91f,.12f), (.96f,.44f), (.63f,.46f), (.23f,.42f), (.16f,.27f) },
+                "Maps/spot_arcadia_atrium.png" => new[] { (.19f,.09f), (.89f,.09f), (.86f,.29f), (.71f,.37f), (.32f,.38f), (.24f,.29f) },
+                "Maps/spot_arcadia_private_room.png" => new[] { (.20f,.08f), (.93f,.08f), (.95f,.38f), (.57f,.40f), (.42f,.31f), (.19f,.21f) },
                 "Maps/spot_arcadia_collapse.png" => new[] { (.22f,.08f), (.70f,.08f), (.92f,.39f), (.82f,.40f), (.52f,.26f) },
                 "Maps/spot_team5ds_garage.png" => new[] { (.12f,.08f), (.85f,.08f), (.86f,.34f), (.69f,.49f), (.27f,.41f) },
                 "Maps/spot_night_circuit.png" => new[] { (.12f,.10f), (.81f,.10f), (.90f,.36f), (.75f,.53f), (.28f,.42f) },
