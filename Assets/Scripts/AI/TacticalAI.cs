@@ -322,7 +322,8 @@ namespace YGOPortable.AI
                 DuelDeckStrategy.CanFillMainMonsterZone(session, prompt, item, setting: false)) &&
             (command != 4 || !UsesTacticalRules || DuelDeckStrategy.CanSetBackrow(session, prompt.playerId, item.code)) &&
             (command != 1 || (CanUseSpecialSummon(session.Players[prompt.playerId], item, planLinks, projected) &&
-                (!UsesTacticalRules || DuelTactics.CanSummonRedDragonSafely(session, prompt, item.code)))) &&
+                (!UsesTacticalRules || (!DuelTactics.HasLethalSpecialSummonBurn(session, prompt.playerId) &&
+                    DuelTactics.CanSummonRedDragonSafely(session, prompt, item.code))))) &&
             (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item) &&
                 CanEndMainPhaseWithEffect(session, prompt, item) &&
                 (!UsesTacticalRules || !DddTurnPlan.ReserveScalesForGilgamesh(session, prompt, item))));

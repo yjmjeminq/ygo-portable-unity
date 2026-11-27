@@ -24,6 +24,7 @@ namespace YGOPortable.AI
         private const uint DestroyerPhoenix = 60461804, Deadnader = 34909328;
         internal const uint AncientGearAdvance = 4064925, NightmarePain = 65261141, CyberdarkInferno = 44352516;
         private const uint GraveSquirmer = 24215921, EternalSoul = 48680970;
+        internal const uint VolcanicEmperor = 46412900, MiracleExcluder = 30875635;
         private const uint VanityEmptiness = 5851097, TourGuide = 10802915;
         internal const ulong ExoddBlazeEquipEffect = ((ulong)402416 << 20) | 2;
         internal const uint Accesscode = 86066372, Cartesia = 95515789, VisionIncrease = 22865492;
@@ -162,6 +163,7 @@ namespace YGOPortable.AI
         internal static bool CanActivate(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
         {
             if (DddTurnPlan.AddsLethalUpkeep(duel, prompt, effect)) return false;
+            if (HasLethalSpecialSummonBurn(duel, prompt.playerId) && SpecialSummonsOnResolution(effect)) return false;
             var last = duel.CurrentChain.LastOrDefault();
             if (effect.code == WingedKuribohLevel6 && ChooseWingedKuribohTiming(duel, prompt, effect) is bool useWinged)
                 return useWinged;
@@ -386,6 +388,21 @@ namespace YGOPortable.AI
             source is { negated: false, Resolved: false } && source.triggerPlayer != player &&
             (source.code is 44362883 or 52947044 or 39996157 or 22398665 or 37630732 or 48130397 ||
                 ((CardDatabase.Get(source.code)?.DeckEffectCategories ?? 0) & SummoningEffects) != 0);
+
+        internal static bool HasLethalSpecialSummonBurn(DuelSession duel, byte player)
+        {
+            int life = duel.Players[player].lp;
+            var opponents = duel.Players[1 - player].mzone;
+            return life > 0 && life <= 500 * opponents.Length &&
+                life <= 500 * opponents.Count(card => IsActive(card, VolcanicEmperor));
+        }
+
+        private static bool SpecialSummonsOnResolution(SelectableCardItem effect) => effect.code switch
+        {
+            VisionIncrease => effect.location is YgoConstants.LOCATION_SZONE or YgoConstants.LOCATION_MZONE,
+            MiracleExcluder => effect.location == YgoConstants.LOCATION_HAND,
+            _ => ((CardDatabase.Get(effect.code)?.DeckEffectCategories ?? 0) & SummoningEffects) != 0,
+        };
 
         private static uint OpposingGraveResponse(DuelSession duel, byte player, ChainLinkInfo source) =>
             source is { negated: false, Resolved: false } && source.triggerPlayer != player &&

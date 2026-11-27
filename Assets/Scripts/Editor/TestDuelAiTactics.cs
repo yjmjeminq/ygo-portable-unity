@@ -63,6 +63,7 @@ namespace YGOPortable.Editor
             VerifyNativeRitualWithSpareMaterials();
             VerifyAdditionalRitualAces();
             VerifyGxSelfDamageAndDestruction();
+            VerifyVolcanicEmperorSiege();
             VerifyFieldAceEffects();
             VerifyDrytronAceCosts();
             VerifyAccesscodeCosts();
@@ -439,6 +440,38 @@ namespace YGOPortable.Editor
                     "Droplet sent Herald instead of the expendable card.");
             }
             Debug.Log("[VERIFY GX SELF DAMAGE] Power Bond, native Squirmer, and Exodd Blaze timing passed.");
+        }
+
+        private static void VerifyVolcanicEmperorSiege()
+        {
+            const uint emperor = DuelTactics.VolcanicEmperor, excluder = DuelTactics.MiracleExcluder, dolphin = 17955766;
+            using var duel = new DuelSession();
+            Require(duel.StartNewDuel(Deck(excluder, dolphin), Empty, Deck(GeminiElf), Empty,
+                seed: new[] { 11UL, 29UL, 71UL, 97UL }, playerOpening: new DuelOpening(500, 5, 0, destinyUses: 0),
+                opponentOpening: new DuelOpening(8000, 5, emperor)), "Could not start the Volcanic Emperor fixture.");
+            var prompt = duel.ActivePrompt;
+            Require(prompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD, "The Volcanic fixture did not open in Main Phase.");
+            int summon = prompt.activatable.FindIndex(card => card.code == excluder);
+            Require(summon >= 0 && DuelTactics.HasLethalSpecialSummonBurn(duel, 0) &&
+                !DuelTactics.CanActivate(duel, prompt, prompt.activatable[summon]),
+                "The native Excluder summon was not rejected at 500 LP against Volcanic Emperor.");
+            Require(BitConverter.ToInt32(Smart().ComputeResponse(duel, prompt), 0) != ((summon << 16) | 5),
+                "The main-phase AI activated the fatal special summon.");
+
+            var chain = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN };
+            var increase = Effect(DuelTactics.VisionIncrease, 1, YgoConstants.LOCATION_SZONE);
+            Require(!DuelTactics.CanActivate(duel, chain, increase), "Increase still chains into fatal summon damage.");
+            Require(DuelTactics.CanActivate(duel, chain, Effect(excluder, 2, YgoConstants.LOCATION_GRAVE)),
+                "The AI blocked Excluder's non-summoning banish effect.");
+            duel.Players[0].lp = 501;
+            Require(DuelTactics.CanActivate(duel, prompt, prompt.activatable[summon]),
+                "A single 500 damage trigger should not disable a recoverable summon line at 501 LP.");
+            duel.Players[0].lp = 500;
+            duel.Players[1].mzone[2].effectsDisabled = true;
+            Require(DuelTactics.CanActivate(duel, prompt, prompt.activatable[summon]),
+                "The AI treated a negated Emperor as an active burn threat.");
+            Require(duel.RetryCount == 0, "The Volcanic Emperor fixture retried a response.");
+            Debug.Log("[VERIFY GX VOLCANIC BURN] Fatal optional summons rejected, non-summoning effects and safe windows kept.");
         }
 
         private static void OpenGxAiFixture(DuelSession duel, uint[] deck, uint[] extra, int life, uint ace,
