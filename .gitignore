@@ -5,6 +5,7 @@
 /[Ll]ibrary/
 /[Ll]ocalCache/
 /[Ll]ogs/
+/qa/
 NativeEngine/build/
 /Assets/Plugins/iOS/
 /Assets/Plugins/iOS.meta

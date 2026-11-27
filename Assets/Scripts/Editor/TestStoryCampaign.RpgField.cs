@@ -31,10 +31,13 @@ namespace YGOPortable.Editor
             var app = canvas.AddComponent<GameAppController>();
             app.AiDifficulty = AIDifficulty.Normal;
             var story = new StoryModeUI(app, canvas.transform, new StoryHandSequence(new int[40]));
-            var world = new TagForceWorldUI(app, canvas.transform);
+            bool touchLayout = Environment.GetEnvironmentVariable("YGO_GX_QA_TOUCH") == "1";
+            var world = new TagForceWorldUI(app, canvas.transform, touchFieldLayout: touchLayout);
             var menu = new TitleAndMenuUI(app, canvas.transform);
             var modals = new DuelPromptModals(canvas.transform, null, null);
-            var panel = world.Root.transform.Find("World");
+            var mobile = world.Root.transform.Find("MobileSafeArea")?.GetComponent<MobileSafeArea>();
+            var panel = (mobile == null ? world.Root.transform : mobile.transform).Find("World");
+            if (touchLayout) mobile.Reflow(new Rect(96, 42, 1758, 858), new Vector2Int(1950, 900));
             var storyRoot = story.Root.transform.Find("StoryDialogue");
             try
             {
@@ -132,6 +135,9 @@ namespace YGOPortable.Editor
                     DeckRepository.SaveUserDeck(alternateDeck);
                     CollectionProgress.RememberDuelDeck(startingDeck.id);
                     app.ShowScreen(AppScreen.MainMenu);
+                    Require(menu.MenuRoot.transform.Find("GxPreview/AcademyIsland")?.GetComponent<Image>()?.sprite != null,
+                        "The bundled GX preview did not load in the main menu.");
+                    CaptureGx("00-main-menu");
                     var gxMenu = menu.MenuRoot.GetComponentsInChildren<Button>()
                         .Single(button => button.transform.parent.name == "GxRpgWorld");
                     Require(menu.MenuRoot.transform.Find("Menu/StoryMode") == null &&
@@ -241,6 +247,7 @@ namespace YGOPortable.Editor
                         VerifyGxWalkerSizes();
                         if (episode.id == "gx_ep_01")
                         {
+                            if (touchLayout) VerifyGxTouchStick();
                             VerifyGxNpcCamera();
                             VerifyGxRunSpeed();
                         }
@@ -587,11 +594,11 @@ namespace YGOPortable.Editor
                     var hide = tools.Find("Hide/Button").GetComponent<Button>();
                     Require(((Image)hide.targetGraphic).sprite == ((Image)tools.Find("Auto/Button").GetComponent<Button>().targetGraphic).sprite,
                         "The new hide button did not use the same RPG toolbar style.");
+                    CaptureGx("02-exhibition-cg-dialogue");
                     Press(storyRoot, "Scene/DialogueTools/Auto/Button");
                     story.Update(.4f);
                     float elapsed = (float)readTime.GetValue(dialogue);
                     Require(AutoSpeed() == 1 && elapsed > 0f, "The dialogue hide fixture did not activate Auto.");
-                    CaptureGx("02-exhibition-cg-dialogue");
                     Press(storyRoot, "Scene/DialogueTools/Hide/Button");
                     Require(box.gameObject.activeSelf && surface.gameObject.activeSelf,
                         "The hide command removed the dialogue before its fade.");
@@ -767,7 +774,7 @@ namespace YGOPortable.Editor
                     var ui = canvas.GetComponent<Canvas>();
                     var cameraObject = new GameObject("GX QA screenshot camera", typeof(Camera));
                     var camera = cameraObject.GetComponent<Camera>();
-                    var frame = RenderTexture.GetTemporary(1600, 900, 24);
+                    var frame = RenderTexture.GetTemporary(touchLayout ? 1950 : 1600, 900, 24);
                     var pixels = new Texture2D(frame.width, frame.height, TextureFormat.RGB24, false);
                     var previousFrame = RenderTexture.active;
                     var oldRenderMode = ui.renderMode;
@@ -869,6 +876,39 @@ namespace YGOPortable.Editor
                     WalkOnGxMap(new Vector2(.5f, .16f));
                 }
 
+                void VerifyGxTouchStick()
+                {
+                    Canvas.ForceUpdateCanvases();
+                    var stick = panel.Find("FieldHud/VirtualStick").GetComponent<GxFieldStick>();
+                    var rect = (RectTransform)stick.transform;
+                    var safe = (RectTransform)mobile.transform;
+                    Require(rect.rect.width >= MobileSafeArea.MinimumTouchSize(rect) && safe.anchorMin.x > 0f && safe.anchorMax.x < 1f,
+                        "The GX mobile movement area did not allow for the notch or minimum touch target.");
+                    var center = (Vector2)rect.TransformPoint(rect.rect.center);
+                    var contact = new PointerEventData(input) { pointerId = 21, position = center, button = PointerEventData.InputButton.Left };
+                    var other = new PointerEventData(input) { pointerId = 22, position = center, button = PointerEventData.InputButton.Left };
+                    stick.OnPointerDown(contact);
+                    Require(stick.Direction == Vector2.zero, "The centered mobile stick caused drift.");
+                    contact.position += Vector2.right * rect.rect.width * .30f;
+                    stick.OnDrag(contact);
+                    stick.OnPointerUp(other);
+                    Require(stick.Direction.x > .75f && Mathf.Abs(stick.Direction.y) < .02f,
+                        "A second finger interrupted GX movement or the touch direction was lost.");
+                    var actor = (RectTransform)FieldScene().Find("Player");
+                    Vector2 before = actor.anchorMin;
+                    world.Update(.075f);
+                    Require(actor.anchorMin.x > before.x && CurrentTerrain().Contains(actor.anchorMin),
+                        "The virtual stick did not move the actual player inside the walkable field.");
+                    stick.OnPointerUp(contact);
+                    Vector2 stopped = actor.anchorMin;
+                    world.Update(.075f);
+                    Require(stick.Direction == Vector2.zero && actor.anchorMin == stopped,
+                        "The player continued to move after releasing the virtual stick.");
+                    CaptureGx("04-mobile-safe-area");
+                    Debug.Log("[VERIFY GX TOUCH] 19.5:9 safe area, pointer isolation, grounded movement and release passed.");
+
+                }
+
                 void VerifyGxNpcCamera()
                 {
                     var local = (RectTransform)FieldScene().Find("Resident_107");
@@ -882,12 +922,19 @@ namespace YGOPortable.Editor
                     CaptureGx("04-academy");
                     Require(((RectTransform)panel).anchorMin == Vector2.zero && ((RectTransform)panel).anchorMax == Vector2.one,
                         "The GX field camera left padding around the viewport.");
-                    Require(prompt.gameObject.activeInHierarchy && hint.Contains("[Space / 클릭]") && hint.Contains("대화"),
+                    Require(prompt.gameObject.activeInHierarchy && hint.Contains("대화") &&
+                        hint.Contains("[Space / 클릭]") == !touchLayout,
                         $"GX did not show the interaction hint near a resident. Hint={hint}, Player={FieldScene().Find("Player").GetComponent<RectTransform>().anchorMin}, NPC={local.anchorMin}.");
-                    Press(local, "SD");
+                    if (touchLayout) Press(panel, "FieldHud/ContextAction");
+                    else Press(local, "SD");
                     world.Update(0f);
                     Require(panel.Find("ResidentChoices") != null && ViewportSize() == viewport && CameraFrame() == framing,
                         "The field shrank or moved when a GX NPC began talking.");
+                    if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("YGO_GX_QA_SCREENSHOTS")))
+                    {
+                        world.Update(.8f);
+                        CaptureGx("04-npc-dialogue");
+                    }
                     world.Back();
                     Require(world.CanWalk && WorldInputRestored() && ViewportSize() == viewport && CameraFrame() == framing,
                         "The GX NPC dialogue did not restore the field and its camera.");
@@ -962,7 +1009,7 @@ namespace YGOPortable.Editor
                     var regionsToCheck = everyMap ? Enumerable.Range(0, gxMap.spots.Length) : new[] { current };
                     try
                     {
-                        foreach (var size in new[] { new Vector2(1600f, 900f), new Vector2(2100f, 900f), new Vector2(1200f, 900f) })
+                        foreach (var size in new[] { new Vector2(1600f, 900f), new Vector2(1950f, 900f), new Vector2(2100f, 900f), new Vector2(1200f, 900f) })
                         {
                             screen.sizeDelta = size;
                             foreach (int index in regionsToCheck)
@@ -970,14 +1017,15 @@ namespace YGOPortable.Editor
                                 Require(world.EnterRpgRegion(index), $"Unable to check layout on {gxMap.spots[index].spotId}.");
                                 Canvas.ForceUpdateCanvases();
                                 var hud = panel.Find("FieldHud");
-                                VerifyDisjoint(hud, "QuestTrack", "Minimap", "DuelistHud", "Controls", "OpenMap", "MenuToggle");
+                                string movement = touchLayout ? "VirtualStick" : "Controls";
+                                VerifyDisjoint(hud, "QuestTrack", "Minimap", "DuelistHud", movement, "OpenMap", "MenuToggle");
                                 var mission = hud.Find("QuestTrack");
                                 VerifyDisjoint(mission, mission.Find("Guide") != null ?
                                     new[] { "RegionName", "Chapter", "Objective", "Guide" } :
                                     new[] { "RegionName", "Chapter", "Objective" });
                                 VerifyDisjoint(hud.Find("DuelistHud"), "Rank", "Dp");
                                 Press(hud, "MenuToggle");
-                                VerifyDisjoint(hud, "FieldDetails", "Minimap", "DuelistHud", "Controls", "OpenMap", "MenuToggle");
+                                VerifyDisjoint(hud, "FieldDetails", "Minimap", "DuelistHud", movement, "OpenMap", "MenuToggle");
                                 Press(hud, "MenuToggle");
                                 Press(hud, "OpenMap");
                                 Canvas.ForceUpdateCanvases();
@@ -1143,6 +1191,24 @@ namespace YGOPortable.Editor
                     var field = FieldScene();
                     var player = (RectTransform)field.Find("Player");
                     var ground = CurrentTerrain();
+                    WalkOnGxMap(new Vector2(.50f, .16f));
+                    var art = player.GetComponentInChildren<TagForceRpgWalkAnimator>();
+                    var atlas = (Sprite[])typeof(TagForceRpgWalkAnimator).GetField("_directions", flags).GetValue(art);
+                    var playerImage = art.GetComponent<Image>();
+                    var strideFrames = new HashSet<Sprite>();
+                    var start = player.anchorMin;
+                    for (int frame = 0; frame < 16; frame++)
+                    {
+                        world.Update(1f / 60f, Vector2.up);
+                        Require(ground.Contains(player.anchorMin), "The GX walk left the walkable area between frames.");
+                        strideFrames.Add(playerImage.sprite);
+                        if (frame % 4 == 0) CaptureGx($"walk-{frame:D2}");
+                    }
+                    var stop = player.anchorMin;
+                    world.Update(1f / 60f);
+                    Require(stop.y > start.y && player.anchorMin == stop && strideFrames.Count > 1 &&
+                        playerImage.sprite == atlas[6], "GX walking frames or the matching rear-facing idle pose were lost.");
+                    CaptureGx("walk-16-idle");
                     var water = new Vector2(.82f, .70f);
                     WalkOnGxMap(water);
                     Require(!ground.Contains(water) && ground.Contains(player.anchorMin) &&
@@ -1670,7 +1736,7 @@ namespace YGOPortable.Editor
 
             void PressRpgNavigation(string option)
             {
-                var nav = world.Root.transform.Find("RpgNavigation");
+                var nav = panel.parent.Find("RpgNavigation");
                 if (!nav.gameObject.activeInHierarchy) Press(panel, "FieldHud/MenuToggle");
                 Require(nav.gameObject.activeInHierarchy, "Opening the field menu did not show its commands.");
                 Press(nav, option);

@@ -130,7 +130,7 @@ namespace YGOPortable.UI
                 Paint(_amount);
             }
             if (_visual == null) return;
-            float scaleTarget = _button.IsInteractable() && held ? .958f : focused ? 1.045f : 1f;
+            float scaleTarget = _button.IsInteractable() && held ? .96f : focused ? 1.035f : 1f;
             if (_scale == scaleTarget) return;
             _scale = Mathf.Abs(_scale - scaleTarget) < .0002f ? scaleTarget :
                 Mathf.Lerp(_scale, scaleTarget, 1f - Mathf.Exp(-(held ? 30f : 16f) * delta));
@@ -189,12 +189,11 @@ namespace YGOPortable.UI
         {
             if (!IsActive() || Scale == 1f) return;
             Vector2 center = graphic.rectTransform.rect.center;
-            float width = Mathf.LerpUnclamped(1f, Scale, .52f);
             var vertex = new UIVertex();
             for (int i = 0; i < vertices.currentVertCount; i++)
             {
                 vertices.PopulateUIVertex(ref vertex, i);
-                vertex.position.x = center.x + (vertex.position.x - center.x) * width;
+                vertex.position.x = center.x + (vertex.position.x - center.x) * Scale;
                 vertex.position.y = center.y + (vertex.position.y - center.y) * Scale;
                 vertices.SetUIVertex(vertex, i);
             }

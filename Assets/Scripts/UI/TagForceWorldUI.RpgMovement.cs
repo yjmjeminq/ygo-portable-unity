@@ -149,6 +149,7 @@ namespace YGOPortable.UI
             float travel = speed * delta * Mathf.Lerp(1f, FieldTerrain.ScaleAt(position.y), .28f);
             if (_manualWalk)
             {
+                travel *= _rpgWalkStrength;
                 var step = _destination - position;
                 float distance = RpgArtDirection(step).magnitude;
                 var next = distance <= travel ? _destination : position + step * (travel / distance);
@@ -304,12 +305,7 @@ namespace YGOPortable.UI
 
         internal int Pose(float distance, bool walking, Vector2 direction)
         {
-            if (!walking)
-            {
-                _facing = Facing.Side;
-                if (Mathf.Abs(direction.x) > 1e-5f) _left = direction.x < 0f;
-            }
-            else if (direction.sqrMagnitude > 1e-7f)
+            if (direction.sqrMagnitude > 1e-7f)
             {
                 float threshold = _facing == Facing.Side ? 1.12f : .90f;
                 if ((_depth != null || _directions != null) && Mathf.Abs(direction.y) > Mathf.Abs(direction.x) * threshold)
@@ -344,7 +340,8 @@ namespace YGOPortable.UI
             }
             else if (walking && _side != null) next = _side[frame];
             if (_image.sprite != next) _image.sprite = next;
-            transform.localScale = new Vector3(flip ? -_widthScale : _widthScale, 1f, 1f);
+            var scale = new Vector3(flip ? -_widthScale : _widthScale, 1f, 1f);
+            if (transform.localScale != scale) transform.localScale = scale;
             _stride?.SetFrame(walking ? frame : -1);
             float contact = walking ? .5f + .5f * Mathf.Cos(_phase * Mathf.PI) : 1f;
             _penumbra.localScale = new Vector3(.94f + .06f * contact, 1.04f - .04f * contact, 1f);

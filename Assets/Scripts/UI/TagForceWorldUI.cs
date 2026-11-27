@@ -18,6 +18,7 @@ namespace YGOPortable.UI
         private readonly TagForceWorldImages _images = new();
         private readonly RectTransform _screen, _body, _navigation;
         private readonly CanvasGroup _worldInput;
+        private readonly bool _touchFieldLayout;
         private readonly Button _back;
         private readonly Text _header, _status;
         private const float WalkFrequency = 8f * 2f * Mathf.PI;
@@ -38,6 +39,8 @@ namespace YGOPortable.UI
         private int _deckLevel = 1;
         private Vector2 _position = new(.50f, .16f), _destination, _partnerPosition;
         private bool _moving, _manualWalk, _fieldMenu;
+        private GxFieldStick _gxFieldStick;
+        private float _rpgWalkStrength = 1f;
         private RectTransform _player, _partner, _playerSprite, _partnerSprite;
         private Text _fieldControls;
         private Action _onArrival;
@@ -71,13 +74,14 @@ namespace YGOPortable.UI
         internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null &&
             _rpgPendingRegion < 0 && !RpgInterludeActive && !AutomaticRpgScenePending;
 
-        internal TagForceWorldUI(GameAppController app, Transform parent)
+        internal TagForceWorldUI(GameAppController app, Transform parent, bool? touchFieldLayout = null)
         {
             _app = app;
+            _touchFieldLayout = touchFieldLayout ?? Application.isMobilePlatform;
             _screen = DuelUiKit.FillRect("Screen_TagForceWorld", parent);
             _worldInput = _screen.gameObject.AddComponent<CanvasGroup>();
             Tint(_screen, new Color(.027f, .064f, .102f));
-            var layout = Application.isMobilePlatform ? MobileSafeArea.Create(_screen) : _screen;
+            var layout = _touchFieldLayout ? MobileSafeArea.Create(_screen) : _screen;
             _header = Label(Area(layout, "Header", .05f, .899f, .78f, .975f), "", 24, TextAnchor.MiddleLeft);
             _back = Btn(Area(layout, "Back", .82f, .908f, .95f, .967f), "뒤로", Back, sound: null);
             _body = Area(layout, "World", .05f, .174f, .95f, .895f);
@@ -511,6 +515,12 @@ namespace YGOPortable.UI
                 return;
             }
             Vector2 movement = _fieldMenu ? Vector2.zero : padDirection;
+            bool usingTouchStick = false;
+            if (!_fieldMenu && movement == Vector2.zero && _gxFieldStick != null)
+            {
+                movement = _gxFieldStick.Direction;
+                usingTouchStick = movement != Vector2.zero;
+            }
             if (!_fieldMenu && movement == Vector2.zero)
             {
                 movement = new Vector2(
@@ -519,6 +529,8 @@ namespace YGOPortable.UI
                     (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) ? 1 : 0) -
                         (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) ? 1 : 0));
             }
+            float stickPressure = usingTouchStick ? movement.magnitude : 0f;
+            _rpgWalkStrength = usingTouchStick ? Mathf.Lerp(.5f, 1f, stickPressure) : 1f;
             if (movement != Vector2.zero)
             {
                 var direction = movement.normalized;
@@ -538,7 +550,8 @@ namespace YGOPortable.UI
                 _manualWalk = _moving = false;
             }
             float time = Time.unscaledTime;
-            AdvanceWalk(delta, time, IsGxCampaign && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
+            AdvanceWalk(delta, time, IsGxCampaign && (stickPressure >= .90f ||
+                Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
             if (CanWalk) AdvanceVisitors(time);
             if (_rpgField) RefreshRpgFieldPrompt(delta);
         }
@@ -651,6 +664,7 @@ namespace YGOPortable.UI
             _fieldMenu = !_fieldMenu;
             if (playSound) DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
             _manualWalk = _moving = false;
+            _gxFieldStick?.ResetStick();
             _onArrival = null;
             _rpgApproachActor = null;
             if (_rpgField)
@@ -1376,7 +1390,7 @@ namespace YGOPortable.UI
             return bust;
         }
 
-        private static Sprite Read(string file, bool readable)
+        internal static Sprite Read(string file, bool readable, Vector4 border = default, float pixelsPerUnit = 100f)
         {
             Texture2D texture = null;
             bool keep = false;
@@ -1388,7 +1402,9 @@ namespace YGOPortable.UI
                     return null;
                 texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
                 if (!texture.LoadImage(bytes, !readable)) return null;
-                var sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.50f, .50f));
+                texture.wrapMode = TextureWrapMode.Clamp;
+                var sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.50f, .50f),
+                    pixelsPerUnit, 0, SpriteMeshType.FullRect, border);
                 keep = sprite != null;
                 return sprite;
             }

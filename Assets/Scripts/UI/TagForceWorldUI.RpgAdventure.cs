@@ -371,18 +371,19 @@ namespace YGOPortable.UI
             _rpgInterlude = curtain.gameObject.AddComponent<CanvasGroup>();
             _rpgInterlude.alpha = 0f;
 
-            var card = Area(curtain, "TitleCard", .13f, .32f, .87f, .68f);
+            var card = Area(curtain, "TitleCard", .235f, .369f, .765f, .631f);
+            RpgUiStyle.Interlude(card);
             _rpgInterludeTitle = card.gameObject.AddComponent<CanvasGroup>();
             _rpgInterludeTitle.interactable = _rpgInterludeTitle.blocksRaycasts = false;
             _rpgInterludeTitle.alpha = 0f;
             var openingMap = episode?.preDialogues?.FirstOrDefault()?.SceneMapPath;
             string place = openingMap != null && _rpgSceneTerrain.TryGetValue(openingMap, out var scene) &&
                 !string.IsNullOrWhiteSpace(scene.Spot.name) ? scene.Spot.name : CampaignRegions[region].Name;
-            HudLabel(Area(card, "Location", .02f, .55f, .98f, .86f), place, 28,
-                DuelUiKit.GoldAccent, align: TextAnchor.MiddleCenter, heading: true);
+            RpgUiStyle.Type(HudLabel(Area(card, "Location", .08f, .57f, .92f, .82f), place, 28,
+                RpgUiStyle.Gold, align: TextAnchor.MiddleCenter, heading: true), strong: true);
             if (!string.IsNullOrWhiteSpace(episode?.title))
-                HudLabel(Area(card, "Episode", .02f, .16f, .98f, .55f), episode.title, 38, Color.white,
-                    align: TextAnchor.MiddleCenter, heading: true);
+                RpgUiStyle.Display(HudLabel(Area(card, "Episode", .08f, .19f, .92f, .55f), episode.title, 38, Color.white,
+                    align: TextAnchor.MiddleCenter, heading: true));
 
             _interludePhase = InterludePhase.FadeOut;
             _interludeTime = 0f;
@@ -390,6 +391,7 @@ namespace YGOPortable.UI
             _revealInterludeDestination = reveal;
             _finishInterlude = finish;
             _moving = _manualWalk = false;
+            _gxFieldStick?.ResetStick();
             _onArrival = null;
             _worldInput.interactable = _worldInput.blocksRaycasts = false;
             UnityEngine.EventSystems.EventSystem.current?.SetSelectedGameObject(null);

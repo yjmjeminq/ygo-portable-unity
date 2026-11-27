@@ -131,6 +131,7 @@ namespace YGOPortable.UI
             {
                 "spot_harbor_beach" => new Vector2(.435f, .285f),
                 "spot_library" => new Vector2(.50f, .27f),
+                "spot_main_academy" => new Vector2(.71f, .34f),
                 _ => new Vector2(.67f, .30f),
             };
             return ("지역 안내", RpgGroundMark(index, marker), spot.subtitle);

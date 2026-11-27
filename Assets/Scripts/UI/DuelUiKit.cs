@@ -211,6 +211,14 @@ namespace YGOPortable.UI
             return btn;
         }
 
+        internal static Button CreateRpgButton(Transform parent, string name, string label, Action onClick,
+            int fontSize = 20, bool primary = false, bool prominent = false)
+        {
+            var button = CreateButton(parent, name, label, onClick, fontSize);
+            RpgUiStyle.Control(button, primary, prominent);
+            return button;
+        }
+
         public static Button CreateWrappedButton(Transform parent, string name, string label, Action onClick,
             int fontSize, bool gold, float minHeight, Sprite icon = null, int sidePadding = 24)
         {

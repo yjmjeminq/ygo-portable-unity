@@ -11,6 +11,7 @@ namespace YGOPortable.UI
         private readonly List<RpgInteraction> _rpgInteractions = new();
         private Button _rpgActionButton;
         private Text _rpgActionText;
+        private string _rpgActionCaption;
         private Text _rpgMenuCaption;
         private CanvasGroup _rpgFieldInput;
         private RectTransform _gxFieldDetails;
@@ -89,9 +90,11 @@ namespace YGOPortable.UI
             _rpgActionButton.interactable = available;
             if (IsGxCampaign) _rpgActionButton.gameObject.SetActive(available);
             string caption = candidate.Caption ?? "상호작용";
-            if (IsGxCampaign && available && !Application.isMobilePlatform)
-                caption = "[Space / 클릭] " + caption;
-            if (_rpgActionText.text != caption) _rpgActionText.text = caption;
+            if (_rpgActionCaption != caption)
+            {
+                _rpgActionCaption = caption;
+                _rpgActionText.text = IsGxCampaign && available && !_touchFieldLayout ? "[Space / 클릭] " + caption : caption;
+            }
             _rpgActionText.color = available ? Color.white : new Color(.72f, .82f, .89f, .66f);
             if (_rpgFieldInput == null) return;
             UpdateRpgResidentMarkers(candidate.Anchor, delta);
@@ -108,9 +111,12 @@ namespace YGOPortable.UI
             _rpgInteractions.Clear();
             _rpgActionButton = null;
             _rpgActionText = null;
+            _rpgActionCaption = null;
             _rpgMenuCaption = null;
             _rpgFieldInput = null;
             _gxFieldDetails = null;
+            _gxFieldStick = null;
+            _rpgWalkStrength = 1f;
             _rpgRadarMarkers.Clear();
             _rpgQuestRewardBanner = null;
         }
@@ -238,8 +244,8 @@ namespace YGOPortable.UI
         private void BuildGxFieldHud(int cleared, int targetRegion, StoryEpisodeData[] episodes)
         {
             var episode = cleared < episodes.Length ? episodes[cleared] : null;
-            var mission = Area(_rpgFieldHud, "QuestTrack", .025f, .810f, .369f, .972f);
-            RpgUiStyle.Glass(mission);
+            var mission = Area(_rpgFieldHud, "QuestTrack", .025f, .818f, .354f, .972f);
+            RpgUiStyle.Panel(mission);
             RpgUiStyle.Display(HudLabel(Area(mission, "RegionName", .056f, .627f, .95f, .942f),
                 CampaignRegions[_rpgLocation].Name, 29, Color.white));
             Tint(Area(mission, "Divider", .056f, .602f, .946f, .609f), new Color(.46f, .63f, .80f, .32f));
@@ -248,12 +254,12 @@ namespace YGOPortable.UI
                 string.IsNullOrWhiteSpace(episode.fieldObjective) ? episode.title : episode.fieldObjective;
             if (travel) objective = $"{CampaignRegions[targetRegion].Name}\n{objective}";
             HudLabel(Area(mission, "Chapter", .056f, .338f, .69f, .594f),
-                episode == null ? "현재 진행" : "!  다음 목표", 17, RpgUiStyle.Gold, heading: true);
+                episode == null ? "현재 진행" : "!  다음 목표", 19, RpgUiStyle.Gold, heading: true);
             var approach = _rpgInteractions.Find(candidate => candidate.Priority == RpgActionPriority.Story).Select;
             var objectiveLabel = HudLabel(Area(mission, "Objective", .056f, .025f, approach != null || travel ? .705f : .947f, .332f),
-                objective, 21, Color.white, heading: true);
-            objectiveLabel.resizeTextMinSize = 15;
-            objectiveLabel.resizeTextMaxSize = 21;
+                objective, 23, Color.white, heading: true);
+            objectiveLabel.resizeTextMinSize = 16;
+            objectiveLabel.resizeTextMaxSize = 23;
             objectiveLabel.resizeTextForBestFit = true;
             if (approach != null || travel)
             {
@@ -267,12 +273,12 @@ namespace YGOPortable.UI
                 BindPortrait(mission, GoToObjective);
                 mission.GetComponent<Button>().navigation = new Navigation { mode = Navigation.Mode.None };
                 var guide = RpgButton(Area(mission, "Guide", .724f, .103f, .951f, .482f),
-                    travel ? "지역 이동" : "목표로 이동", GoToObjective, 18, primary: true);
+                    travel ? "지역 이동" : "목표로 이동", GoToObjective, 20, primary: true);
                 guide.navigation = new Navigation { mode = Navigation.Mode.None };
             }
 
-            BuildRpgMinimap(Area(_rpgFieldHud, "Minimap", .787f, .791f, .974f, .972f));
-            var stats = Area(_rpgFieldHud, "DuelistHud", .787f, .715f, .974f, .782f);
+            BuildRpgMinimap(Area(_rpgFieldHud, "Minimap", .802f, .815f, .975f, .972f));
+            var stats = Area(_rpgFieldHud, "DuelistHud", .802f, .750f, .975f, .804f);
             RpgUiStyle.Glass(stats);
             HudLabel(Area(stats, "Rank", .09f, .27f, .40f, .96f), $"Lv. {CollectionProgress.RpgRank}", 19, RpgUiStyle.Cyan, heading: true);
             HudLabel(Area(stats, "Dp", .43f, .27f, .92f, .96f), $"DP {CollectionProgress.Balance:N0}",
@@ -294,10 +300,17 @@ namespace YGOPortable.UI
             _gxFieldDetails.gameObject.SetActive(false);
 
             if (_page == Page.Field) AddGxIdentity(_player, $"나 · {RpgPlayerName}", RpgUiStyle.Cyan);
-            var controls = Area(_rpgFieldHud, "Controls", .025f, .035f, .263f, .085f);
-            RpgUiStyle.Glass(controls);
-            HudLabel(Area(controls, "Move", .074f, 0f, .94f, 1f), Application.isMobilePlatform ? "바닥을 터치해 이동" : "WASD / 방향키 · Shift 달리기",
-                17, new Color(.82f, .90f, .97f));
+            if (_touchFieldLayout)
+            {
+                if (_page == Page.Field) _gxFieldStick = GxFieldStick.Create(_rpgFieldHud);
+            }
+            else
+            {
+                var controls = Area(_rpgFieldHud, "Controls", .025f, .035f, .263f, .085f);
+                RpgUiStyle.Glass(controls);
+                HudLabel(Area(controls, "Move", .074f, 0f, .94f, 1f), "WASD / 방향키 · Shift 달리기",
+                    17, new Color(.82f, .90f, .97f));
+            }
             _rpgActionButton = RpgButton(Area(_rpgFieldHud, "ContextAction", .501f, .030f, .745f, .098f),
                 "", ActivateRpgInteraction, 20, primary: true, sound: null, prominent: true);
             _rpgActionButton.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -307,9 +320,11 @@ namespace YGOPortable.UI
             var map = RpgButton(Area(_rpgFieldHud, "OpenMap", .756f, .030f, .864f, .098f), "월드맵",
                 () => { if (CanWalk) Show(Page.Map); }, 21);
             map.navigation = new Navigation { mode = Navigation.Mode.None };
+            GxQuickIcon(map, RpgUiStyle.Symbol.Map);
             var menu = RpgButton(Area(_rpgFieldHud, "MenuToggle", .875f, .030f, .974f, .098f), "메뉴",
                 () => ToggleFieldMenu(), 21, sound: null);
             menu.navigation = new Navigation { mode = Navigation.Mode.None };
+            GxQuickIcon(menu, RpgUiStyle.Symbol.Menu);
             _rpgMenuCaption = menu.GetComponentInChildren<Text>();
             if (_page == Page.Field) _rpgFieldInput = _rpgViewport.gameObject.AddComponent<CanvasGroup>();
             RefreshRpgFieldPrompt();
@@ -323,6 +338,15 @@ namespace YGOPortable.UI
                 value.resizeTextMaxSize = 18;
                 value.resizeTextForBestFit = true;
             }
+        }
+
+        private static void GxQuickIcon(Button button, RpgUiStyle.Symbol symbol)
+        {
+            var icon = Area(button.transform, "Icon", .09f, .27f, .30f, .73f);
+            DuelUiKit.AddImage(icon.gameObject, RpgUiStyle.Glyph(symbol), RpgUiStyle.Cyan, true, false);
+            var label = button.GetComponentInChildren<Text>().rectTransform;
+            label.anchorMin = new Vector2(.28f, 0f);
+            label.anchorMax = new Vector2(.95f, 1f);
         }
 
         private static void AddGxIdentity(RectTransform actor, string caption, Color color)

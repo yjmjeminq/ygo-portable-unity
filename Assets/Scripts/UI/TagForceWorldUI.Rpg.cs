@@ -524,8 +524,7 @@ namespace YGOPortable.UI
             Tint(stripe, color);
             var speakerLabel = HudLabel(Area(badge, "Name", .125f, .04f, .944f, .96f), name, 25, color);
             RpgUiStyle.Display(speakerLabel);
-            conversation = HudLabel(Area(panel, "DailyLine", .103f, .056f, .648f, .271f), line, 25,
-                new Color(.90f, .94f, .97f));
+            conversation = HudLabel(Area(panel, "DailyLine", .103f, .056f, .648f, .271f), line, 29, Color.white);
             RpgUiStyle.Reading(conversation);
             conversation.lineSpacing = 1.28f;
             StartTypingDialogue(conversation, line);
@@ -570,7 +569,9 @@ namespace YGOPortable.UI
         {
             BuildRpgMenuBackdrop();
             var selected = CollectionProgress.LastDuelDeckId;
-            HudLabel(Area(_body, "DeckHeading", .06f, .81f, .94f, .96f), "GX에서 사용할 내 덱", 25, Color.white, heading: true);
+            RpgUiStyle.Panel(Area(_body, "DeckFrame", .062f, .17f, .938f, .98f));
+            RpgUiStyle.Display(HudLabel(Area(_body, "DeckHeading", .10f, .81f, .90f, .95f), "GX에서 사용할 내 덱", 30,
+                Color.white, heading: true));
             var list = List("GxDeckList", .10f, .20f, .90f, .80f);
             var status = HudLabel(Area(_body, "DeckStatus", .10f, .155f, .90f, .20f), "", 16, Color.white);
             foreach (var deck in DeckRepository.UserDecks.Where(deck => GameAppController.CanStartWithDeck(deck, out _)))

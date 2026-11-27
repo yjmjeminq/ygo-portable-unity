@@ -2601,6 +2601,8 @@ namespace YGOPortable.UI
             var dim = DuelUiKit.FillRect("Overlay_MatchResult", parent);
             ResultRoot = dim.gameObject;
             DuelUiKit.AddImage(dim.gameObject, DuelUiKit.WhiteSprite, new Color(0f, 0.021f, 0.036f, 0.66f));
+            RpgUiStyle.Panel(DuelUiKit.CreateRect("ResultFrame", dim, new Vector2(.165f, .135f), new Vector2(.835f, .842f),
+                Vector2.zero, Vector2.zero), gold: true);
 
             var crown = DuelUiKit.CreateRect("WinnerCrown", dim, new Vector2(.448f, .685f), new Vector2(.552f, .825f),
                 Vector2.zero, Vector2.zero);
@@ -2619,13 +2621,13 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
             DuelStyle.Shadow(_resStats);
             var r1 = DuelUiKit.CreateRect("Rematch", dim, new Vector2(.22f, .169f), new Vector2(.397f, .234f), Vector2.zero, Vector2.zero);
-            _rematchButton = DuelStyle.Button(r1, "B", "재대결", () => { HideResult(); _resRematch?.Invoke(); }, 18, gold: true);
+            _rematchButton = DuelUiKit.CreateRpgButton(r1, "B", "재대결", () => { HideResult(); _resRematch?.Invoke(); }, 20, primary: true);
 
             var r2 = DuelUiKit.CreateRect("OpponentSelect", dim, new Vector2(.411f, .169f), new Vector2(.589f, .234f), Vector2.zero, Vector2.zero);
-            DuelStyle.Button(r2, "B", "상대 선택", () => { HideResult(); _resOppSel?.Invoke(); }, 18);
+            DuelUiKit.CreateRpgButton(r2, "B", "상대 선택", () => { HideResult(); _resOppSel?.Invoke(); }, 20);
 
             var r3 = DuelUiKit.CreateRect("MainMenu", dim, new Vector2(.603f, .169f), new Vector2(.78f, .234f), Vector2.zero, Vector2.zero);
-            DuelStyle.Button(r3, "B", "메인 메뉴", () => { HideResult(); _resMenu?.Invoke(); }, 18);
+            DuelUiKit.CreateRpgButton(r3, "B", "메인 메뉴", () => { HideResult(); _resMenu?.Invoke(); }, 20);
 
             ResultRoot.SetActive(false);
         }

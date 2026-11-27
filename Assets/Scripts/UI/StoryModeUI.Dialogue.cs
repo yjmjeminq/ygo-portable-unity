@@ -176,7 +176,7 @@ namespace YGOPortable.UI
                 _heading = AddLabel(content, "Episode", .06f, .88f, .94f, .965f, 29, color: DuelUiKit.GoldAccent);
                 _headingPlate = DuelUiKit.AddImage(_heading.transform.parent.gameObject, null, Color.white, false, false);
                 _heroIdentity = AddLabel(content, "ProtagonistIdentity", .065f, .837f, .495f, .884f, 17, color: HeroColor);
-                var sceneTime = Region(content, "SceneTime", .416f, .916f, .672f, .973f);
+                var sceneTime = Region(content, "SceneTime", .407f, .916f, .589f, .973f);
                 RpgUiStyle.Glass(sceneTime);
                 _sceneTimeBadge = sceneTime.gameObject.AddComponent<CanvasGroup>();
                 _sceneTimeBadge.blocksRaycasts = _sceneTimeBadge.interactable = false;
@@ -225,7 +225,7 @@ namespace YGOPortable.UI
                     UseDialogueTool(_onSkip ?? Finish));
                 _hide = AddButton(dialogue, "Hide", "창 숨김", .797f, .727f, .952f, .927f, () => HandleDisplayInput(toggle: true));
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
-                _rpgTools = Region(content, "DialogueTools", .661f, .920f, .973f, .970f);
+                _rpgTools = Region(content, "DialogueTools", .606f, .909f, .974f, .975f);
                 var flash = DuelUiKit.AddImage(DuelUiKit.FillRect("DialogueFlash", scene).gameObject, DuelUiKit.WhiteSprite,
                     Color.clear, false, false);
                 _fx = scene.gameObject.AddComponent<StoryDialogueFx>();
@@ -645,7 +645,8 @@ namespace YGOPortable.UI
                 var speaker = !narration && !_heroSpeaking && _rpg
                     ? FindSpeaker(line.speaker) : null;
                 _opponentSpeaking = !narration && !_heroSpeaking && (!_rpg || speaker != null || previousHeroSpeaking);
-                _speaker.color = _heroSpeaking ? HeroColor : _rpg ? RpgUiStyle.SpeakerColor(speaker?.name ?? line.speaker) : OpponentColor;
+                _speaker.color = _rpg ? RpgUiStyle.SpeakerColor(_heroSpeaking ? _protagonist : speaker?.name ?? line.speaker) :
+                    _heroSpeaking ? HeroColor : OpponentColor;
                 _speakerPlate.color = _rpg ? Color.white : new Color(.028f, .063f, .13f, .94f);
                 _speakerStripe.color = _speaker.color;
                 _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
@@ -756,6 +757,7 @@ namespace YGOPortable.UI
                     }
                 }
                 _text.resizeTextMinSize = rpg ? 23 : 13;
+                _text.resizeTextMaxSize = rpg ? 31 : 29;
                 _text.lineSpacing = rpg ? 1.28f : 1f;
                 _text.supportRichText = rpg;
                 foreach (var button in new[] { _previous, _logButton, _auto, _skip, _hide })
@@ -828,7 +830,7 @@ namespace YGOPortable.UI
                         rpg ? new Rect(i * .202f, .04f, .19f, .92f) : new Rect(.36f + i * .12f, .727f, .11f, .20f));
                     var label = tools[i].GetComponentInChildren<Text>();
                     label.text = captions[i];
-                    label.fontSize = label.resizeTextMaxSize = rpg ? 18 : 22;
+                    label.fontSize = label.resizeTextMaxSize = rpg ? 20 : 22;
                 }
 
                 Place(_next.transform.parent, panel, rpg ? new Rect(0f, 0f, 1f, 1f) : new Rect(.778f, .042f, .174f, .172f));

@@ -28,6 +28,7 @@ namespace YGOPortable.UI
         private Button _codexButton;
         private Text _shopBalance;
         private RectTransform _shopCardBacks;
+        private static Sprite _gxAtlasPreview;
         private Button _settingsOpenButton;
         private Button _settingsCloseButton;
         private Text _aiDifficultyLabel;
@@ -117,30 +118,45 @@ namespace YGOPortable.UI
             MenuRoot = root.gameObject;
             _menuControls = MenuRoot.AddComponent<CanvasGroup>();
             AddTitleBackground(root);
+            var content = Application.isMobilePlatform ? MobileSafeArea.Create(root) : root;
 
-            var logo = DuelUiKit.CreateRect("Logo", root, new Vector2(0.31f, 0.674f), new Vector2(0.69f, 0.938f),
+            var logo = DuelUiKit.CreateRect("Logo", content, new Vector2(.115f, .701f), new Vector2(.452f, .937f),
                 Vector2.zero, Vector2.zero);
             AddLogo(logo);
-            var menu = DuelUiKit.CreateMenuPanel(root, "Menu", new Vector2(.205f, .132f),
-                new Vector2(.538f, .643f));
+            var menu = DuelUiKit.CreateMenuPanel(content, "Menu", new Vector2(.062f, .115f), new Vector2(.503f, .701f));
+            RpgUiStyle.Panel(menu);
             int row = 0;
-            Button AddRow(string name, string label, Action action) =>
-                AddMenuEntry(menu, name, .831f - row++ * .127f, label, action);
-            _gxRpgWorldButton = AddRow("GxRpgWorld", "GX RPG · 여왕의 대관식", _app.OpenGxRpgField);
+            Button AddRow(string name, string label, Action action, bool campaign = false) =>
+                AddMenuEntry(menu, name, .835f - row++ * .126f, label, action, campaign);
+            _gxRpgWorldButton = AddRow("GxRpgWorld", "GX RPG · 여왕의 대관식", _app.OpenGxRpgField, campaign: true);
             _rankedButton = AddRow("Ranked", "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
             _freeDuelButton = AddRow("FreeDuel", "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
             _deckEditorButton = AddRow("DeckEditor", "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
             _codexButton = AddRow("ArchetypeCodex", "카드군 도감", () => _app.ShowScreen(AppScreen.ArchetypeCodex));
             _settingsOpenButton = AddRow("Settings", "환경 설정", OpenSettings);
             AddRow("ReturnToTitle", "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
-            BuildShopTile(root);
-            _championBadge = OfflineRankedUI.AddChampionBadge(root, new Vector2(.726f, .908f), new Vector2(.971f, .966f));
+            BuildGxPreview(content);
+            BuildShopTile(content);
+            _championBadge = OfflineRankedUI.AddChampionBadge(content, new Vector2(.726f, .908f), new Vector2(.971f, .966f));
             _championBadge.SetActive(false);
+        }
+
+        private static void BuildGxPreview(RectTransform content)
+        {
+            _gxAtlasPreview ??= TagForceWorldImages.Read(Path.Combine(Application.streamingAssetsPath,
+                "TagForce", "UI", "GxChrome", "academy-preview.png"), readable: false);
+            if (_gxAtlasPreview == null) return;
+            var frame = DuelUiKit.CreateRect("GxPreview", content, new Vector2(.525f, .421f), new Vector2(.937f, .898f),
+                Vector2.zero, Vector2.zero);
+            RpgUiStyle.Panel(frame, gold: true);
+            var art = DuelUiKit.FillRect("AcademyIsland", frame, 18f);
+            DuelUiKit.AddImage(art.gameObject, _gxAtlasPreview, Color.white, true, false);
         }
 
         private void BuildShopTile(Transform root)
         {
-            var tile = DuelUiKit.CreateMenuPanel(root, "ShopTile", new Vector2(.555f, .132f), new Vector2(.795f, .643f));
+            var tile = DuelUiKit.CreateMenuPanel(root, "ShopTile", new Vector2(.525f, .115f), new Vector2(.937f, .398f));
+            RpgUiStyle.Panel(tile);
             var hitbox = DuelUiKit.FillRect("Button", tile, 7f);
             var target = DuelUiKit.AddImage(hitbox.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             _shopButton = hitbox.gameObject.AddComponent<Button>();
@@ -151,10 +167,8 @@ namespace YGOPortable.UI
                 DuelAudio.PlayClick();
                 _app.ShowScreen(AppScreen.CardShop);
             });
-            MenuButtonMotion.Attach(_shopButton);
-
             var cardBack = CardArtLoader.GetCardBackSprite();
-            _shopCardBacks = DuelUiKit.CreateRect("Cards", tile, new Vector2(.12f, .385f), new Vector2(.88f, .885f),
+            _shopCardBacks = DuelUiKit.CreateRect("Cards", tile, new Vector2(.079f, .16f), new Vector2(.466f, .90f),
                 Vector2.zero, Vector2.zero);
             void AddCard(float left, float right, float angle, Color tint)
             {
@@ -171,16 +185,20 @@ namespace YGOPortable.UI
                 AddCard(.2825f, .7175f, 0f, Color.white);
             }
 
-            var wallet = DuelUiKit.CreateRect("Wallet", tile, new Vector2(.12f, .277f), new Vector2(.88f, .365f),
+            var wallet = DuelUiKit.CreateRect("Wallet", tile, new Vector2(.495f, .56f), new Vector2(.931f, .81f),
                 Vector2.zero, Vector2.zero);
             _shopBalance = DuelUiKit.AddFittedText(wallet, "Text", "", 23, 14, TextAnchor.MiddleCenter,
                 DuelUiKit.GoldAccent, FontStyle.Bold);
 
-            var action = DuelUiKit.CreateRect("Action", tile, new Vector2(.11f, .10f), new Vector2(.89f, .24f),
+            RpgUiStyle.Type(_shopBalance, strong: true);
+            var action = DuelUiKit.CreateRect("Action", tile, new Vector2(.495f, .205f), new Vector2(.931f, .51f),
                 Vector2.zero, Vector2.zero);
-            DuelUiKit.AddImage(action.gameObject, DuelUiChrome.Primary, Color.white, false, false).type = Image.Type.Sliced;
-            DuelUiKit.AddFittedText(action, "Label", "카드 상점", 26, 17, TextAnchor.MiddleCenter,
-                DuelUiKit.TextPrimary, FontStyle.Bold);
+            var actionImage = DuelUiKit.AddImage(action.gameObject, RpgUiStyle.ButtonSkin(primary: true), Color.white, false, false);
+            actionImage.type = Image.Type.Sliced;
+            var actionLabel = DuelUiKit.AddFittedText(action, "Label", "카드 상점", 27, 17, TextAnchor.MiddleCenter,
+                DuelUiKit.TextPrimary, FontStyle.Normal);
+            RpgUiStyle.Type(actionLabel, strong: true);
+            MenuButtonMotion.Attach(_shopButton, actionLabel.rectTransform, RpgUiStyle.Cyan, surface: actionImage);
         }
 
         private static void AddTitleBackground(Transform root)
@@ -197,11 +215,11 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
         }
 
-        private static Button AddMenuEntry(Transform parent, string name, float y, string label, Action action)
+        private static Button AddMenuEntry(Transform parent, string name, float y, string label, Action action, bool campaign)
         {
             var row = DuelUiKit.CreateRect(name, parent, new Vector2(0.097f, y), new Vector2(0.91f, y + .10f),
                 Vector2.zero, Vector2.zero);
-            return MenuButtonMotion.Attach(DuelUiKit.CreateButton(row, "Button", label, action, 23));
+            return DuelUiKit.CreateRpgButton(row, "Button", label, action, 25, primary: campaign, prominent: campaign);
         }
 
         private void RefreshAiDifficulty()
